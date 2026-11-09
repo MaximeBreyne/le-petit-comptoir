@@ -6,3 +6,5 @@ checks/artifacts/
 release-windows/
 release-final/
 .build/
+
+.qa-settings-profile/

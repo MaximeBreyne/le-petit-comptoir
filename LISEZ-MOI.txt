@@ -1,7 +1,7 @@
-LE PETIT COMPTOIR — BAR · Prototype 0.2.0
+LE PETIT COMPTOIR — BAR · Prototype 0.3.0
 
 WINDOWS 64 BITS
-Ouvrir release-final/Le-Petit-Comptoir-Bar-0.2.0-Setup.exe.
+Ouvrir release-final/Le-Petit-Comptoir-Bar-0.3.0-Setup.exe.
 L’assistant permet de choisir le dossier et de créer un raccourci.
 Le jeu fonctionne hors ligne. Il est désinstallable depuis les paramètres Windows.
 L’exécutable de ce prototype n’est pas signé numériquement.
@@ -28,3 +28,22 @@ npm start
 npm run dist:win
 Les sources du jeu sont dans dist/, le lanceur Windows dans desktop/.
 La scène 3D et les personnages sont encore des représentations simplifiées.
+
+RÉGLAGES (VERSION 0.3.0)
+Bouton Réglages dans la barre du haut, ou Échap hors des autres menus.
+Touches personnalisables : déplacement, rotation, pause et dosage.
+Le jeu utilise la position physique des touches : ZQSD sur AZERTY, WASD sur QWERTY.
+Choisir une touche déjà utilisée affiche un message et conserve l’affectation actuelle.
+F11 et Échap sont réservés au plein écran et aux menus.
+Qualité : basse 65 %, moyenne 100 %, élevée 150–200 % selon l’écran.
+Limite de rendu : 30, 60 ou 120 images par seconde, selon l’écran et les performances.
+Champ de vision, luminosité, sensibilité et inversion verticale réglables.
+Volumes séparés : général, effets de service et ambiance. Option muet et test sonore.
+Les réglages sont appliqués immédiatement et sauvegardés sans modifier la partie.
+Le jeu se met en pause pendant les menus et lors d’un changement de fenêtre.
+
+RENDU
+Le rendu WebGL remplace le tri des faces et vérifie la profondeur à chaque pixel.
+Les surfaces proches masquent correctement les surfaces plus éloignées.
+Les déplacements glissent le long des obstacles et la vitesse diagonale est normalisée.
+La version reste un prototype graphique avec des personnages et décors simplifiés.

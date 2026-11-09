@@ -2,14 +2,14 @@ const {app,BrowserWindow}=require('electron');const path=require('node:path');co
 app.setPath('userData',path.resolve('.qa-profile'));
 const errors=[];let win;
 app.whenReady().then(async()=>{try{
- win=new BrowserWindow({width:1440,height:960,show:false,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
- win.webContents.on('console-message',(_e,details)=>{if(details.level==='error')errors.push(details.message)});
- win.webContents.on('render-process-gone',(_e,d)=>{console.error(d);process.exitCode=1;app.quit()});
+ win=new BrowserWindow({width:1440,height:960,show:false,webPreferences:{backgroundThrottling:false,nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ win.webContents.on('console-message',details=>{if(details.level==='error'||details.level===3)errors.push(details.message)});
+ win.webContents.on('render-process-gone',(_e,d)=>{console.error(d);app.exit(1)});
  await win.loadFile(path.resolve(process.env.BAR_QA_TARGET||'dist/index.html'));
  await new Promise(r=>setTimeout(r,1000));
  const result=await win.webContents.executeJavaScript(`(()=>{
  function check(v,m){if(!v)throw Error(m)}
- game.s=new Game().s;state=game.s;paused=false;ui();
+ game.s=new Game().s;state=game.s;paused=false;preferences=defaultPreferences();ui();check(renderer,'WebGL renderer initialized');
  $('open').click();check(state.open,'Open button');
  game.s.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90}];ui();
  document.querySelector('[data-recipe="beer"]').click();check(state.prep.recipe==='beer','Recipe click');
@@ -34,4 +34,4 @@ app.whenReady().then(async()=>{try{
  fs.mkdirSync('checks/artifacts',{recursive:true});fs.writeFileSync('checks/artifacts/bar-preview.png',(await win.webContents.capturePage()).toPNG());
  if(errors.length)throw Error(errors.join('\n'));
  console.log('WINDOWS UI OK',JSON.stringify(result));app.quit();
- }catch(e){console.error(e);process.exitCode=1;app.quit()}});
+ }catch(e){console.error(e);app.exit(1)}});
