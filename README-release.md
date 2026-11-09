@@ -57,6 +57,8 @@ automatique. Le retour au menu ou au bureau conserve la partie actuelle.
 Le décor comporte une réserve dédiée, du parquet, des matériaux détaillés,
 des ombres et un éclairage chaud. Les chaises font face aux tables et la
 machine à café possède un espace distinct pour la tasse en préparation.
+Les montants des chaises restent derrière le dossier. Les textes des étiquettes,
+enseignes et cartes murales gardent leurs proportions et s’adaptent à leur support.
 Les personnages restent stylisés.
 
 Le logo original vert et doré est présent dans l’accueil, la barre du jeu,

@@ -6,6 +6,7 @@ class BarRenderer {
   if(!this.gl)throw new Error('Le rendu 3D nécessite WebGL. Activez l’accélération graphique de Windows puis relancez le jeu.');
   const gl=this.gl;
   const derivatives=!!gl.getExtension('OES_standard_derivatives');
+  this.anisotropy=gl.getExtension('EXT_texture_filter_anisotropic');
   this.colors=new Map();this.scratch=new Float32Array(16384);this.dynamicCapacity=0;
   const vertex=`precision highp float;
    attribute vec3 position;attribute vec3 color;attribute float material;attribute vec3 normal;attribute vec2 texcoord;
@@ -70,7 +71,7 @@ class BarRenderer {
      float edge=smoothstep(.001,.003+aa,joint),grain=noise(world.xz*vec2(160.0,3.0));
      base*=mix(.55,.83+.20*hash(floor(plank)),edge)*(.94+.09*grain);roughness=.53;spec=.085;height=grain*.0002;
     }
-    if(labelUV.x>=0.0){base=texture2D(labels,labelUV).rgb;roughness=.82;spec=.04;}
+    if(labelUV.x>=0.0){base=texture2D(labels,labelUV).rgb;roughness=.82;spec=.04;height=0.0;}
     n=bump(n,height);
     vec3 v=normalize(camera-world),linear=pow(max(base,vec3(.001)),vec3(2.2));
     float visibility=shadow();
@@ -121,26 +122,45 @@ class BarRenderer {
   gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));return program;
  }
  resetAtlas(){
-  this.atlas=document.createElement('canvas');this.atlas.width=4096;this.atlas.height=2048;this.atlasContext=this.atlas.getContext('2d');this.labelMap=new Map();this.atlasDirty=true;
+  const limit=this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE);
+  this.atlas=document.createElement('canvas');this.atlas.width=Math.min(4096,limit);this.atlas.height=Math.min(2048,limit);
+  this.atlasContext=this.atlas.getContext('2d');this.labelMap=new Map();this.atlasCursor={x:0,y:0,rowHeight:0};this.atlasDirty=true;
+ }
+ labelAspect(b){
+  const face=b.labelFace||'front',width=face==='left'||face==='right'?b.d:b.w,height=face==='top'||face==='bottom'?b.d:b.h;
+  return Number((width/height).toFixed(5));
  }
  label(b){
   if(!b.label&&!b.labelLines)return null;
-  const lines=b.labelLines||String(b.label).split('\n');
-  const key=JSON.stringify([lines,b.labelColor,b.labelBg||b.c,b.labelSize,b.labelAlign]);
+  const lines=(b.labelLines||String(b.label).split('\n')).map(String);
+  const aspect=this.labelAspect(b),font=b.labelFont||'Arial, sans-serif';
+  const key=JSON.stringify([lines,b.labelColor,b.labelBg||b.c,font,b.labelAlign,aspect]);
   if(this.labelMap.has(key))return this.labelMap.get(key);
-  const index=this.labelMap.size;if(index>=64)return null;
-  const x=index%8*512,y=Math.floor(index/8)*256,ctx=this.atlasContext;
-  ctx.fillStyle=b.labelBg||b.c;ctx.fillRect(x,y,512,256);
-  ctx.fillStyle=b.labelColor||'#eee6d5';ctx.textAlign=b.labelAlign||'center';ctx.textBaseline='middle';
-  const size=b.labelSize||Math.min(52,160/lines.length);ctx.font=`600 ${size}px Georgia, serif`;
-  lines.forEach((line,i)=>ctx.fillText(String(line),x+(ctx.textAlign==='left'?28:256),y+128+(i-(lines.length-1)/2)*size*1.35,456));
-  const rect={u0:(x+2)/4096,u1:(x+510)/4096,v0:1-(y+254)/2048,v1:1-(y+2)/2048};
+  // Each sampled rectangle has the physical face's aspect ratio. Fixed 2:1
+  // rectangles used to squash lettering on shelf tags and stretch wall posters.
+  const resolution=this.atlas.width/4096,gutter=8,w=Math.round(Math.min(1008,496*aspect)*resolution),h=Math.round(w/aspect);
+  const packedW=w+gutter*2,packedH=h+gutter*2,cursor=this.atlasCursor;
+  if(cursor.x+packedW>this.atlas.width){cursor.x=0;cursor.y+=cursor.rowHeight;cursor.rowHeight=0;}
+  if(cursor.y+packedH>this.atlas.height)throw Error('La texture des panneaux est pleine.');
+  const x=cursor.x+gutter,y=cursor.y+gutter,ctx=this.atlasContext;
+  ctx.fillStyle=b.labelBg||b.c;ctx.fillRect(cursor.x,cursor.y,packedW,packedH);
+  cursor.x+=packedW;cursor.rowHeight=Math.max(cursor.rowHeight,packedH);
+  ctx.fillStyle=b.labelColor||'#eee6d5';ctx.textAlign=b.labelAlign||'center';ctx.textBaseline='alphabetic';
+  ctx.font=`700 100px ${font}`;
+  const metrics=lines.map(line=>ctx.measureText(line)),ascent=Math.max(1,...metrics.map(m=>m.actualBoundingBoxAscent)),descent=Math.max(0,...metrics.map(m=>m.actualBoundingBoxDescent));
+  const padX=w*.06,padY=h*.16,scale=Math.min((w-padX*2)/Math.max(1,...metrics.map(m=>m.width)),(h-padY*2)/(ascent+descent+(lines.length-1)*130));
+  const blockHeight=(ascent+descent+(lines.length-1)*130)*scale;
+  ctx.font=`700 ${100*scale}px ${font}`;
+  const textX=x+(ctx.textAlign==='left'?padX:ctx.textAlign==='right'?w-padX:w/2);
+  lines.forEach((line,i)=>ctx.fillText(line,textX,y+(h-blockHeight)/2+(ascent+i*130)*scale));
+  const rect={u0:x/this.atlas.width,u1:(x+w)/this.atlas.width,v0:1-(y+h)/this.atlas.height,v1:1-y/this.atlas.height};
   this.labelMap.set(key,rect);this.atlasDirty=true;return rect;
  }
  uploadAtlas(){
   if(!this.atlasDirty)return;const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.labelTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.atlas);gl.generateMipmap(gl.TEXTURE_2D);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  if(this.anisotropy)gl.texParameterf(gl.TEXTURE_2D,this.anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(this.anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);this.atlasDirty=false;
  }
  mesh(boxes){
@@ -179,7 +199,7 @@ class BarRenderer {
     const label=this.label(b),labelFace={front:0,back:1,left:2,right:3,top:4,bottom:5}[b.labelFace||'front'];
     faces.forEach((face,i)=>{for(const k of [face[0],face[1],face[2],face[0],face[2],face[3]]){
      const p=corners[k],n=normals[i];let u=-1,v=-1;
-     if(label&&i===labelFace){let tx=(p[0]+1)/2,ty=(p[1]+1)/2;if(i===1)tx=1-tx;if(i===2||i===3)tx=(p[2]+1)/2;if(i>=4)ty=(p[2]+1)/2;u=label.u0+tx*(label.u1-label.u0);v=label.v0+ty*(label.v1-label.v0)}
+     if(label&&i===labelFace){let tx=(p[0]+1)/2,ty=(p[1]+1)/2;if(i===1)tx=1-tx;if(i===2)tx=(1-p[2])/2;if(i===3)tx=(p[2]+1)/2;if(i===4)ty=(p[2]+1)/2;if(i===5)ty=(1-p[2])/2;u=label.u0+tx*(label.u1-label.u0);v=label.v0+ty*(label.v1-label.v0)}
      emit(...p,...n,u,v);
     }});
    }
@@ -187,7 +207,10 @@ class BarRenderer {
   return out.subarray(0,offset);
  }
  setScene(boxes){
-  const gl=this.gl;this.resetAtlas();let data=this.mesh(boxes);gl.bindBuffer(gl.ARRAY_BUFFER,this.staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);this.count=data.length/12;
+  const gl=this.gl;this.resetAtlas();
+  // Pack tall labels first, keeping the existing 4096x2048 texture budget.
+  boxes.filter(b=>b.label||b.labelLines).sort((a,b)=>this.labelAspect(a)-this.labelAspect(b)).forEach(b=>this.label(b));
+  let data=this.mesh(boxes);gl.bindBuffer(gl.ARRAY_BUFFER,this.staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);this.count=data.length/12;
   const casters=boxes.filter(b=>b.castShadow!==false&&b.shadow!==false&&b.mat!==6&&b.mat!==7&&b.y-b.h/2<2.7&&!(b.h>2.7&&(b.w>10||b.d>9))&&!(b.w>11&&b.d>9));
   data=this.mesh(casters);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);this.shadowCount=data.length/12;this.shadowDirty=true;this.uploadAtlas();
  }

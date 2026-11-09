@@ -5,15 +5,15 @@ const BarScene=(()=>{
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
  const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
  const storageBins=[
-  {key:'beer',label:'BIERE',pack:500,x:1,y:.37,kind:'keg',color:'#8d9993'},
+  {key:'beer',label:'BIÈRE',pack:500,x:1,y:.37,kind:'keg',color:'#8d9993'},
   {key:'wine',label:'VIN',pack:75,x:2.25,y:.37,kind:'bottle',color:'#553b3c'},
   {key:'rum',label:'RHUM',pack:70,x:3.5,y:.37,kind:'bottle',color:'#716340'},
-  {key:'coffee',label:'CAFE',pack:20,x:1,y:1.01,kind:'bag',color:'#9a7953'},
+  {key:'coffee',label:'CAFÉ',pack:20,x:1,y:1.01,kind:'bag',color:'#9a7953'},
   {key:'sugar',label:'SIROP',pack:100,x:2.25,y:1.01,kind:'bottle',color:'#b19c6e'},
-  {key:'soda',label:'EAU PETILLANTE',pack:100,x:3.5,y:1.01,kind:'bottle',color:'#78908c'},
+  {key:'soda',label:'EAU PÉTILLANTE',pack:100,x:3.5,y:1.01,kind:'bottle',color:'#78908c'},
   {key:'lime',label:'CITRONS',pack:12,x:1,y:1.65,kind:'produce',color:'#7d8e45'},
   {key:'mint',label:'MENTHE',pack:12,x:2.25,y:1.65,kind:'produce',color:'#4f754b'},
-  {key:'ice',label:'GLACONS',pack:20,x:3.5,y:1.65,kind:'bag',color:'#b3c8c2'},
+  {key:'ice',label:'GLAÇONS',pack:20,x:3.5,y:1.65,kind:'bag',color:'#b3c8c2'},
  ];
  function containsWalkablePosition(x,z){
   if(!Number.isFinite(x)||!Number.isFinite(z))return false;
@@ -39,7 +39,7 @@ const BarScene=(()=>{
   g.cylinder(x,y+.305*scale,z,r,.05*scale,r,color,M.glass,{topRadius:.48});
   g.cylinder(x,y+.375*scale,z,r*.48,.09*scale,r*.48,color,M.glass);
   g.cylinder(x,y+.425*scale,z,r*.53,.026*scale,r*.53,'#b3a078',M.metal);
-  if(label)g.box(x,y+.16*scale,z+r*.505,r*.8,.115*scale,.003,'#d4c9af',M.paint,{label,labelFace:'back',labelColor:'#37352c',labelSize:24,castShadow:false});
+  if(label)g.box(x,y+.16*scale,z+r*.505,r*.8,.115*scale,.003,'#d4c9af',M.paint,{label,labelFace:'back',labelColor:'#37352c',castShadow:false});
  }
  function glass(g,recipe,x,y,z,fill=1){
   const rim='#c4cfc9';
@@ -101,7 +101,7 @@ const BarScene=(()=>{
   b(6.8,.58,.15,10.4,1.16,.14,'#33443b',M.wood);
   for(const x of [.29,1.61])b(x,1.16,.12,.075,2.32,.16,'#5a6758',M.wood,solid);
   b(.95,2.33,.12,1.4,.09,.16,'#5a6758',M.wood);
-  b(.95,2.59,.122,1.18,.25,.035,'#263e36',0,{label:'RESERVE',labelFace:'back',labelSize:74,labelColor:'#dfcea5',castShadow:false});
+  b(.95,2.59,.122,1.18,.25,.035,'#263e36',0,{label:'RÉSERVE',labelFace:'back',labelColor:'#f2e9cf',castShadow:false});
   b(.95,.013,0,1.2,.025,.24,'#8d9387',M.metal);
   // A separate, fully enclosed room: rear shelves, clear aisle and inventory desk.
   b(2.3,-.11,-2.1,4.6,.22,4.2,'#82877b',M.tile);
@@ -117,12 +117,13 @@ const BarScene=(()=>{
   for(const y of [.35,.99,1.63,2.27])b(2.25,y,-3.73,3.85,.04,.68,'#9b9c85',M.paint,solid);
   // Whole rack footprint stays collidable even when every shelf is empty.
   b(2.25,.17,-3.76,3.85,.3,.66,'#677063',M.paint,solid);
-  for(const bin of storageBins)b(bin.x,bin.y-.085,-3.38,.94,.12,.025,'#d6d1b6',0,{label:bin.label,labelFace:'back',labelSize:66,labelColor:'#344b3c',castShadow:false});
-  b(2.25,2.67,-4.075,2.4,.28,.025,'#2b4037',0,{label:'LA RESERVE',labelFace:'back',labelSize:74,labelColor:'#e1cca0',castShadow:false});
+  for(const bin of storageBins)b(bin.x,bin.y-.085,-3.38,.94,.16,.025,'#eee8d5',0,{label:bin.label,labelFace:'back',labelColor:'#203c2c',castShadow:false});
+  // Mounted on the front of the rack so its uprights cannot mask the lettering.
+  b(2.25,2.49,-3.37,2.6,.34,.03,'#243c30',0,{label:'LA RÉSERVE',labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f2e9cf',castShadow:false});
   b(4.05,.93,-1.18,.76,.055,1.35,'#9e9479',M.wood,solid);
   for(const x of [3.74,4.36])for(const z of [-1.74,-.62])b(x,.45,z,.05,.9,.05,'#48574e',M.metal,solid);
-  b(4.06,.964,-1.17,.34,.012,.48,'#d9d2ba',0,{label:'INVENTAIRE',labelFace:'top',labelSize:42,labelColor:'#405247',castShadow:false});
-  b(4.455,1.8,-1.18,1.25,.58,.024,'#2d473c',0,{ry:Math.PI/2,label:'STOCKS\nE : GERER LA RESERVE',labelSize:35,labelColor:'#dfd0a6',castShadow:false});
+  b(4.06,.964,-1.17,.34,.012,.48,'#d9d2ba',0,{label:'INVENTAIRE',labelFace:'top',labelColor:'#405247',castShadow:false});
+  b(4.455,1.8,-1.18,1.25,.58,.024,'#2d473c',0,{ry:Math.PI/2,label:'STOCKS\nE : GÉRER LA RÉSERVE',labelColor:'#f2e9cf',castShadow:false});
   c(3.9,.3,-2.53,.6,.6,.6,'#637f75',M.metal,solid);
   c(3.9,.614,-2.53,.62,.026,.62,'#9bad9d',M.metal);
   b(3.9,.78,-2.53,.1,.3,.1,'#6c8174',M.metal);
@@ -142,7 +143,7 @@ const BarScene=(()=>{
   b(6,1.41,9.95,.07,2.82,.1,'#263a36',M.metal,noShadow);
   b(6,.15,9.91,2.9,.3,.1,'#293b34',M.wood);
   for(const x of [5.84,6.16])c(x,1.18,9.82,.026,.38,.026,'#b79d62',M.metal);
-  b(6,2.23,9.9,.68,.27,.015,'#203f37',0,{label:'BIENVENUE',labelSize:32,labelColor:'#ddd2b1',labelFace:'front',castShadow:false});
+  b(6,2.23,9.9,.68,.27,.015,'#203f37',0,{label:'BIENVENUE',labelColor:'#ddd2b1',labelFace:'front',castShadow:false});
   b(6,.006,9.06,2.3,.013,1.15,'#383e36',M.fabric,noShadow);
   // Street beyond the windows, deliberately simple and outside the playable room.
   b(6,-.08,11.1,20,.14,2.1,'#92928a',M.tile,noShadow);
@@ -176,7 +177,7 @@ const BarScene=(()=>{
     }
    }
   }
-  b(6,3.02,.82,5.15,.34,.06,'#293a33',M.wood,{label:'LE PETIT COMPTOIR',labelFace:'back',labelSize:100,labelColor:'#d8c291',castShadow:false});
+  b(6,3.02,.82,5.15,.34,.06,'#293a33',M.wood,{label:'LE PETIT COMPTOIR',labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f0dfb9',castShadow:false});
   // A narrow service counter with timber slats and brass foot rail.
   b(6,.5,3.02,8.8,1,.9,'#3f3329',M.wood,solid);
   b(6,1.045,3.03,9.04,.09,1.12,'#363a35',M.paint,solid);
@@ -226,7 +227,7 @@ const BarScene=(()=>{
   bottle(g,7.75,1.11,3.02,'#65724c',.75,'SIROP');
   b(2.65,1.15,2.94,.43,.07,.38,'#252e2b');
   b(2.65,1.32,2.94,.09,.31,.09,'#38433e',M.metal);
-  b(2.65,1.5,2.94,.56,.36,.045,'#192c2b',0,{rx:-.2,label:'COMPTOIR\n17:00',labelColor:'#a5bda5',labelSize:34});
+  b(2.65,1.5,2.94,.56,.36,.045,'#192c2b',0,{rx:-.2,label:'COMPTOIR\n17:00',labelColor:'#d2e5cf'});
   // Illuminated bottle fridge by the wall.
   b(10.96,1.04,.75,1.15,2.08,1.12,'#253330',M.metal,solid);
   b(10.96,1.11,1.32,.97,1.67,.025,'#c5d1bc',M.light);
@@ -235,7 +236,7 @@ const BarScene=(()=>{
    for(let j=0;j<5;j++)bottle(g,10.6+j*.18,y+.02,1.43,['#587952','#9f713b','#455c69'][j%3],.58,'');
   }
   for(const x of [10.43,11.49])b(x,1.08,1.54,.045,1.98,.055,'#273835',M.metal);
-  b(10.96,2.04,1.38,1.05,.15,.09,'#344b46',0,{label:'FRAÎCHEUR',labelFace:'back',labelSize:30});
+  b(10.96,2.04,1.38,1.05,.15,.09,'#344b46',0,{label:'FRAÎCHEUR',labelFace:'back'});
   c(11.43,1.14,1.6,.027,.46,.027,'#c1c7b7',M.metal);
   // Bistro tables and upholstered chairs with believable leg dimensions.
   function chair(x,z,angle=0){
@@ -243,7 +244,9 @@ const BarScene=(()=>{
    const p=(dx,dz)=>[x+dx*cos+dz*sin,z-dx*sin+dz*cos];
    let [xx,zz]=p(0,0);b(xx,.48,zz,.48,.075,.47,'#6e4b3e',M.fabric,{solid:true,ry:angle});
    [xx,zz]=p(0,.21);b(xx,.78,zz,.47,.48,.055,'#586052',M.wood,{solid:true,ry:angle});
-   for(const dx of [-.19,.19])for(const dz of [-.18,.18]){[xx,zz]=p(dx,dz);const h=dz>0?.99:.46;b(xx,h/2,zz,.038,h,.038,'#343b33',M.metal)}
+   // Local +Z is the back: its uprights meet the outer face of the backrest,
+   // continuing down to the rear feet without protruding into the seat.
+   for(const dx of [-.19,.19])for(const [dz,h] of [[-.18,.46],[.24,.99]]){[xx,zz]=p(dx,dz);b(xx,h/2,zz,.038,h,.038,'#343b33',M.metal,{ry:angle})}
   }
   for(const [x,z] of [[1.65,6.4],[1.65,8.6],[10.22,6.5],[10.22,8.65]]){
    c(x,.75,z,1.05,.065,1.05,'#826c4d',M.wood,{solid:true});
@@ -261,10 +264,10 @@ const BarScene=(()=>{
   }
   // Framed menu, wall art, clocks and pendant lamps.
   b(.24,2.1,4.35,.055,1.25,1.5,'#473f31',M.wood);
-  b(.28,2.1,4.35,1.35,1.1,.025,'#263b32',0,{ry:-Math.PI/2,label:'LA CARTE\nPression  5 €\nVin rouge  6 €\nEspresso  3 €\nMojito  10 €',labelSize:28});
+  b(.28,2.1,4.35,1.35,1.1,.025,'#263b32',0,{ry:-Math.PI/2,label:'LA CARTE\nPression  5 €\nVin rouge  6 €\nEspresso  3 €\nMojito  10 €'});
   for(const [z,word] of [[4.75,'CAFÉ\nDE QUARTIER'],[7.6,'LES BELLES\nSOIRÉES']]){
    b(11.84,2.03,z,.055,1.0,.77,'#4b4436',M.wood);
-   b(11.8,2.03,z,.63,.87,.02,'#a79266',0,{ry:Math.PI/2,label:word,labelSize:36,labelColor:'#263b34'});
+   b(11.8,2.03,z,.63,.87,.02,'#a79266',0,{ry:Math.PI/2,label:word,labelColor:'#263b34'});
   }
   c(10.96,2.65,.2,.49,.055,.49,'#b8ac8c',M.metal,{rx:Math.PI/2});
   c(10.96,2.65,.235,.43,.015,.43,'#e0d6bb',0,{rx:Math.PI/2});

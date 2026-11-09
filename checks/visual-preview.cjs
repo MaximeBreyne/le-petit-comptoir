@@ -86,6 +86,39 @@ app.whenReady().then(async()=>{
   await capture('preview-game.png');
 
   const hiddenHud=await win.webContents.insertCSS('body > :not(#world):not(script):not(style){visibility:hidden!important}');
+  const labels=await evaluate(`(()=>{
+   let count=0,worstAspectError=0;const regions=new Map();
+   for(const box of boxes.filter(box=>box.label||box.labelLines)){
+    const rect=renderer.label(box),face=box.labelFace||'front';
+    if(!rect)throw Error('Missing label: '+box.label);
+    if(!(rect.u0>=0&&rect.v0>=0&&rect.u1<=1&&rect.v1<=1&&rect.u1>rect.u0&&rect.v1>rect.v0))throw Error('Invalid label region: '+box.label);
+    const aspect=face==='top'||face==='bottom'?box.w/box.d:face==='left'||face==='right'?box.d/box.h:box.w/box.h;
+    const pixelAspect=(rect.u1-rect.u0)*renderer.atlas.width/((rect.v1-rect.v0)*renderer.atlas.height);
+    const error=Math.abs(pixelAspect/aspect-1);worstAspectError=Math.max(worstAspectError,error);
+    if(error>.02)throw Error('Distorted label aspect: '+box.label+' ('+pixelAspect+' instead of '+aspect+')');
+    regions.set(JSON.stringify([rect.u0,rect.v0,rect.u1,rect.v1]),rect);count++;
+   }
+   const unique=[...regions.values()];
+   for(let i=0;i<unique.length;i++)for(let j=0;j<i;j++){
+    const a=unique[i],b=unique[j];
+    if(Math.min(a.u1,b.u1)-Math.max(a.u0,b.u0)>1e-7&&Math.min(a.v1,b.v1)-Math.max(a.v0,b.v0)>1e-7)throw Error('Overlapping label atlas regions');
+   }
+   return {count,regions:unique.length,worstAspectError};
+  })()`);
+  const atlas=await evaluate('renderer.atlas.toDataURL("image/png")');
+  fs.writeFileSync(path.join(artifacts,'preview-label-atlas.png'),Buffer.from(atlas.split(',')[1],'base64'));
+  const detailViews={
+   reserve:{x:2.25,y:1.65,z:-1.25,a:Math.PI,pitch:-.06},
+   'reserve-oblique':{x:3.6,y:1.65,z:-1.2,a:Math.atan2(-1.35,-2.5),pitch:-.06},
+   menu:{x:2,y:1.7,z:4.35,a:-Math.PI/2,pitch:.12},
+   chairs:{x:2.9,y:1.35,z:7.45,a:3.75,pitch:-.28},
+   signs:{x:6,y:1.7,z:2,a:Math.PI,pitch:.18},
+   banner:{x:6,y:1.7,z:6.3,a:Math.PI,pitch:.20},
+  };
+  for(const [name,view]of Object.entries(detailViews)){
+   await evaluate('camera='+JSON.stringify(view)+';render();');
+   await capture('preview-'+name+'.png');
+  }
   const scene=await evaluate(`(()=>{
    camera=typeof BarScene!=='undefined'&&BarScene.homeCamera?{...BarScene.homeCamera}:{x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
    render();renderer.gl.finish();
@@ -107,9 +140,9 @@ app.whenReady().then(async()=>{
   if(!pause.paused||pause.mode!=='pause'||!pause.overlayVisible)throw Error('Pause menu did not pause the game');
   await capture('preview-pause.png');
   if(errors.length)throw Error(errors.join('\n'));
-  const result={home,game:gameView,scene,pause};
+  const result={home,game:gameView,labels,detailViews,scene,pause};
   fs.writeFileSync(path.join(artifacts,'visual-preview.json'),JSON.stringify(result,null,2));
   console.log('VISUAL PREVIEW OK',JSON.stringify(result));
   clearTimeout(timeout);win.destroy();app.exit(0);
- }catch(error){clearTimeout(timeout);console.error(error);app.exit(1)}
+ }catch(error){clearTimeout(timeout);console.error(error);if(errors.length)console.error(errors.join('\n'));app.exit(1)}
 });

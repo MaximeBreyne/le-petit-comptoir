@@ -81,6 +81,9 @@ restent stylisés. Les clients arrivent et repartent en marchant,
 conservent leur place au comptoir et bloquent le passage lorsqu'ils attendent.
 Les chaises font face aux tables et la machine à café laisse un espace
 distinct pour la tasse en préparation, sans tasse superposée.
+Les montants des chaises sont placés derrière le dossier. Les étiquettes,
+enseignes et menus du décor gardent les proportions du texte et une taille
+adaptée au panneau ; les étiquettes de la réserve sont plus contrastées.
 La souris et les flèches suivent le sens du regard : gauche vers gauche.
 
 VÉRIFICATIONS DU RENDU
