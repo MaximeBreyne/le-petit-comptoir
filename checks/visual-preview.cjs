@@ -85,10 +85,23 @@ app.whenReady().then(async()=>{
   })()`);
   await capture('preview-game.png');
 
+  const hud=await evaluate(`(()=>{
+   camera={...BarScene.homeCamera};state.time=1230;ui();render();
+   if(!$('workbench').hidden||document.getElementById('interactionMode')||document.querySelector('aside'))throw Error('Persistent management panels still cover the room');
+   if($('dayProgress').value!==210)throw Error('Half-day HUD progress is incorrect');
+   return {status:$('serviceStatus').textContent,remaining:$('dayRemaining').textContent,progress:$('dayProgress').value};
+  })()`);
+  await capture('preview-room.png');
+  for(const [name,flags]of Object.entries({closed:{open:false,closing:false},open:{open:true,closing:false},closing:{open:true,closing:true}})){
+   await evaluate('Object.assign(state,'+JSON.stringify(flags)+');camera={x:6.78,y:1.78,z:8.7,a:0,pitch:.12};ui();render();');
+   await capture('preview-entrance-'+name+'.png');
+  }
+  await evaluate('state.open=true;state.closing=false;state.time=1020;ui();');
+
   const hiddenHud=await win.webContents.insertCSS('body > :not(#world):not(script):not(style){visibility:hidden!important}');
   const labels=await evaluate(`(()=>{
    let count=0,worstAspectError=0;const regions=new Map();
-   for(const box of boxes.filter(box=>box.label||box.labelLines)){
+   for(const box of [...boxes,...BarVenue.labelTemplates].filter(box=>box.label||box.labelLines)){
     const rect=renderer.label(box),face=box.labelFace||'front';
     if(!rect)throw Error('Missing label: '+box.label);
     if(!(rect.u0>=0&&rect.v0>=0&&rect.u1<=1&&rect.v1<=1&&rect.u1>rect.u0&&rect.v1>rect.v0))throw Error('Invalid label region: '+box.label);
@@ -153,8 +166,10 @@ app.whenReady().then(async()=>{
    return {tables:4,employees:['bartender','waiter'],register:{x:2.65,z:2.0}};
   })()`);
   await capture('preview-tables.png');
+  await evaluate('state.management.waiter=false;camera={x:BarScene.tableSeat(1).x-.70,y:1.3,z:BarScene.tableSeat(1).z,a:Math.PI/2,pitch:0};render();');
+  await capture('preview-customer-face.png');
   const waiterTray=await evaluate(`(()=>{
-   state.staff.bartender=null;state.staff.waiter={orderId:2,task:'serve',recipe:'beer',drink:{recipe:'beer',quality:95,orderId:2},remaining:4,total:6};
+   state.management.waiter=true;state.staff.bartender=null;state.staff.waiter={orderId:2,task:'serve',recipe:'beer',drink:{recipe:'beer',quality:95,orderId:2},remaining:4,total:6};
    for(let i=0;i<60;i++){visualTime+=.05;render()}
    const p=alongRoute(waiterVisual.route,waiterVisual.progress),sn=Math.sin(p.angle),cs=Math.cos(p.angle);
    const x=p.x-sn*.8+cs*1.5,z=p.z-cs*.8-sn*1.5;
@@ -200,7 +215,7 @@ app.whenReady().then(async()=>{
   if(!pause.paused||pause.mode!=='pause'||!pause.overlayVisible)throw Error('Pause menu did not pause the game');
   await capture('preview-pause.png');
   if(errors.length)throw Error(errors.join('\n'));
-  const result={home,game:gameView,labels,detailViews,scene,serviceScene,waiterTray,serviceUI,cashUI,pause};
+  const result={home,game:gameView,hud,labels,detailViews,scene,serviceScene,waiterTray,serviceUI,cashUI,pause};
   fs.writeFileSync(path.join(artifacts,'visual-preview.json'),JSON.stringify(result,null,2));
   console.log('VISUAL PREVIEW OK',JSON.stringify(result));
   clearTimeout(timeout);win.destroy();app.exit(0);

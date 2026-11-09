@@ -10,7 +10,7 @@ app.whenReady().then(async()=>{try{
  const result=await win.webContents.executeJavaScript(`(()=>{
  function check(v,m){if(!v)throw Error(m)}
  GameMenu.newGame();if(GameMenu.getMode()==='confirm')document.querySelector('[data-menu-action="confirm"]').click();preferences=defaultPreferences();ui();check(renderer,'WebGL renderer initialized');
- $('open').click();check(state.open,'Open button');
+ BarTablet.open('drinks');document.querySelector('[data-tablet-page="drinks"] [data-tablet-action="service"]').click();check(state.open,'Open service from the tablet');
  camera={...BarScene.playCamera};game.s.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90,tableId:null,slot:1,phase:'preparing',arrivalRemaining:0,paymentMethod:'card'}];state.nextId=2;state.spawn=999;ui();
  BarTablet.open('drinks');document.querySelector('[data-tablet-recipe="beer"]').click();check(state.prep.recipe==='beer','Tablet recipe click');
  document.querySelector('[data-action="step"]').click();check(game.isPour(),'Select glass');
@@ -19,9 +19,9 @@ app.whenReady().then(async()=>{try{
  pour.dispatchEvent(new KeyboardEvent('keyup',{code:'Space',bubbles:true}));check(!state.prep.pouring,'Released pour');
  document.querySelector('[data-action="finish"]').click();check(state.prep.ready,'Validate dose');
  document.querySelector('[data-action="plate"]').click();check(state.tray.length===1,'Tray');
- document.querySelector('[data-serve="1"]').click();check(state.sold===0&&state.cash===260&&state.orders[0].phase==='drinking'&&state.tray.length===0,'Serve without prematurely crediting payment');
+ BarTablet.open('service',1);document.querySelector('[data-tablet-order-action="serve"][data-order-id="1"]').click();check(state.sold===0&&state.cash===260&&state.orders[0].phase==='drinking'&&state.tray.length===0,'Serve through tablet without prematurely crediting payment');
  for(let i=0;i<41;i++)game.tick(.1);check(state.orders[0].phase==='payment','Payment requested after drinking');game.pickupTerminal(BarEngine.registerPosition);game.payCard(1,camera);check(state.sold===0&&state.cash===260,'Pending authorization');for(let i=0;i<31;i++)game.tick(.1);ui();check(state.sold===1&&state.cash===266&&state.orders.length===0,'Confirmed payment and tip');
- $('order').click();check(BarTablet.isOpen()&&BarTablet.getTab()==='reserve','Supplier tablet');
+ document.querySelector('[data-tablet-tab="reserve"]').click();check(BarTablet.isOpen()&&BarTablet.getTab()==='reserve','Supplier tablet');
  document.querySelector('[data-tablet-buy="rum"]').click();check(state.deliveries.length===1,'Order delivery');
  BarTablet.close({resumeLook:false});check(!BarTablet.isOpen(),'Close tablet');
  for(let i=0;i<101;i++)game.tick(.1);check(state.reserve.rum===140&&state.stock.rum===70,'Delivery arrived in reserve');

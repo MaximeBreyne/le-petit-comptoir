@@ -1,6 +1,6 @@
 {
   "name": "le-petit-comptoir-bar",
-  "version": "0.7.1",
+  "version": "0.7.3",
   "description": "Jeu de gestion de bar hors ligne",
   "author": "Le Petit Comptoir",
   "private": true,
@@ -8,7 +8,7 @@
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
     "start": "electron .",
-    "test": "node check-game.cjs && node --test checks/updater.cjs checks/local-update-source.cjs checks/desktop-menu.cjs checks/release-cleanup.cjs checks/build-windows.cjs checks/service-engine.cjs",
+    "test": "node check-game.cjs && node --test checks/updater.cjs checks/local-update-source.cjs checks/desktop-menu.cjs checks/release-cleanup.cjs checks/build-windows.cjs checks/service-engine.cjs checks/renderer.cjs",
     "dist:win": "node scripts/build-windows.cjs",
     "verify:release": "node scripts/verify-release.cjs"
   },

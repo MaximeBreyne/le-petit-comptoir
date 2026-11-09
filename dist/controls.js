@@ -34,7 +34,7 @@ onkeydown=e=>{
  if(editing)return;
  if(e.code==='KeyE'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
   e.preventDefault();if(e.repeat)return;
-  const target=interactionTarget();if(target)BarTablet.open(target.section,target.orderId);else toast('Approchez une table, la caisse derrière le bar ou entrez dans la réserve, puis appuyez sur E.');
+  if(!useInteraction())toast('Approchez le panneau d’entrée, une table, la caisse ou la réserve, puis appuyez sur E.');
   return;
  }
  if(e.code===b.pour.code&&game.isPour()){e.preventDefault();if(!paused)game.setPour(true);return}
@@ -43,7 +43,11 @@ onkeydown=e=>{
 };
 onkeyup=e=>{keys[e.code]=false;if(e.code===preferences.bindings.pour.code)game.setPour(false)};
 onblur=()=>{keys={};game.setPour(false);audio.setState(false,false);if(GameMenu.getMode()==='play'){save(true);GameMenu.pause()}};
-canvas.onclick=()=>{if(!paused&&!menusOpen()&&!BarTablet.isOpen()&&!BarInput.isLooking())BarInput.enterLook()};
+canvas.onclick=()=>{
+ if(paused||menusOpen()||BarTablet.isOpen())return;
+ if(BarInput.isLooking()&&BarVenue.aimedAtSign(camera))useInteraction({action:'service'});
+ else if(!BarInput.isLooking())BarInput.enterLook();
+};
 $('modal').addEventListener('close',()=>{if(GameMenu.getMode()==='play'&&!paused&&!BarInput.isLooking())BarInput.enterCursor();else BarInput.refresh()});
 document.addEventListener('mousemove',e=>{if(document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused&&!menusOpen()&&!BarTablet.isOpen()){camera.a+=e.movementX*.0025*preferences.sensitivity;camera.pitch=Math.max(-1.15,Math.min(1.15,camera.pitch-e.movementY*.0025*preferences.sensitivity*(preferences.invertY?-1:1)))}});
 function movement(dt){if(paused||menusOpen()||BarTablet.isOpen()||BarInput.isCursorMode())return;const b=preferences.bindings;if(keys[b.turnLeft.code])camera.a-=dt*1.8;if(keys[b.turnRight.code])camera.a+=dt*1.8;let forward=(keys[b.forward.code]?1:0)-(keys[b.back.code]?1:0),side=(keys[b.right.code]?1:0)-(keys[b.left.code]?1:0);const length=Math.hypot(forward,side)||1;forward/=length;side/=length;

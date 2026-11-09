@@ -1,7 +1,8 @@
 ﻿/* Offline WebGL renderer: procedural materials, area lights, cached shadows and a label atlas. */
 class BarRenderer {
- constructor(canvas,boxes){
+ constructor(canvas,boxes,{labels=[]}={}){
   this.canvas=canvas;
+  this.sceneLabels=labels;
   this.gl=canvas.getContext('webgl',{alpha:false,antialias:true,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});
   if(!this.gl)throw new Error('Le rendu 3D nécessite WebGL. Activez l’accélération graphique de Windows puis relancez le jeu.');
   const gl=this.gl;
@@ -124,27 +125,50 @@ class BarRenderer {
  resetAtlas(){
   const limit=this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE);
   this.atlas=document.createElement('canvas');this.atlas.width=Math.min(4096,limit);this.atlas.height=Math.min(2048,limit);
-  this.atlasContext=this.atlas.getContext('2d');this.labelMap=new Map();this.atlasCursor={x:0,y:0,rowHeight:0};this.atlasDirty=true;
+  this.atlasContext=this.atlas.getContext('2d');this.labelMap=new Map();this.atlasFreeRects=[{x:0,y:0,w:this.atlas.width,h:this.atlas.height}];this.atlasDirty=true;
  }
  labelAspect(b){
   const face=b.labelFace||'front',width=face==='left'||face==='right'?b.d:b.w,height=face==='top'||face==='bottom'?b.d:b.h;
   return Number((width/height).toFixed(5));
  }
+ labelDimensions(b){
+  const aspect=this.labelAspect(b),pixels=Math.min(1008,Math.max(64,b.labelPixels||1008)),resolution=this.atlas.width/4096;
+  const w=Math.max(1,Math.round(Math.min(pixels,496*aspect)*resolution)),h=Math.max(1,Math.round(w/aspect));
+  return {aspect,pixels,w,h,gutter:8};
+ }
+ allocateLabel(w,h){
+  // MaxRects keeps gaps below short signs available to later labels. Existing
+  // rectangles never move, so dynamic additions preserve already-uploaded UVs.
+  let best=null,shortest=Infinity,longest=Infinity;
+  for(const rect of this.atlasFreeRects){
+   if(w>rect.w||h>rect.h)continue;
+   const short=Math.min(rect.w-w,rect.h-h),long=Math.max(rect.w-w,rect.h-h);
+   if(short<shortest||(short===shortest&&(long<longest||(long===longest&&(!best||rect.y<best.y||(rect.y===best.y&&rect.x<best.x)))))){best={x:rect.x,y:rect.y,w,h};shortest=short;longest=long;}
+  }
+  if(!best)throw Error('La texture des panneaux est pleine.');
+  const next=[],right=best.x+w,bottom=best.y+h;
+  for(const rect of this.atlasFreeRects){
+   const farX=rect.x+rect.w,farY=rect.y+rect.h;
+   if(right<=rect.x||best.x>=farX||bottom<=rect.y||best.y>=farY){next.push(rect);continue;}
+   if(best.x>rect.x)next.push({x:rect.x,y:rect.y,w:best.x-rect.x,h:rect.h});
+   if(right<farX)next.push({x:right,y:rect.y,w:farX-right,h:rect.h});
+   if(best.y>rect.y)next.push({x:rect.x,y:rect.y,w:rect.w,h:best.y-rect.y});
+   if(bottom<farY)next.push({x:rect.x,y:bottom,w:rect.w,h:farY-bottom});
+  }
+  this.atlasFreeRects=next.filter((rect,index)=>!next.some((other,otherIndex)=>otherIndex!==index&&other.x<=rect.x&&other.y<=rect.y&&other.x+other.w>=rect.x+rect.w&&other.y+other.h>=rect.y+rect.h&&(otherIndex<index||other.x!==rect.x||other.y!==rect.y||other.w!==rect.w||other.h!==rect.h)));
+  return best;
+ }
  label(b){
   if(!b.label&&!b.labelLines)return null;
   const lines=(b.labelLines||String(b.label).split('\n')).map(String);
-  const aspect=this.labelAspect(b),font=b.labelFont||'Arial, sans-serif';
-  const key=JSON.stringify([lines,b.labelColor,b.labelBg||b.c,font,b.labelAlign,aspect]);
+  const {aspect,pixels,w,h,gutter}=this.labelDimensions(b),font=b.labelFont||'Arial, sans-serif';
+  const key=JSON.stringify([lines,b.labelColor,b.labelBg||b.c,font,b.labelAlign,aspect,pixels]);
   if(this.labelMap.has(key))return this.labelMap.get(key);
   // Each sampled rectangle has the physical face's aspect ratio. Fixed 2:1
   // rectangles used to squash lettering on shelf tags and stretch wall posters.
-  const resolution=this.atlas.width/4096,gutter=8,w=Math.round(Math.min(1008,496*aspect)*resolution),h=Math.round(w/aspect);
-  const packedW=w+gutter*2,packedH=h+gutter*2,cursor=this.atlasCursor;
-  if(cursor.x+packedW>this.atlas.width){cursor.x=0;cursor.y+=cursor.rowHeight;cursor.rowHeight=0;}
-  if(cursor.y+packedH>this.atlas.height)throw Error('La texture des panneaux est pleine.');
-  const x=cursor.x+gutter,y=cursor.y+gutter,ctx=this.atlasContext;
-  ctx.fillStyle=b.labelBg||b.c;ctx.fillRect(cursor.x,cursor.y,packedW,packedH);
-  cursor.x+=packedW;cursor.rowHeight=Math.max(cursor.rowHeight,packedH);
+  const packedW=w+gutter*2,packedH=h+gutter*2,allocation=this.allocateLabel(packedW,packedH);
+  const x=allocation.x+gutter,y=allocation.y+gutter,ctx=this.atlasContext;
+  ctx.fillStyle=b.labelBg||b.c;ctx.fillRect(allocation.x,allocation.y,packedW,packedH);
   ctx.fillStyle=b.labelColor||'#eee6d5';ctx.textAlign=b.labelAlign||'center';ctx.textBaseline='alphabetic';
   ctx.font=`700 100px ${font}`;
   const metrics=lines.map(line=>ctx.measureText(line)),ascent=Math.max(1,...metrics.map(m=>m.actualBoundingBoxAscent)),descent=Math.max(0,...metrics.map(m=>m.actualBoundingBoxDescent));
@@ -163,53 +187,65 @@ class BarRenderer {
   if(this.anisotropy)gl.texParameterf(gl.TEXTURE_2D,this.anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(this.anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);this.atlasDirty=false;
  }
+ static topology(){
+  if(this.unitGeometry)return this.unitGeometry;
+  // Cache unit meshes once, retaining JS double precision until the final
+  // transformed vertices are written to the GPU's Float32 buffer.
+  const segments=16,rings=10,sphere=new Float64Array(segments*rings*6*3),circle=new Float64Array((segments+1)*2);
+  let offset=0;
+  const point=(i,j)=>{const p=-Math.PI/2+i*Math.PI/rings,t=j*Math.PI*2/segments;return [Math.cos(p)*Math.cos(t),Math.sin(p),Math.cos(p)*Math.sin(t)];};
+  for(let i=0;i<rings;i++)for(let j=0;j<segments;j++){
+   const a=point(i,j),c=point(i+1,j),d=point(i+1,j+1),e=point(i,j+1);
+   for(const p of [a,c,d,a,d,e]){sphere[offset++]=p[0];sphere[offset++]=p[1];sphere[offset++]=p[2];}
+  }
+  for(let i=0;i<=segments;i++){const angle=i*Math.PI*2/segments;circle[i*2]=Math.cos(angle);circle[i*2+1]=Math.sin(angle);}
+  return this.unitGeometry={segments,rings,sphere,circle,corners:[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],faces:[[0,1,2,0,2,3],[5,4,7,5,7,6],[4,0,3,4,3,7],[1,5,6,1,6,2],[3,2,6,3,6,7],[4,5,1,4,1,0]],normals:[[0,0,-1],[0,0,1],[-1,0,0],[1,0,0],[0,1,0],[0,-1,0]]};
+ }
  mesh(boxes){
-  const segments=16,rings=10;
+  const {segments,rings,sphere,circle,corners,faces,normals}=BarRenderer.topology();
   let needed=0;for(const b of boxes)needed+=(b.shape==='sphere'?segments*rings*6:b.round||b.shape==='cylinder'?segments*12:36)*12;
   if(this.scratch.length<needed)this.scratch=new Float32Array(Math.max(needed,this.scratch.length*2));
   const out=this.scratch;let offset=0;
-  const corners=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
-  const faces=[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]],normals=[[0,0,-1],[0,0,1],[-1,0,0],[1,0,0],[0,1,0],[0,-1,0]];
   for(const b of boxes){
    let rgb=this.colors.get(b.c);if(!rgb){const hex=b.c||'#ffffff';rgb=[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];this.colors.set(b.c,rgb)}
    const mat=b.mat??b.wood??(['#b39872','#634631','#d4b27c','#ba9968','#a98555','#684d37'].includes(b.c)?1:0);
    const cx=Math.cos(b.rx||0),sx=Math.sin(b.rx||0),cy=Math.cos(b.ry||0),sy=Math.sin(b.ry||0),cz=Math.cos(b.rz||0),sz=Math.sin(b.rz||0);
+   const halfW=b.w/2,halfH=b.h/2,halfD=b.d/2,normalW=Math.max(.00001,b.w),normalH=Math.max(.00001,b.h),normalD=Math.max(.00001,b.d);
    const emit=(x,y,z,nx,ny,nz,u=-1,v=-1)=>{
-    x*=b.w/2;y*=b.h/2;z*=b.d/2;
+    x*=halfW;y*=halfH;z*=halfD;
     let a=y*cx-z*sx;z=y*sx+z*cx;y=a;a=x*cy+z*sy;z=-x*sy+z*cy;x=a;a=x*cz-y*sz;y=x*sz+y*cz;x=a;
-    nx/=Math.max(.00001,b.w);ny/=Math.max(.00001,b.h);nz/=Math.max(.00001,b.d);
+    nx/=normalW;ny/=normalH;nz/=normalD;
     a=ny*cx-nz*sx;nz=ny*sx+nz*cx;ny=a;a=nx*cy+nz*sy;nz=-nx*sy+nz*cy;nx=a;a=nx*cz-ny*sz;ny=nx*sz+ny*cz;nx=a;
     const length=Math.hypot(nx,ny,nz)||1;
     out[offset++]=b.x+x;out[offset++]=b.y+y;out[offset++]=b.z+z;out[offset++]=rgb[0];out[offset++]=rgb[1];out[offset++]=rgb[2];out[offset++]=mat;out[offset++]=nx/length;out[offset++]=ny/length;out[offset++]=nz/length;out[offset++]=u;out[offset++]=v;
    };
    if(b.shape==='sphere'){
-    const point=(i,j)=>{const p=-Math.PI/2+i*Math.PI/rings,t=j*Math.PI*2/segments;return [Math.cos(p)*Math.cos(t),Math.sin(p),Math.cos(p)*Math.sin(t)]};
-    for(let i=0;i<rings;i++)for(let j=0;j<segments;j++){
-     const a=point(i,j),c=point(i+1,j),d=point(i+1,j+1),e=point(i,j+1);
-     for(const p of [a,c,d,a,d,e])emit(...p,...p);
-    }
+    for(let i=0;i<sphere.length;i+=3){const x=sphere[i],y=sphere[i+1],z=sphere[i+2];emit(x,y,z,x,y,z);}
    }else if(b.round||b.shape==='cylinder'){
     const top=b.topRadius??1,bottom=b.bottomRadius??1,slope=(bottom-top)/2;
     for(let i=0;i<segments;i++){
-     const a=i*Math.PI*2/segments,c=(i+1)*Math.PI*2/segments,p=[Math.cos(a),Math.sin(a)],q=[Math.cos(c),Math.sin(c)];
-     for(const [n,y]of [[p,-1],[q,-1],[q,1],[p,-1],[q,1],[p,1]]){const radius=y===1?top:bottom;emit(n[0]*radius,y,n[1]*radius,n[0],slope,n[1])}
-     for(const y of [-1,1]){const radius=y===1?top:bottom;emit(0,y,0,0,y,0);emit(p[0]*radius,y,p[1]*radius,0,y,0);emit(q[0]*radius,y,q[1]*radius,0,y,0)}
+     const px=circle[i*2],pz=circle[i*2+1],qx=circle[i*2+2],qz=circle[i*2+3];
+     const bx=px*bottom,bz=pz*bottom,cx=qx*bottom,cz=qz*bottom,tx=px*top,tz=pz*top,ux=qx*top,uz=qz*top;
+     emit(bx,-1,bz,px,slope,pz);emit(cx,-1,cz,qx,slope,qz);emit(ux,1,uz,qx,slope,qz);
+     emit(bx,-1,bz,px,slope,pz);emit(ux,1,uz,qx,slope,qz);emit(tx,1,tz,px,slope,pz);
+     emit(0,-1,0,0,-1,0);emit(bx,-1,bz,0,-1,0);emit(cx,-1,cz,0,-1,0);
+     emit(0,1,0,0,1,0);emit(tx,1,tz,0,1,0);emit(ux,1,uz,0,1,0);
     }
    }else{
     const label=this.label(b),labelFace={front:0,back:1,left:2,right:3,top:4,bottom:5}[b.labelFace||'front'];
-    faces.forEach((face,i)=>{for(const k of [face[0],face[1],face[2],face[0],face[2],face[3]]){
+    for(let i=0;i<faces.length;i++)for(const k of faces[i]){
      const p=corners[k],n=normals[i];let u=-1,v=-1;
      if(label&&i===labelFace){let tx=(p[0]+1)/2,ty=(p[1]+1)/2;if(i===1)tx=1-tx;if(i===2)tx=(1-p[2])/2;if(i===3)tx=(p[2]+1)/2;if(i===4)ty=(p[2]+1)/2;if(i===5)ty=(1-p[2])/2;u=label.u0+tx*(label.u1-label.u0);v=label.v0+ty*(label.v1-label.v0)}
-     emit(...p,...n,u,v);
-    }});
+     emit(p[0],p[1],p[2],n[0],n[1],n[2],u,v);
+    }
    }
   }
   return out.subarray(0,offset);
  }
  setScene(boxes){
   const gl=this.gl;this.resetAtlas();
-  // Pack tall labels first, keeping the existing 4096x2048 texture budget.
-  boxes.filter(b=>b.label||b.labelLines).sort((a,b)=>this.labelAspect(a)-this.labelAspect(b)).forEach(b=>this.label(b));
+  // Largest regions first; stable ties keep packing deterministic across reloads.
+  [...boxes,...this.sceneLabels].filter(b=>b.label||b.labelLines).map(b=>({box:b,...this.labelDimensions(b)})).sort((a,b)=>(b.w+16)*(b.h+16)-(a.w+16)*(a.h+16)||b.h-a.h||b.w-a.w).forEach(item=>this.label(item.box));
   let data=this.mesh(boxes);gl.bindBuffer(gl.ARRAY_BUFFER,this.staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);this.count=data.length/12;
   const casters=boxes.filter(b=>b.castShadow!==false&&b.shadow!==false&&b.mat!==6&&b.mat!==7&&b.y-b.h/2<2.7&&!(b.h>2.7&&(b.w>10||b.d>9))&&!(b.w>11&&b.d>9));
   data=this.mesh(casters);gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);this.shadowCount=data.length/12;this.shadowDirty=true;this.uploadAtlas();

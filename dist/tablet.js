@@ -31,7 +31,8 @@ window.BarTablet=(()=>{
 
  // Fixed seating cards keep their controls stable as customers arrive and leave.
  const service=pages.get('service'),serviceNote=make('div','tablet-reserve-note');
- const roomSummary=make('div','tablet-service-summary');service.append(serviceNote,roomSummary);
+ const roomServiceNotice=make('div','tablet-service-notice'),roomServiceText=make('p'),roomServiceAction=button('Ouvrir le bar','service','tablet-button');roomServiceAction.id='tabletServiceToggle';roomServiceNotice.append(roomServiceText,roomServiceAction);
+ const roomSummary=make('div','tablet-service-summary');service.append(roomServiceNotice,serviceNote,roomSummary);
  const tableGrid=make('div','tablet-service-grid'),counterGrid=make('div','tablet-service-grid');
  service.append(make('h3','tablet-group-title','Tables de la salle'),tableGrid,make('h3','tablet-group-title','Au comptoir'),counterGrid);
  const seats=new Map();let selectedOrderId=null;
@@ -53,7 +54,8 @@ window.BarTablet=(()=>{
  function reachOrder(order){return !!game.canReachOrder?.(order.id,camera)}
  function refreshService(s){
   const payments=s.payments||{},orders=s.orders||[];
-  serviceNote.textContent='Rejoignez une table pour prendre la commande sur cette tablette. Revenez avec la boisson, puis encaissez après la dégustation.';
+  serviceNote.textContent='Vous pouvez aussi ouvrir ou fermer le service avec la pancarte près de l’entrée. Rejoignez ensuite une table pour prendre la commande sur cette tablette, apporter la boisson et encaisser.';
+  roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
   roomSummary.textContent=`${count} client${count>1?'s':''} · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalCarried?'avec vous':'au comptoir'}`;
   const counterOrders=orders.filter(order=>!order.tableId);
@@ -137,7 +139,7 @@ window.BarTablet=(()=>{
  }
 
  // Drinks: keep controls and cards mounted so typing, focus and scrolling survive ticks.
- const drinks=pages.get('drinks'),notice=make('div','tablet-service-notice'),noticeText=make('p'),serviceAction=button('Ouvrir le bar','service','tablet-button');
+ const drinks=pages.get('drinks'),notice=make('div','tablet-service-notice'),noticeText=make('p'),serviceAction=button('Ouvrir le bar','service','tablet-button');serviceAction.id='tabletDrinksServiceToggle';
  const returnPrep=button('Revenir à la préparation','prep','tablet-button tablet-button-subtle');notice.append(noticeText,serviceAction,returnPrep);drinks.append(notice);
  const filters=make('div','tablet-filters'),searchLabel=make('label','tablet-search-label');searchLabel.append(make('span',null,'Rechercher une boisson'));
  const search=make('input');search.id='tabletSearch';search.type='search';search.placeholder='Nom, ingrédient…';search.autocomplete='off';searchLabel.append(search);
@@ -184,6 +186,8 @@ window.BarTablet=(()=>{
  const teamIntro=make('div','tablet-management-intro');teamIntro.append(icon('team'),make('div',null));teamIntro.lastChild.append(make('h3',null,'Un coup de main pendant le service.'),make('p',null,'Confiez les stocks, la préparation et le service à votre équipe. Les encaissements restent entre vos mains.'));team.append(teamIntro);
  const upgradeLists=new Map();for(const key of ['building','licenses','team']){const list=make('div','tablet-upgrade-list');pages.get(key).append(list);upgradeLists.set(key,list)}
  for(const key of ['building','licenses','team'])pages.get(key).append(make('p','tablet-section-note','Les déblocages dépendent du nombre total de clients servis. Les achats et recrutements sont conservés dans votre sauvegarde.'));
+ const newBarNotice=make('div','tablet-service-notice'),newBarAction=button('Nouveau bar','new-bar','tablet-button tablet-button-subtle');
+ newBarNotice.append(make('p',null,'Recommencez avec un nouveau bar. Une confirmation protège la partie actuelle ; vos sauvegardes manuelles restent disponibles.'),newBarAction);building.append(newBarNotice);
  function syncUpgrades(){
   const catalog=BarEngine.managementUpgrades||{},signature=JSON.stringify(catalog);if(signature===upgradesSignature)return;upgradesSignature=signature;
   for(const list of upgradeLists.values())list.replaceChildren();upgradeCards.clear();
@@ -202,8 +206,9 @@ window.BarTablet=(()=>{
   const s=game.s,inReserve=!!BarScene.inStockroom?.(camera);syncCatalogue();syncUpgrades();cash.textContent=money(s.cash);serviceStatus.textContent=s.gameOver?'Partie terminée':s.closing?'Dernière tournée':s.open?'Service ouvert':'Service fermé';serviceStatus.dataset.open=String(s.open&&!s.closing);
   refreshService(s);refreshRegister(s);
   location.textContent=inReserve?'Dans la réserve':'Dans le bar';location.dataset.reserve=String(inReserve);
-  noticeText.textContent=s.gameOver?'Votre trésorerie est épuisée. Retrouvez le menu pour commencer une nouvelle partie.':s.prep?`${recipes[s.prep.recipe].name} est en préparation. Terminez cette boisson au comptoir.`:!s.open?'Ouvrez le bar, puis choisissez une boisson à préparer.':s.closing?'Le bar termine son service. Préparez les dernières commandes.':'Choisissez une recette, puis préparez-la au comptoir.';
-  serviceAction.hidden=!!s.prep||s.gameOver;serviceAction.disabled=s.closing;serviceAction.textContent=s.open?'Dernière tournée':'Ouvrir le bar';returnPrep.hidden=!s.prep;
+  noticeText.textContent=s.gameOver?'Votre trésorerie est épuisée. Ouvrez Bâtiment pour commencer un nouveau bar.':s.prep?`${recipes[s.prep.recipe].name} est en préparation. Terminez cette boisson au comptoir.`:!s.open?'Ouvrez le bar, puis choisissez une boisson à préparer.':s.closing?'Le bar termine son service. Préparez les dernières commandes.':'Choisissez une recette, puis préparez-la au comptoir.';
+  for(const item of [serviceAction,roomServiceAction]){item.hidden=false;item.disabled=s.closing||s.gameOver;item.textContent=s.open?'Dernière tournée':'Ouvrir le bar';}
+  newBarAction.disabled=!GameMenu.hasSession()||GameMenu.getMode()!=='play'||paused;returnPrep.hidden=!s.prep;
   for(const [id,entry]of recipeCards){const recipe=recipes[id],licensed=game.canPrepare?game.canPrepare(id):true,available=game.canMake(id);entry.prepare.disabled=!s.open||s.gameOver||!!s.prep||!available||s.tray.length>=s.capacity;entry.availability.textContent=!licensed?'Licence requise · voir Licences':!available?'Stock au comptoir insuffisant':s.prep?.recipe===id?'En préparation':s.tray.length>=s.capacity?'Plateau plein':'Ingrédients disponibles';entry.availability.dataset.available=String(available);for(const [key,row]of entry.ingredientNodes)row.classList.toggle('missing',(s.stock[key]||0)<recipe.ingredients[key])}
   reserveNote.textContent=inReserve?'Vous êtes dans la réserve. Réapprovisionnez le comptoir avec les ingrédients disponibles.':'Pour réapprovisionner le comptoir, rejoignez la réserve derrière le bar puis appuyez sur E.';reserveNote.classList.toggle('tablet-reserve-present',inReserve);
   for(const [key,row]of stockRows){const ingredient=ingredients[key],stored=s.reserve?.[key]||0,limit=game.serviceCapacity?.(key)??BarEngine.serviceCapacities?.[key]??ingredient.pack*2;row.serviceAmount.textContent=`${number(s.stock[key])} ${ingredient.unit}`;row.capacity.textContent=`Capacité : ${number(limit)} ${ingredient.unit}`;row.reserveAmount.textContent=`${number(stored)} ${ingredient.unit}`;const deliveries=s.deliveries.filter(d=>d.key===key);row.delivery.textContent=deliveries.length?`${deliveries.length} lot${deliveries.length>1?'s':''} en route · ${Math.ceil(Math.min(...deliveries.map(d=>d.remaining)))} s`:'Aucune livraison en cours';row.refill.disabled=!inReserve||s.gameOver||stored<=0||s.stock[key]>=limit;row.refill.title=!inReserve?'Rejoignez la réserve pour transférer les ingrédients.':'';row.buy.disabled=s.gameOver||s.cash<ingredient.cost}
@@ -227,6 +232,7 @@ window.BarTablet=(()=>{
  dialog.addEventListener('cancel',event=>{event.preventDefault();handleEscape()});
  dialog.addEventListener('close',()=>{document.body.dataset.tabletOpen=String(dialog.open)});
  dialog.addEventListener('click',event=>{
+  if(!dialog.open||!window.GameMenu?.hasSession()||GameMenu.getMode()!=='play'||paused||$('modal').open||$('settingsModal').open)return;
   const target=event.target.closest('button');if(!target||target.disabled)return;
   if(target.dataset.tabletTab){setTab(target.dataset.tabletTab);return}
   const actAndRefresh=fn=>{let message;act(()=>{message=fn();return message});feedback.textContent=message||'';refresh(true);};
@@ -251,7 +257,7 @@ window.BarTablet=(()=>{
   if(target.dataset.tabletBuy){let message;act(()=>{message=game.buy(target.dataset.tabletBuy);return message});feedback.textContent=message||'Commande enregistrée.';refresh(true);return}
   if(target.dataset.tabletRestock){if(!BarScene.inStockroom?.(camera)){feedback.textContent='Rejoignez la réserve pour réapprovisionner le comptoir.';refresh(true);return}const key=target.dataset.tabletRestock;let message;act(()=>{message=game.restock(key);return message});feedback.textContent=message||'Comptoir réapprovisionné.';refresh(true);return}
   if(target.dataset.tabletUpgrade){let message;act(()=>{message=game.purchaseUpgrade(target.dataset.tabletUpgrade);return message});feedback.textContent=message||'Amélioration acquise.';refresh(true);return}
-  switch(target.dataset.tabletAction){case'close':close();break;case'prep':close({resumeLook:false});break;case'service':act(()=>game.s.open?game.close():game.open());refresh(true);break;case'terminal-pickup':actAndRefresh(()=>game.pickupTerminal(camera));break;case'terminal-return':actAndRefresh(()=>game.returnTerminal(camera));break;case'fund-till':actAndRefresh(()=>game.fundTill(Number(fundAmount.value),camera));break}
+  switch(target.dataset.tabletAction){case'close':close();break;case'prep':close({resumeLook:false});break;case'service':actAndRefresh(()=>game.s.open?game.close():game.open());break;case'new-bar':GameMenu.newGame();break;case'terminal-pickup':actAndRefresh(()=>game.pickupTerminal(camera));break;case'terminal-return':actAndRefresh(()=>game.returnTerminal(camera));break;case'fund-till':actAndRefresh(()=>game.fundTill(Number(fundAmount.value),camera));break}
  });
  return {open,close,toggle,isOpen:()=>dialog.open,refresh,handleEscape,reset,getTab:()=>current,focusOrder};
 })();

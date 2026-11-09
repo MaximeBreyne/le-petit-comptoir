@@ -48,7 +48,7 @@ app.whenReady().then(async()=>{
 
    key('Tab','Tab');await flush();
    check(!locked&&BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play','TAB opens the tablet without entering pause');
-   click('[data-tablet-action="service"]');check(state.open,'Open bar is usable in the tablet');
+   click('[data-tablet-tab="drinks"]');click('[data-tablet-page="drinks"] [data-tablet-action="service"]');check(state.open,'Open bar is usable in the tablet');
    state.spawn=999;const clock=state.time;last=performance.now()-30;frame(performance.now());check(state.time>clock,'Service time continues in cursor mode');
    const stillAngle=camera.a;document.dispatchEvent(new MouseEvent('mousemove',{movementX:40,movementY:20}));check(camera.a===stillAngle,'Cursor motion does not rotate the camera');
    const position={x:camera.x,z:camera.z};key(preferences.bindings.forward.code,'z');movement(.1);key(preferences.bindings.forward.code,'z','keyup');check(camera.x===position.x&&camera.z===position.z,'Cursor typing does not move the player');
@@ -78,13 +78,13 @@ app.whenReady().then(async()=>{
    key('Tab','Tab');await flush();check(!state.prep.pouring&&BarTablet.isOpen(),'Opening the tablet releases held pouring');
    key(preferences.bindings.pour.code,' ','keyup');click('[data-tablet-action="prep"]');await flush();
    key(preferences.bindings.pour.code,' ');for(let i=0;i<36;i++)game.tick(.1);key(preferences.bindings.pour.code,' ','keyup');ui();
-   click('[data-action="finish"]');click('[data-action="plate"]');click('[data-serve="1"]');
+   click('[data-action="finish"]');click('[data-action="plate"]');BarTablet.open('service',1);click('[data-tablet-order-action="serve"][data-order-id="1"]');BarTablet.close({resumeLook:false});await flush();
    check(state.sold===0&&state.cash===260&&state.orders[0].phase==='drinking'&&state.tray.length===0,'A drink can be selected, prepared and served without ESC before payment');
    for(let i=0;i<41;i++)game.tick(.1);check(state.orders[0].phase==='payment','The served client requests payment');game.pickupTerminal(BarEngine.registerPosition);game.payCard(1,camera);check(state.sold===0&&state.cash===260,'Pending card approval does not credit money');for(let i=0;i<31;i++)game.tick(.1);ui();check(state.sold===1&&state.cash===266&&state.orders.length===0,'Payment completes service without ESC');
    check(GameMenu.getMode()==='play'&&!paused&&BarInput.isCursorMode(),'Service never enters the pause menu');
 
    // A modal is an intentional release, not an unexpected pointer loss.
-   BarInput.enterLook();await flush();click('#order');await flush();
+   BarInput.enterLook();await flush();key('Tab','Tab');await flush();click('[data-tablet-tab="reserve"]');await flush();
    check(BarTablet.isOpen()&&BarTablet.getTab()==='reserve'&&GameMenu.getMode()==='play','Supplier tablet opens without a pause overlay');
    const beforeBuy=state.cash;click('[data-tablet-buy="rum"]');check(state.cash===beforeBuy-18,'Supplier remains usable after intentional unlock');
    BarTablet.close();await flush();check(!BarTablet.isOpen()&&GameMenu.getMode()==='play','Close supplier returns to the active session');
@@ -146,7 +146,7 @@ app.whenReady().then(async()=>{
    const waitFor=async(expression,message)=>{
     const deadline=Date.now()+2500;
     while(Date.now()<deadline){if(await win.webContents.executeJavaScript(expression))return;await sleep(30)}
-    const state=await win.webContents.executeJavaScript("({mode:GameMenu.getMode(),paused,looking:BarInput.isLooking(),cursor:BarInput.isCursorMode(),locked:document.pointerLockElement===canvas,help:document.getElementById('interactionHelp')?.textContent,focused:document.hasFocus(),nativeLockErrors:window.nativeLockErrors})");
+    const state=await win.webContents.executeJavaScript("({mode:GameMenu.getMode(),paused,looking:BarInput.isLooking(),cursor:BarInput.isCursorMode(),locked:document.pointerLockElement===canvas,interaction:document.body.dataset.interaction,focused:document.hasFocus(),nativeLockErrors:window.nativeLockErrors})");
     throw Error(message+': '+JSON.stringify(state));
    };
    const nativeClick=async selector=>{
@@ -162,7 +162,7 @@ app.whenReady().then(async()=>{
    await waitFor("document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused",'Focused Continue must capture the camera without a scene click');
    nativeKey('Tab');
    await waitFor("!document.pointerLockElement&&BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play'",'Native TAB must open the tablet without pause');
-   await nativeClick('[data-tablet-recipe="beer"]');
+   await nativeClick('[data-tablet-tab="drinks"]');await nativeClick('[data-tablet-recipe="beer"]');
    await waitFor("state.prep?.recipe==='beer'&&!paused",'Native cursor click must choose a drink without ESC');
    await win.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
    await sleep(250);

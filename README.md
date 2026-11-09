@@ -26,7 +26,18 @@ Tab ouvre ou range la tablette de gestion. Choisir une boisson sur la tablette
 libère le curseur pour la préparer ; cliquer sur le décor reprend la caméra.
 La tablette regroupe le service, les boissons, la caisse, les stocks, le bâtiment,
 les licences et l’équipe. Le service continue pendant son utilisation.
-Ouvrir le bar, choisir une recette sur la tablette, suivre les étapes, maintenir pour doser,
+Pour ouvrir le bar, approchez le panneau suspendu à la porte d’entrée et appuyez
+sur E, ou utilisez Ouvrir le bar dans Service ou Boissons sur la tablette.
+Un clic en regardant le panneau à proximité permet également de le tourner.
+Le même panneau ou bouton lance la dernière tournée : les clients présents
+doivent être servis et encaissés avant le bilan. Le panneau reflète cet état.
+En haut à gauche, seuls le statut et le temps de jeu restant jusqu’à minuit
+sont affichés, avec une barre d’avancement de 17 h à minuit.
+Les stocks, améliorations et l’action Nouveau bar se consultent uniquement
+dans la tablette ; Nouveau bar se trouve dans Bâtiment et demande confirmation.
+Les commandes de préparation apparaissent seulement lorsqu’une boisson est
+en préparation ou sur le plateau. Aucun panneau de mode caméra n’est affiché.
+Choisir une recette sur la tablette, suivre les étapes, maintenir pour doser,
 valider, poser sur le plateau puis rejoindre le client pour servir et encaisser.
 Les touches 1 à 4 ne sélectionnent plus les boissons.
 Les ingrédients sont prélevés au début de la préparation.
@@ -103,7 +114,9 @@ npm run dist:win
 Les sources du jeu sont dans dist/, le lanceur Windows dans desktop/.
 La scène 3D comporte une réserve accessible, du parquet, des matériaux détaillés, un éclairage chaud,
 des ombres, des enseignes et des bouteilles et verres arrondis. Les personnages
-restent stylisés. Les clients arrivent et repartent en marchant,
+restent stylisés, avec des visages modelés : yeux, iris, pupilles, paupières,
+sourcils, nez, lèvres, oreilles et coiffures variées.
+Les clients arrivent et repartent en marchant,
 conservent leur place au comptoir et bloquent le passage lorsqu'ils attendent.
 Les chaises font face aux tables et la machine à café laisse un espace
 distinct pour la tasse en préparation, sans tasse superposée.
@@ -113,6 +126,12 @@ adaptée au panneau ; les étiquettes de la réserve sont plus contrastées.
 La souris et les flèches suivent le sens du regard : gauche vers gauche.
 
 VÉRIFICATIONS DU RENDU
+npm test inclut les contrôles du rangement des textures de panneaux et de
+la géométrie mise en cache, en plus du moteur, des sauvegardes et du build.
+electron checks/hud.cjs vérifie l’interface, la progression de la journée
+et les interactions avec le panneau d’entrée dans une fenêtre masquée.
+electron checks/visual-preview.cjs produit les aperçus du bar, du panneau
+et des visages dans checks/artifacts, sans modifier le profil du joueur.
 node checks/realism.cjs
 Ce contrôle nécessite Node 22+ et Chrome sous Windows (CHROME_PATH permet
 de choisir son exécutable). Il utilise un profil de test temporaire et vérifie

@@ -149,7 +149,6 @@ const BarScene=(()=>{
   b(6,1.41,9.95,.07,2.82,.1,'#263a36',M.metal,noShadow);
   b(6,.15,9.91,2.9,.3,.1,'#293b34',M.wood);
   for(const x of [5.84,6.16])c(x,1.18,9.82,.026,.38,.026,'#b79d62',M.metal);
-  b(6,2.23,9.9,.68,.27,.015,'#203f37',0,{label:'BIENVENUE',labelColor:'#ddd2b1',labelFace:'front',castShadow:false});
   b(6,.006,9.06,2.3,.013,1.15,'#383e36',M.fabric,noShadow);
   // Street beyond the windows, deliberately simple and outside the playable room.
   b(6,-.08,11.1,20,.14,2.1,'#92928a',M.tile,noShadow);
@@ -372,17 +371,60 @@ const BarScene=(()=>{
   // Separate joints, facial planes and layered clothing replace block silhouettes.
   c(0,1.105,0,.40,.49,.25,shirt,M.fabric,{topRadius:1.12,contactShadow:true});
   s(0,.855,0,.35,.2,.25,'#333f43',M.fabric);
-  c(0,1.425,0,.105,.13,.11,skin,M.skin);
-  s(0,1.59,0,.19,.265,.205,skin,M.skin);
-  s(0,1.697,.025,.196,.12,.205,hair,M.fabric);
-  s(-.088,1.61,.012,.026,.067,.043,skin,M.skin);s(.088,1.61,.012,.026,.067,.043,skin,M.skin);
-  s(0,1.58,-.105,.022,.04,.026,skin,M.skin);
-  s(0,1.535,-.087,.055,.006,.018,'#865b4c',M.skin);
+  // Faces point towards local -Z. Layer the features beyond the skull surface:
+  // putting the eyes at the skull centreline used to hide them inside the head.
+  c(0,1.38,.014,.112,.10,.12,skin,M.skin);
+  {
+   // Lower the head into the neck without changing shoulders or seated poses.
+   const s=(ox,y,...args)=>g.sphere(ox,y-.03,...args);
+   const c=(ox,y,...args)=>g.cylinder(ox,y-.03,...args);
+   const b=(ox,y,...args)=>g.box(ox,y-.03,...args);
+   const faceShade=['#ad7b5c','#80583f','#bd987b','#976b50'][id%4];
+   const lips=['#976451','#745044','#ac7767','#875b4b'][id%4];
+   const iris=['#555e4d','#513c2b','#5e6971','#635135'][id%4];
+   s(0,1.565,0,.202,.268,.210,skin,M.skin);
+   s(0,1.492,.008,.164,.12,.170,skin,M.skin);
+   for(const side of [-1,1]){
+    s(side*.099,1.565,.005,.030,.061,.040,skin,M.skin);
+    c(side*.109,1.567,-.006,.009,.003,.027,faceShade,M.skin,{rz:Math.PI/2,rx:.18});
+    // The whites are mostly covered by the lids, with small, inset irises.
+    const eyeAngle=-side*.42;
+    s(side*.0415,1.593,-.092,.034,.012,.015,'#d6d1bc',M.skin,{ry:eyeAngle});
+    c(side*.0415,1.593,-.0995,.010,.0015,.010,iris,M.skin,{rx:Math.PI/2});
+    c(side*.0415,1.593,-.1003,.0045,.001,.0045,'#242720',M.skin,{rx:Math.PI/2});
+    s(side*.0415,1.599,-.089,.039,.006,.015,skin,M.skin,{ry:eyeAngle});
+    s(side*.0415,1.587,-.089,.038,.005,.014,skin,M.skin,{ry:eyeAngle});
+    b(side*.042,1.611,-.090,.038,.004,.007,hair,M.fabric,{ry:eyeAngle,rz:side*.08});
+   }
+   s(0,1.574,-.097,.022,.059,.027,skin,M.skin);
+   s(0,1.55,-.109,.027,.023,.026,skin,M.skin);
+   for(const side of [-1,1]){
+    s(side*.010,1.546,-.100,.017,.014,.022,skin,M.skin);
+    c(side*.009,1.541,-.111,.005,.0015,.003,faceShade,M.skin,{rx:1.15});
+   }
+   s(0,1.519,-.095,.050,.006,.013,lips,M.skin);
+   s(0,1.512,-.094,.048,.007,.015,lips,M.skin);
+   b(0,1.515,-.102,.043,.0014,.0015,faceShade,M.skin);
+   // A shared scalp with a few broad locks gives distinct silhouettes at low cost.
+   s(0,1.663,.029,.208,.108,.202,hair,M.fabric);
+   s(0,1.602,.084,.178,.137,.071,hair,M.fabric);
+   const hairStyle=id%4;
+   if(hairStyle===0){
+    s(-.035,1.671,-.044,.144,.055,.101,hair,M.fabric,{rz:-.16});
+    s(.068,1.64,-.005,.055,.086,.13,hair,M.fabric);
+   }else if(hairStyle===1){
+    for(const side of [-1,1])s(side*.087,1.604,.034,.042,.132,.107,hair,M.fabric);
+    s(0,1.626,.124,.11,.099,.093,hair,M.fabric);
+   }else if(hairStyle===2){
+    s(.025,1.677,-.043,.17,.067,.112,hair,M.fabric,{rz:.10});
+    s(-.074,1.638,.009,.049,.085,.128,hair,M.fabric);
+   }else{
+    for(const side of [-1,1])s(side*.09,1.628,.032,.037,.086,.112,hair,M.fabric);
+   }
+  }
+  // A fitted neckline avoids floating collar rectangles cutting into the chest.
+  c(0,1.348,.014,.133,.018,.14,shirt,M.fabric,{topRadius:.94});
   for(const side of [-1,1]){
-   s(side*.043,1.623,-.089,.028,.009,.012,'#b4ae9c');
-   s(side*.043,1.623,-.096,.009,.009,.005,'#343a31');
-   b(side*.044,1.642,-.093,.036,.005,.007,hair,8,{rz:side*.09});
-   b(side*.038,1.34,-.125,.055,.075,.012,'#9b9989',M.fabric,{rz:side*.28});
    s(side*.185,1.30,0,.14,.14,.17,shirt,M.fabric);
    const stride=!seated&&moving?Math.sin(time*7.2+id+side*1.57)*.34:0;
    const kneeZ=seated?-.35:Math.sin(stride)*.39,kneeY=seated?.81:.865-Math.cos(stride)*.39;
@@ -409,7 +451,7 @@ const BarScene=(()=>{
     }
    }
   }
-  for(let y=.98;y<1.34;y+=.087)b(0,y,-.128,.012,.012,.009,'#c2b9a0',M.paint);
+  for(let y=.98;y<1.34;y+=.087)b(0,y,-.125*(1+.12*(y-.86)/.49)-.003,.012,.012,.009,'#c2b9a0',M.paint);
   if(staffKind){
    const apron=staffKind==='bartender'?'#254c3a':'#43566a';
    b(0,1.16,-.133,.28,.30,.018,apron,M.fabric);

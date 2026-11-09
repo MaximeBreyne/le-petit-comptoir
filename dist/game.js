@@ -1,7 +1,5 @@
 const $=id=>document.getElementById(id), money=n=>n.toLocaleString('fr-BE',{style:'currency',currency:'EUR'});
 const {Game,ingredients,recipes}=BarEngine;
-const escapeHTML=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const servicePhaseLabels={'awaiting-order':'Commande à prendre',preparing:'Boisson à préparer',drinking:'Déguste sa boisson',payment:'Attend l’addition','cash-collected':'Espèces reçues · allez à la caisse','change-ready':'Monnaie prête · retournez au client','card-processing':'Paiement par carte en cours'};
 // Keep unchanged DOM nodes: keyboard focus and held controls survive UI refreshes.
 function updateHTML(element,html){if(element._html!==html){element.innerHTML=html;element._html=html}}
 let saved=null;try{saved=JSON.parse(localStorage.getItem('comptoir-bar-v2'))}catch{}
@@ -10,15 +8,15 @@ function save(force=false){if(force!==true&&window.GameMenu&&!GameMenu.canAutosa
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,4000)}
 function modal(title,html){game.setPour(false);keys={};window.BarTablet?.close({suspend:true});if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();$('modalTitle').textContent=title;$('modalContent').innerHTML=html;$('modal').showModal()}
 function act(fn){if(paused){toast('Reprenez la partie pour continuer.');return}const sales=game.s.totalSold,result=fn();toast(result);audio.chime(game.s.totalSold>sales?'sale':'click');state=game.s;save();ui()}
-function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;const t=Math.min(1440,state.time);$('clock').textContent=t>=1440?'00:00':String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('pause').textContent=paused?'Reprendre':'Pause';$('mission').textContent=state.gameOver?'Trésorerie épuisée. Commencez un nouveau bar.':state.totalSold<5?`Servez 5 clients pour agrandir le plateau (${state.totalSold}/5).`:`${state.totalSold} clients servis · Soignez le dosage pour gagner des pourboires.`;$('progress').style.setProperty('--progress',Math.min(100,state.totalSold*20)+'%');$('serviceStatus').textContent=state.closing?'DERNIÈRE TOURNÉE':state.open?'OUVERT':'FERMÉ';$('open').disabled=state.open||state.gameOver;$('open').textContent=state.open?'Service en cours':'Ouvrir le bar';$('end').disabled=!state.open||state.closing;
- updateHTML($('customers'),state.orders.length?state.orders.map(o=>{
-  const phase=game.orderPhase(o),arriving=o.arrivalRemaining>0,known=phase!=='awaiting-order';
-  const place=o.tableId?`Table ${o.tableId}`:'Comptoir',canServe=!arriving&&phase==='preparing'&&game.canReachOrder(o.id,camera)&&state.tray.some(t=>t.recipe===o.recipe&&(!t.orderId||t.orderId===o.id));
-  return `<div class="customer"><strong>${escapeHTML(o.name)}</strong> · ${place}<small>${arriving?'Arrive dans le bar':servicePhaseLabels[phase]||phase}${known?' · '+escapeHTML(recipes[o.recipe].name):''}</small>${['awaiting-order','preparing'].includes(phase)?`<div class="patience"><i style="width:${Math.max(0,Math.ceil(o.patience))}%"></i></div>`:''}<button ${canServe?`data-serve="${o.id}"`:`data-service-order="${o.id}"`}>${canServe?'Servir la boisson':'Voir sur la tablette'}</button></div>`;
- }).join(''):'<p class="empty">'+(state.open?'Un instant de calme. Les clients peuvent s’installer aux tables ou au comptoir.':'Ouvrez à 17 h et accueillez vos premiers habitués.')+'</p>');
+function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;const t=Math.min(1440,state.time);$('clock').textContent=t>=1440?'00:00':String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('pause').textContent=paused?'Reprendre':'Pause';
+ const day=BarVenue.dayProgress(state),status=BarVenue.serviceState(state);
+ $('serviceHud').dataset.state=status;
+ $('serviceStatus').textContent={closed:'FERMÉ',open:'OUVERT',closing:'DERNIÈRE TOURNÉE'}[status];
+ $('dayRemaining').textContent=day.text;$('dayProgress').value=day.elapsed;
+ $('dayProgress').setAttribute('aria-valuetext',day.text);
  $('register').textContent=state.payments?.terminalCarried?'Caisse · terminal en main':'Caisse';
- updateHTML($('stock'),Object.entries(ingredients).map(([k,i])=>`<div class="row"><span>${i.name}<br><small>Réserve : ${Math.round((state.reserve?.[k]||0)*10)/10} ${i.unit}</small></span><b>${Math.round(state.stock[k]*10)/10} ${i.unit}</b></div>`).join('')+state.deliveries.map(d=>`<p class="delivery">Vers la réserve : ${ingredients[d.key].name} · ${Math.ceil(d.remaining)} s</p>`).join(''));
- $('upgrade').disabled=false;$('upgrade').textContent='Gérer';$('upgradeText').textContent=state.upgraded?'Plateau de 4 boissons installé.':'Améliorations, licences et équipe dans la tablette.';$('trayCount').textContent=`PLATEAU ${state.tray.length}/${state.capacity}`;
+ $('trayCount').textContent=`PLATEAU ${state.tray.length}/${state.capacity}`;
+ $('workbench').hidden=!state.prep&&!state.tray.length;
  const p=state.prep;let html='<p class="empty">Choisissez une boisson. Sélectionnez le récipient, puis réalisez les étapes de la recette. Les ingrédients sont prélevés dès le début.</p>';
  if(p){let r=recipes[p.recipe];html=`<div class="sectionTitle"><strong>${r.name}</strong><span>${r.glass}</span></div><p class="steps">${r.steps.map((s,i)=>i===p.step?'<strong>'+s+'</strong>':s).join(' → ')}</p>`;
  if(p.ready)html+=`<p>Dosage : <strong>${p.quality}%</strong> · ${p.quality<40?'La boisson sera refusée.':p.quality>=85?'Excellent ! Pourboire possible.':'Boisson acceptable.'}</p><div class="actions"><button class="primary" data-action="plate">Poser sur le plateau</button>`;
@@ -32,18 +30,19 @@ function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').text
  window.BarTablet?.refresh();
  if(window.BarInput&&typeof camera!=='undefined')BarInput.refresh();
 }
-$('open').onclick=()=>act(()=>game.open());$('end').onclick=()=>act(()=>game.close());$('upgrade').onclick=()=>BarTablet.open('building');$('chooseDrink').onclick=$('tablet').onclick=()=>BarTablet.open('drinks');$('register').onclick=()=>BarTablet.open('register');$('customers').onclick=e=>{let b=e.target.closest('[data-serve]');if(b)act(()=>game.serve(+b.dataset.serve,camera));else{b=e.target.closest('[data-service-order]');if(b)BarTablet.open('service',+b.dataset.serviceOrder)}};$('tray').onclick=e=>{let b=e.target.closest('[data-remove]');if(b)act(()=>game.discard(+b.dataset.remove))};
+$('chooseDrink').onclick=$('tablet').onclick=()=>BarTablet.open('drinks');$('register').onclick=()=>BarTablet.open('register');$('tray').onclick=e=>{let b=e.target.closest('[data-remove]');if(b)act(()=>game.discard(+b.dataset.remove))};
 $('prep').onclick=e=>{const b=e.target.closest('[data-action]');if(!b||b.dataset.action==='pour')return;act(()=>{switch(b.dataset.action){case 'step':if(game.s.prep.recipe==='mojito'&&game.s.prep.step===5)game.finishMix();else game.step();break;case 'finish':game.finishPour();break;case 'plate':return game.plate();case 'discard':return game.discard()}})};
 $('prep').onpointerdown=e=>{let b=e.target.closest('#pour');if(b&&!paused){b.setPointerCapture(e.pointerId);game.setPour(true);e.preventDefault()}};$('prep').onpointerup=$('prep').onpointercancel=()=>game.setPour(false);
-function supplier(){BarTablet.open('reserve')}
-$('order').onclick=supplier;$('close').onclick=()=>$('modal').close();
+$('close').onclick=()=>$('modal').close();
 $('help').onclick=()=>modal('Bienvenue derrière le bar',`<p><strong>Tab : votre tablette. E : interagir à proximité.</strong> Les clients s’installent aux quatre tables numérotées ou au comptoir. Rejoignez une table et ouvrez Service pour prendre sa commande ; elle apparaît alors dans la tablette.</p><p><strong>Préparer et apporter.</strong> Choisissez la recette, suivez les étapes, maintenez la touche pour doser, validez et posez la boisson sur le plateau. Revenez près du client pour la servir. Cliquez sur le décor ou rangez la tablette pour reprendre la caméra.</p><p><strong>Espèces.</strong> Après la dégustation, prenez l’argent à la table. Rejoignez la caisse derrière le bar et appuyez sur E. Sélectionnez les pièces et billets à rendre, puis rapportez la monnaie et le ticket au client. Les recettes sont enregistrées une seule fois, à la fin de l’encaissement. Le fond de caisse fait partie de votre trésorerie.</p><p><strong>Carte bancaire.</strong> Prenez le terminal sans fil à la caisse, apportez-le au client et lancez son paiement depuis Service. Attendez trois secondes pour la confirmation. Le terminal reste avec vous jusqu’à son retour sur le socle.</p><p><strong>Votre équipe.</strong> Recrutez progressivement l’aide de réserve, le préparateur de boissons et le serveur. Le préparateur utilise vos ingrédients ; le serveur prend les commandes et apporte les boissons. Les paiements restent à votre charge. Chaque employé a un salaire par soir.</p><p><strong>Réserve.</strong> La pièce est derrière le bar, à gauche. E ouvre ses stocks ; les livraisons y arrivent après dix secondes et doivent être transférées au comptoir.</p><p><strong>Maj : courir · Échap : pause · F11 : plein écran.</strong> La tablette laisse le service continuer. Les paramètres mettent le jeu en pause ; « Revenir au jeu » reprend immédiatement la partie. Le bilan attend la fin des commandes et paiements. Charges de base : 35 € plus les salaires.</p>`);
 // Static architecture and dynamic props use the same depth-tested scene.
 const canvas=$('world');let camera={...BarScene.playCamera},keys={};const boxes=BarScene.create();
+BarVenue.addFrame(boxes);
 let renderer=null,visualTime=0;const customerVisuals=new Map();
 let waiterVisual=null;
-try{renderer=new BarRenderer(canvas,boxes)}catch(error){$('graphicsError').hidden=false;$('graphicsError').textContent=error.message;console.error(error)}
+try{renderer=new BarRenderer(canvas,boxes,{labels:BarVenue.labelTemplates})}catch(error){$('graphicsError').hidden=false;$('graphicsError').textContent=error.message;console.error(error)}
 function interactionTarget(){
+ if(BarVenue.nearSign(camera))return {action:'service',label:'E : tourner le panneau du service.'};
  if(BarScene.inStockroom(camera))return {section:'reserve',label:'E : gérer les stocks de la réserve.'};
  if(game.nearRegister(camera))return {section:'register',label:'E : utiliser la caisse et prendre le terminal.'};
  const near=state.orders.filter(order=>game.canReachOrder(order.id,camera)).sort((a,b)=>{
@@ -54,6 +53,14 @@ function interactionTarget(){
  const table=BarEngine.tables.find(t=>Math.hypot(camera.x-t.x,camera.z-t.z)<1.7);
  if(table)return {section:'service',label:`E : consulter la table ${table.id}.`};
  return null;
+}
+function useInteraction(target=interactionTarget()){
+ if(!target)return false;
+ if(target.action==='service'){
+  if(state.closing)toast('Dernière tournée : terminez le service des clients présents.');
+  else act(()=>state.open?game.close():game.open());
+ }else BarTablet.open(target.section,target.orderId);
+ return true;
 }
 function routeLength(route){return route.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-route[i].x,p.z-route[i].z),0)}
 function alongRoute(route,progress){
@@ -84,6 +91,7 @@ function renderStaff(dynamic){
  if(job?.task==='serve'&&job.recipe){const g=BarScene.geometry(dynamic),x=p.x-Math.sin(p.angle)*.34,z=p.z-Math.cos(p.angle)*.34,bob=v.progress<1?Math.sin(visualTime*11+55)*.012:Math.sin(visualTime*1.7+55)*.006;g.cylinder(x,1.1+bob,z,.35,.025,.35,'#b6a77c',5);BarScene.glass(g,job.recipe,x,1.12+bob,z)}
 }
 function render(){if(!renderer)return;const dynamic=[];
+ BarVenue.render(dynamic,state);
  BarScene.storageVisuals(dynamic,state);
  BarScene.registerVisuals(dynamic,state,{open:window.BarTablet?.isOpen()&&BarTablet.getTab()==='register'&&game.nearRegister(camera)});
  renderStaff(dynamic);

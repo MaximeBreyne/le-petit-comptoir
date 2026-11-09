@@ -6,7 +6,7 @@ window.GameMenu=(()=>{
  let sessionActive=false,view='home',returnView='home',settingsOrigin='home',confirmation=null,escapeSuppressedUntil=0;
  const panel=document.createElement('section');panel.id='gameMenu';panel.className='game-menu';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','menuTitle');
  document.body.append(panel);
- const gameUI=[...document.querySelectorAll('body > header, body > aside, #workbench, body > footer')];
+ const gameUI=[...document.querySelectorAll('body > header, #serviceHud, #workbench, body > footer')];
 
  function read(key){try{return JSON.parse(localStorage.getItem(key))}catch{return null}}
  function validState(s){
@@ -156,7 +156,6 @@ window.GameMenu=(()=>{
   const first=buttons[0],lastButton=buttons.at(-1);
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();lastButton.focus()}else if(!event.shiftKey&&document.activeElement===lastButton){event.preventDefault();first.focus()}
  });
- $('reset').onclick=newGame;
  show('home');
  return {isHome:()=>!sessionActive,hasSession:()=>sessionActive,isBlocking:()=>view!=='play',canAutosave:()=>sessionActive&&view==='play',getMode:()=>view,pause,resume,openSettings,closeSettings,handleEscape,pointerUnlocked,returnHome,resetView,didAutosave,continueGame,newGame,validState};
 })();
