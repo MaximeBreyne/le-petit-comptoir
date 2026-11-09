@@ -17,7 +17,7 @@ window.GameMenu=(()=>{
   if(!Object.keys(ingredients).every(k=>Number.isFinite(s.stock[k])&&s.stock[k]>=0))return false;
   if(s.reserve!==undefined&&(!s.reserve||!Object.keys(ingredients).every(k=>Number.isFinite(s.reserve[k])&&s.reserve[k]>=0)))return false;
   if(s.management!==undefined&&(!s.management||!['cocktails','counter','assistant'].every(k=>typeof s.management[k]==='boolean')||!Number.isFinite(s.management.restockTimer)||s.management.restockTimer<0))return false;
-  if(!Array.isArray(s.orders)||s.orders.length>3||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
+  if(!Array.isArray(s.orders)||s.orders.length>7||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
   if(!Array.isArray(s.tray)||s.tray.length>s.capacity||!s.tray.every(t=>t&&recipes[t.recipe]&&Number.isFinite(t.quality)&&t.quality>=0&&t.quality<=100))return false;
   if(!Array.isArray(s.deliveries)||!s.deliveries.every(d=>d&&ingredients[d.key]&&Number.isFinite(d.remaining)&&d.remaining>=0&&d.remaining<=10))return false;
   if(s.prep){const p=s.prep,r=recipes[p.recipe];if(!r||!Number.isInteger(p.step)||p.step<0||p.step>=r.steps.length||!Number.isFinite(p.amount)||p.amount<0||p.amount>r.target*1.60001||!Number.isFinite(p.quality)||p.quality<0||p.quality>100||typeof p.ready!=='boolean')return false}
@@ -35,7 +35,7 @@ window.GameMenu=(()=>{
  function show(next){
   view=next;panel.hidden=next==='play';document.body.dataset.screen=sessionActive?'game':'home';document.body.dataset.menuOpen=String(next!=='play');
   for(const element of gameUI)element.inert=next!=='play';
-  if(next!=='play'){freeze();renderMenu();requestAnimationFrame(()=>panel.querySelector('button:not(:disabled)')?.focus({preventScroll:true}))}
+  if(next!=='play'){freeze();renderMenu();requestAnimationFrame(()=>{if(view===next&&!panel.hidden)panel.querySelector('button:not(:disabled)')?.focus({preventScroll:true})})}
  }
  function notify(message){const feedback=$('menuFeedback');if(feedback)feedback.textContent=message;else toast(message)}
  function persistCurrent(){save(true);return !saveFailed}
@@ -43,7 +43,7 @@ window.GameMenu=(()=>{
  function resetView(savedCamera){
   camera=validCamera(savedCamera)?{...savedCamera}:{...initialCamera};
   camera.pitch=Math.max(-1.15,Math.min(1.15,camera.pitch));
-  customerVisuals.clear();visualTime=0;keys={};$('prep').dataset.view='';
+  customerVisuals.clear();waiterVisual=null;visualTime=0;keys={};$('prep').dataset.view='';
  }
  function browserFullscreen(){
   if(!window.desktopGame&&!document.fullscreenElement&&navigator.userActivation?.isActive)document.documentElement.requestFullscreen?.().catch(()=>{});
@@ -65,13 +65,16 @@ window.GameMenu=(()=>{
   closeDialogs();sessionActive=false;show('home');
  }
  function openSettings(){
-  settingsOrigin=sessionActive?(view==='play'?'pause':view):'home';
+  settingsOrigin=sessionActive?view:'home';
   if(view==='play')show('pause');
   view='settings';freeze();capturing=null;settingsUI();$('settingsStatus').textContent='';
+  $('settingsClose').textContent=sessionActive?'Revenir au jeu':'Retour au menu';
   if(!$('settingsModal').open)$('settingsModal').showModal();
  }
- function closeSettings(){
-  if($('settingsModal').open)$('settingsModal').close();capturing=null;keys={};last=performance.now();show(settingsOrigin);
+ function closeSettings({resumeSession=false}={}){
+  if(view!=='settings'&&!$('settingsModal').open)return;
+  if($('settingsModal').open)$('settingsModal').close();capturing=null;keys={};last=performance.now();
+  if(sessionActive&&(resumeSession||settingsOrigin==='play'))resume();else show(settingsOrigin);
  }
  function chooseSaves(kind){returnView=sessionActive?'pause':'home';show(kind)}
  function storeSlot(slot){

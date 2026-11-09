@@ -1,14 +1,14 @@
 const settingLabels={forward:'Avancer',back:'Reculer',left:'Aller à gauche',right:'Aller à droite',turnLeft:'Tourner à gauche',turnRight:'Tourner à droite',sprint:'Maintenir pour courir',pause:'Pause / reprendre',pour:'Maintenir pour verser'};
 let capturing=null,lastRender=0;
 const menusOpen=()=>GameMenu.isBlocking()||$('modal').open||$('settingsModal').open;
-function controlHints(){const b=preferences.bindings;$('controlHints').textContent=`${b.forward.label} / ${b.back.label} / ${b.left.label} / ${b.right.label} : bouger · ${b.sprint.label} : courir · Tab : tablette · E : réserve · ${b.pour.label} : verser · Échap : pause`;}
+function controlHints(){const b=preferences.bindings;$('controlHints').textContent=`${b.forward.label} / ${b.back.label} / ${b.left.label} / ${b.right.label} : bouger · ${b.sprint.label} : courir · Tab : tablette · E : table / caisse / réserve · ${b.pour.label} : verser · Échap : pause`;}
 function settingsUI(){
  $('bindings').replaceChildren();for(const [action,label]of Object.entries(settingLabels)){let row=document.createElement('div'),text=document.createElement('span'),button=document.createElement('button');row.className='binding';text.textContent=label;button.type='button';button.dataset.bind=action;button.textContent=capturing===action?'Appuyez sur une touche…':preferences.bindings[action].label;button.className=capturing===action?'capturing':'';row.append(text,button);$('bindings').append(row)}
  for(const k of ['quality','fps','fov','brightness','sensitivity','invertY','volume','effects','ambience','muted']){const e=$(k);if(e.type==='checkbox')e.checked=preferences[k];else e.value=preferences[k];const out=$(k+'Value');if(out)out.value=k==='fov'?preferences[k]+'°':k==='sensitivity'?preferences[k].toFixed(1)+'×':preferences[k]+' %'}controlHints();
 }
 function persistSettings(){const okay=savePreferences();$('settingsStatus').textContent=okay?'Réglages sauvegardés.':'Sauvegarde des réglages impossible : vérifiez l’espace disque.';audio.update();controlHints()}
 function openSettings(){GameMenu.openSettings()}
-$('settings').onclick=openSettings;$('settingsClose').onclick=()=>GameMenu.closeSettings();$('settingsModal').addEventListener('cancel',e=>{e.preventDefault();if(capturing){capturing=null;settingsUI()}else GameMenu.closeSettings()});
+$('settings').onclick=openSettings;$('settingsClose').onclick=()=>GameMenu.closeSettings({resumeSession:true});$('settingsModal').addEventListener('cancel',e=>{e.preventDefault();if(capturing){capturing=null;settingsUI()}else GameMenu.closeSettings()});
 $('bindings').onclick=e=>{const b=e.target.closest('[data-bind]');if(b){capturing=b.dataset.bind;$('settingsStatus').textContent='Appuyez sur une touche. Échap annule.';settingsUI()}};
 for(const k of ['quality','fps','fov','brightness','sensitivity','invertY','volume','effects','ambience','muted'])$(k).addEventListener('input',()=>{const e=$(k);preferences[k]=e.type==='checkbox'?e.checked:e.tagName==='SELECT'&&k==='quality'?e.value:Number(e.value);settingsUI();persistSettings();render()});
 $('settingsReset').onclick=()=>{preferences=defaultPreferences();capturing=null;settingsUI();persistSettings();render()};
@@ -34,7 +34,7 @@ onkeydown=e=>{
  if(editing)return;
  if(e.code==='KeyE'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
   e.preventDefault();if(e.repeat)return;
-  if(BarScene.inStockroom(camera))BarTablet.open('reserve');else toast('La réserve se trouve derrière le bar, par la porte à gauche des étagères.');
+  const target=interactionTarget();if(target)BarTablet.open(target.section,target.orderId);else toast('Approchez une table, la caisse derrière le bar ou entrez dans la réserve, puis appuyez sur E.');
   return;
  }
  if(e.code===b.pour.code&&game.isPour()){e.preventDefault();if(!paused)game.setPour(true);return}

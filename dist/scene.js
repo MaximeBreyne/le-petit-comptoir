@@ -4,6 +4,12 @@ const BarScene=(()=>{
  const playCamera={x:6,y:1.68,z:1.55,a:0,pitch:-.06};
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
  const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
+ const tableLocations=globalThis.BarEngine?.tables||[{id:1,x:1.65,z:6.4},{id:2,x:1.65,z:8.6},{id:3,x:10.22,z:6.5},{id:4,x:10.22,z:8.65}];
+ function tableSeat(id){
+  const table=tableLocations.find(table=>table.id===Number(id));if(!table)return null;
+  const inside=table.x<6?1:-1;
+  return {x:table.x+inside*.78,z:table.z,angle:inside*Math.PI/2};
+ }
  const storageBins=[
   {key:'beer',label:'BIÈRE',pack:500,x:1,y:.37,kind:'keg',color:'#8d9993'},
   {key:'wine',label:'VIN',pack:75,x:2.25,y:.37,kind:'bottle',color:'#553b3c'},
@@ -225,9 +231,16 @@ const BarScene=(()=>{
   c(7.2,1.22,3.02,.18,.25,.18,'#aeb7aa',M.metal,{topRadius:.8});
   c(7.47,1.19,3.02,.14,.18,.14,'#abb3a8',M.metal);
   bottle(g,7.75,1.11,3.02,'#65724c',.75,'SIROP');
-  b(2.65,1.15,2.94,.43,.07,.38,'#252e2b');
-  b(2.65,1.32,2.94,.09,.31,.09,'#38433e',M.metal);
-  b(2.65,1.5,2.94,.56,.36,.045,'#192c2b',0,{rx:-.2,label:'COMPTOIR\n17:00',labelColor:'#d2e5cf'});
+  // Cash drawer and till face the staff aisle (-Z), with the display tilted
+  // upward toward the barman. The room sees the monitor's closed back.
+  b(2.65,1.17,2.94,.68,.15,.53,'#26332f',M.metal);
+  b(2.65,1.26,3.0,.42,.035,.29,'#33433b',M.metal);
+  b(2.65,1.405,3.0,.10,.30,.09,'#38433e',M.metal);
+  b(2.65,1.59,2.97,.68,.43,.055,'#1c302b',M.paint,{rx:.22});
+  b(2.65,1.597,2.938,.595,.335,.009,'#234d3c',M.paint,{rx:.22,label:'CAISSE\nE : ENCAISSER',labelFace:'front',labelColor:'#edf4df',castShadow:false});
+  // The cordless terminal rests beside the till until the player picks it up.
+  b(3.25,1.12,2.65,.205,.045,.29,'#2c3934',M.metal);
+  b(3.25,1.146,2.65,.16,.008,.25,'#101f1a',M.paint);
   // Illuminated bottle fridge by the wall.
   b(10.96,1.04,.75,1.15,2.08,1.12,'#253330',M.metal,solid);
   b(10.96,1.11,1.32,.97,1.67,.025,'#c5d1bc',M.light);
@@ -248,7 +261,7 @@ const BarScene=(()=>{
    // continuing down to the rear feet without protruding into the seat.
    for(const dx of [-.19,.19])for(const [dz,h] of [[-.18,.46],[.24,.99]]){[xx,zz]=p(dx,dz);b(xx,h/2,zz,.038,h,.038,'#343b33',M.metal,{ry:angle})}
   }
-  for(const [x,z] of [[1.65,6.4],[1.65,8.6],[10.22,6.5],[10.22,8.65]]){
+  for(const {id,x,z} of tableLocations){
    c(x,.75,z,1.05,.065,1.05,'#826c4d',M.wood,{solid:true});
    c(x,.38,z,.075,.72,.075,'#333c35',M.metal);
    c(x,.04,z,.53,.05,.53,'#303a33',M.metal);
@@ -256,6 +269,9 @@ const BarScene=(()=>{
    c(x,.818,z,.09,.07,.09,'#b2a890');c(x,.9,z,.025,.16,.025,'#72804b');
    s(x+.025,.99,z,.13,.11,.08,'#61734b');
    b(x-.2,.787,z+.18,.2,.008,.14,'#d7cdb4');
+   const inward=x<6?1:-1,signAngle=-inward*Math.PI/2;
+   b(x+inward*.26,.794,z-.18,.24,.015,.07,'#867854',M.metal,{ry:signAngle});
+   b(x+inward*.26,.85,z-.18,.23,.10,.018,'#203e30',M.paint,{ry:signAngle,label:'TABLE '+id,labelColor:'#f2e8c9',castShadow:false});
   }
   for(const x of [2.8,9.2]){
    c(x,.79,4.18,.4,.095,.4,'#785242',M.fabric,{solid:true});
@@ -305,16 +321,54 @@ const BarScene=(()=>{
    }
   }
  }
- function customer(items,{x,z,id,time,moving,departing=false,patience=100}){
+ function terminal(items,{x=3.25,y=1.175,z=2.65,angle=0,pitch=0}={}){
+  const source=geometry(items),cs=Math.cos(angle),sn=Math.sin(angle),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const b=(dx,dy,dz,w,h,d,color,mat=0)=>{
+   const py=dy*cp-dz*sp,pz=dy*sp+dz*cp;
+   source.box(x+dx*cs+pz*sn,y+py,z-dx*sn+pz*cs,w,h,d,color,mat,{ry:angle,rx:pitch,castShadow:false});
+  };
+  b(0,0,0,.17,.05,.245,'#172a24',M.paint);
+  b(0,.027,-.066,.134,.007,.079,'#94c3a4',M.paint);
+  b(0,.032,-.078,.085,.003,.008,'#254a36',M.paint);
+  b(-.025,.032,-.057,.035,.003,.006,'#254a36',M.paint);
+  for(let row=0;row<4;row++)for(let col=0;col<3;col++){
+   const color=row===3?(col===0?'#b45746':col===2?'#6eab72':'#c2a65d'):'#c3c9b7';
+   b((col-1)*.04,.031,.004+row*.029,.031,.009,.022,color,M.paint);
+  }
+  b(.066,.029,-.078,.006,.004,.013,'#e0dcb4',M.paint);
+ }
+ function registerVisuals(items,state,{open=false}={}){
+  const {box:b,cylinder:c}=geometry(items),z=open?2.59:2.94;
+  // Open tray extends toward the barman, with separate note/coin compartments.
+  b(2.65,1.122,z,.615,.016,.46,'#354239',M.metal);
+  for(const x of [2.345,2.955])b(x,1.157,z,.013,.07,.46,'#475347',M.metal);
+  b(2.65,1.157,z-.225,.625,.075,.018,'#36453b',M.metal);
+  b(2.65,1.16,z-.24,.15,.026,.025,'#b2aa84',M.metal);
+  if(open){
+   for(const x of [2.51,2.66,2.81])b(x,1.145,z,.012,.035,.41,'#17251d',M.paint);
+   b(2.65,1.145,z-.07,.59,.035,.012,'#17251d',M.paint);
+   for(const [i,color]of ['#a5ae82','#aab4c3','#c2aa85','#a9b695'].entries()){
+    b(2.43+i*.15,1.142,z+.06,.10,.008,.16,color,M.paint);
+    b(2.43+i*.15,1.149,z+.06,.009,.008,.15,'#657868',M.metal);
+    for(let coin=0;coin<3;coin++)c(2.42+i*.15+(coin%2)*.04,1.145+Math.floor(coin/2)*.008,z-.15,.027,.007,.027,i%2?'#b4aa72':'#bdc0aa',M.metal);
+   }
+  }
+  if(!state?.payments?.terminalCarried)terminal(items);
+ }
+ function customer(items,{x,z,id,time,moving,departing=false,patience=100,seated=false,angle,staffKind,carrying=false}){
   const g=geometry(items),skin=['#c4916d','#956c51','#d4b191','#b18061'][id%4];
-  const shirt=['#555f61','#815c4b','#6b7058','#525f74','#927e68'][id%5];
+  const shirt=staffKind?'#d1d0b8':['#555f61','#815c4b','#6b7058','#525f74','#927e68'][id%5];
   const hair=['#45352a','#302c26','#8b7750','#62564b'][id%4];
-  const turn=departing?Math.PI:0,cs=Math.cos(turn),sn=Math.sin(turn),bob=moving?Math.sin(time*11+id)*.012:Math.sin(time*1.7+id)*.006;
+  const turn=Number.isFinite(angle)?angle:departing?Math.PI:0,cs=Math.cos(turn),sn=Math.sin(turn),bob=!seated&&moving?Math.sin(time*11+id)*.012:Math.sin(time*1.7+id)*.006,seatOffset=seated?-.265:0;
   const original=g.box;
-  g.box=(ox,y,oz,w,h,d,c,mat=0,extra={})=>original(x+ox*cs+oz*sn,y+bob,z-ox*sn+oz*cs,w,h,d,c,mat,{...extra,ry:(extra.ry||0)+turn});
+  g.box=(ox,y,oz,w,h,d,c,mat=0,extra={})=>original(x+ox*cs+oz*sn,y+bob+seatOffset,z-ox*sn+oz*cs,w,h,d,c,mat,{...extra,ry:(extra.ry||0)+turn});
   g.cylinder=(...args)=>{args[8]={...args[8],round:true};return g.box(...args)};
   g.sphere=(...args)=>{args[8]={...args[8],shape:'sphere'};return g.box(...args)};
   const {box:b,cylinder:c,sphere:s}=g;
+  const armSegment=(a,end,width,depth,color)=>{
+   const dx=end.x-a.x,dy=end.y-a.y,dz=end.z-a.z;
+   c((a.x+end.x)/2,(a.y+end.y)/2,(a.z+end.z)/2,width,Math.hypot(dx,dy,dz),depth,color,color===skin?M.skin:M.fabric,{rx:Math.atan2(Math.hypot(dx,dz),dy),ry:Math.atan2(dx,dz)});
+  };
   // Separate joints, facial planes and layered clothing replace block silhouettes.
   c(0,1.105,0,.40,.49,.25,shirt,M.fabric,{topRadius:1.12,contactShadow:true});
   s(0,.855,0,.35,.2,.25,'#333f43',M.fabric);
@@ -330,20 +384,39 @@ const BarScene=(()=>{
    b(side*.044,1.642,-.093,.036,.005,.007,hair,8,{rz:side*.09});
    b(side*.038,1.34,-.125,.055,.075,.012,'#9b9989',M.fabric,{rz:side*.28});
    s(side*.185,1.30,0,.14,.14,.17,shirt,M.fabric);
-   const stride=moving?Math.sin(time*7.2+id+side*1.57)*.34:0;
-   const kneeZ=Math.sin(stride)*.39,kneeY=.865-Math.cos(stride)*.39;
-   c(side*.105,(.865+kneeY)/2,kneeZ/2,.15,.39,.16,'#38444a',M.fabric,{rx:-stride,topRadius:1.12});
+   const stride=!seated&&moving?Math.sin(time*7.2+id+side*1.57)*.34:0;
+   const kneeZ=seated?-.35:Math.sin(stride)*.39,kneeY=seated?.81:.865-Math.cos(stride)*.39;
+   c(side*.105,(.865+kneeY)/2,kneeZ/2,.15,Math.hypot(.865-kneeY,kneeZ),.16,'#38444a',M.fabric,{rx:seated?Math.atan2(-kneeZ,.865-kneeY):-stride,topRadius:1.12});
    s(side*.105,kneeY,kneeZ,.13,.12,.14,'#354147',M.fabric);
-   const lower=stride+Math.max(0,-stride)*.8,ankleZ=kneeZ+Math.sin(lower)*.38,ankleY=kneeY-Math.cos(lower)*.38;
-   c(side*.105,(kneeY+ankleY)/2,(kneeZ+ankleZ)/2,.108,.38,.12,'#354147',M.fabric,{rx:-lower,topRadius:1.15});
+   const lower=stride+Math.max(0,-stride)*.8,ankleZ=seated?kneeZ:kneeZ+Math.sin(lower)*.38,ankleY=seated?.34:kneeY-Math.cos(lower)*.38;
+   c(side*.105,(kneeY+ankleY)/2,(kneeZ+ankleZ)/2,.108,Math.hypot(kneeY-ankleY,kneeZ-ankleZ),.12,'#354147',M.fabric,{rx:seated?0:-lower,topRadius:1.15});
    s(side*.105,Math.max(.055,ankleY-.015),ankleZ-.055,.13,.1,.25,'#30332d',0);
-   const swing=moving?-stride*.8:(patience<30?Math.sin(time*2.8)*.12:.02),elbowY=1.31-Math.cos(swing)*.27,elbowZ=Math.sin(swing)*.27;
-   c(side*.245,(1.31+elbowY)/2,elbowZ/2,.115,.27,.13,shirt,M.fabric,{rx:-swing});
-   s(side*.245,elbowY,elbowZ,.104,.105,.105,skin,M.skin);
-   c(side*.245,elbowY-.13,elbowZ-.02,.085,.26,.095,skin,M.skin,{rx:.12,topRadius:1.08});
-   s(side*.245,elbowY-.285,elbowZ-.04,.085,.11,.05,skin,M.skin);
+   if(carrying&&!seated){
+    // Both hands support a tray at local (0,1.10,-.34), clear of the torso.
+    const shoulder={x:side*.21,y:1.31,z:0},elbow={x:side*.20,y:1.08,z:-.15},wrist={x:side*.145,y:1.05,z:-.34};
+    armSegment(shoulder,elbow,.115,.13,shirt);s(elbow.x,elbow.y,elbow.z,.104,.105,.105,skin,M.skin);
+    armSegment(elbow,wrist,.085,.095,skin);s(wrist.x,1.06,-.34,.09,.055,.10,skin,M.skin);
+   }else{
+    const swing=moving?-stride*.8:(patience<30?Math.sin(time*2.8)*.12:.02),elbowY=seated?1.1:1.31-Math.cos(swing)*.27,elbowZ=seated?-.19:Math.sin(swing)*.27;
+    c(side*.245,(1.31+elbowY)/2,elbowZ/2,.115,Math.hypot(1.31-elbowY,elbowZ),.13,shirt,M.fabric,{rx:seated?Math.atan2(-elbowZ,1.31-elbowY):-swing});
+    s(side*.245,elbowY,elbowZ,.104,.105,.105,skin,M.skin);
+    if(seated){
+     c(side*.245,1.11,-.29,.085,Math.hypot(.02,.20),.095,skin,M.skin,{rx:Math.atan2(.20,-.02),topRadius:1.08});
+     s(side*.245,1.12,-.40,.085,.055,.10,skin,M.skin);
+    }else{
+     c(side*.245,elbowY-.13,elbowZ-.02,.085,.26,.095,skin,M.skin,{rx:.12,topRadius:1.08});
+     s(side*.245,elbowY-.285,elbowZ-.04,.085,.11,.05,skin,M.skin);
+    }
+   }
   }
   for(let y=.98;y<1.34;y+=.087)b(0,y,-.128,.012,.012,.009,'#c2b9a0',M.paint);
+  if(staffKind){
+   const apron=staffKind==='bartender'?'#254c3a':'#43566a';
+   b(0,1.16,-.133,.28,.30,.018,apron,M.fabric);
+   b(0,.90,-.145,.34,.28,.020,apron,M.fabric);
+   for(const side of [-1,1])b(side*.10,1.365,-.135,.026,.15,.015,apron,M.fabric,{rz:side*.18});
+   b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
+  }
  }
- return {create,geometry,bottle,glass,customer,storageVisuals,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,registerVisuals,terminal,tableSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

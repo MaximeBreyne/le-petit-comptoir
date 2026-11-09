@@ -72,14 +72,15 @@ app.whenReady().then(async()=>{
    for(let index=1;index<=4;index++){key('Digit'+index,String(index));key('Numpad'+index,String(index));check(state.prep===null,'Number shortcuts no longer select a recipe')}
 
    game.s=new Game().s;state=game.s;game.open();state.spawn=999;
-   state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90}];state.nextId=2;ui();
+   camera={...BarScene.playCamera};state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90,tableId:null,slot:1,phase:'preparing',arrivalRemaining:0,paymentMethod:'card'}];state.nextId=2;ui();
    key('Tab','Tab');await flush();click('[data-tablet-recipe="beer"]');await flush();click('[data-action="step"]');
    key(preferences.bindings.pour.code,' ');check(state.prep.pouring,'Pour key works with cursor controls');
    key('Tab','Tab');await flush();check(!state.prep.pouring&&BarTablet.isOpen(),'Opening the tablet releases held pouring');
    key(preferences.bindings.pour.code,' ','keyup');click('[data-tablet-action="prep"]');await flush();
    key(preferences.bindings.pour.code,' ');for(let i=0;i<36;i++)game.tick(.1);key(preferences.bindings.pour.code,' ','keyup');ui();
    click('[data-action="finish"]');click('[data-action="plate"]');click('[data-serve="1"]');
-   check(state.sold===1&&state.cash===266&&state.tray.length===0,'A drink can be selected, prepared and served without ESC');
+   check(state.sold===0&&state.cash===260&&state.orders[0].phase==='drinking'&&state.tray.length===0,'A drink can be selected, prepared and served without ESC before payment');
+   for(let i=0;i<41;i++)game.tick(.1);check(state.orders[0].phase==='payment','The served client requests payment');game.pickupTerminal(BarEngine.registerPosition);game.payCard(1,camera);check(state.sold===0&&state.cash===260,'Pending card approval does not credit money');for(let i=0;i<31;i++)game.tick(.1);ui();check(state.sold===1&&state.cash===266&&state.orders.length===0,'Payment completes service without ESC');
    check(GameMenu.getMode()==='play'&&!paused&&BarInput.isCursorMode(),'Service never enters the pause menu');
 
    // A modal is an intentional release, not an unexpected pointer loss.

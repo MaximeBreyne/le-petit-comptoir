@@ -24,11 +24,35 @@ app.whenReady().then(async()=>{
    const check=(value,message)=>{if(!value)throw Error(message)};
    const click=(action,slot)=>{const selector='[data-menu-action="'+action+'"]'+(slot===undefined?'':'[data-slot="'+slot+'"]');const b=document.querySelector(selector);check(b&&!b.disabled,'Active control '+selector);b.click()};
    const esc=()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Escape',key:'Escape',bubbles:true,cancelable:true}));
+   const flush=()=>new Promise(resolve=>setTimeout(resolve,60));
+   // Control the browser's asynchronous unlock event to reproduce the settings
+   // return race without hidden-window pointer-capture permission failures.
+   let locked=null,deferUnlock=false;const deferredUnlocks=[];
+   Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>locked});
+   canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
+   document.exitPointerLock=()=>{
+    const release=()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))};
+    if(deferUnlock)deferredUnlocks.push(release);else queueMicrotask(release);
+   };
    check(GameMenu.isHome()&&paused&&!GameMenu.hasSession(),'Welcome shown before play');
    check(!$('gameMenu').hidden,'Welcome overlay visible');
    check(document.querySelector('[data-menu-action="continue"]').disabled,'No empty continue');
    save();check(localStorage.getItem('comptoir-bar-v2')===null,'Welcome does not create/overwrite a save');
+   click('settings');check($('settingsModal').open&&GameMenu.isHome(),'Settings open from welcome without a game');
+   $('settingsClose').click();await flush();
+   check(GameMenu.isHome()&&GameMenu.getMode()==='home'&&paused&&!$('settingsModal').open,'Returning from welcome settings stays at welcome');
    click('new');check(GameMenu.getMode()==='play'&&!paused,'New game enters play');
+   await flush();check(locked===canvas,'Initial camera lock settled');
+   deferUnlock=true;GameMenu.openSettings();
+   check(paused&&deferredUnlocks.length===1,'Opening settings queues one intentional unlock');
+   $('settingsClose').click();check(GameMenu.getMode()==='play'&&!paused,'Return button resumes immediately');
+   deferUnlock=false;for(const release of deferredUnlocks.splice(0))release();await flush();
+   check(GameMenu.getMode()==='play'&&!paused&&locked===canvas&&BarInput.isLooking(),'Late unlock after settings does not reopen pause');
+   check(document.activeElement===canvas,'Deferred pause-menu focus cannot steal focus after returning to play');
+   GameMenu.pause();GameMenu.openSettings();$('settingsClose').click();await flush();
+   check(GameMenu.getMode()==='play'&&!paused&&locked===canvas,'Return to game button also resumes when settings came from pause');
+   GameMenu.openSettings();await flush();esc();await flush();
+   check(GameMenu.getMode()==='play'&&!paused&&locked===canvas,'Escape from settings opened in play returns to play');
    game.open();state.time=1439.9;state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:100}];state.nextId=2;
    for(let i=0;i<100;i++)game.tick(.1);
    check(state.closing&&state.time>1450&&state.orders.length===1,'Closing service continues while the last customer waits');
@@ -58,7 +82,7 @@ app.whenReady().then(async()=>{
    click('new');click('confirm');check(state.cash===260&&GameMenu.getMode()==='play','Confirmed new game resets session');
    check(JSON.parse(localStorage.getItem('comptoir-bar-slot-v1-1')).state.cash===173,'New game preserves manual slots');
    GameMenu.pause();GameMenu.openSettings();document.querySelector('[data-bind="forward"]').click();
-   return {savedCash:173,manualSlots:3,homeProtected:true,loadValidated:true,mode:GameMenu.getMode()};
+   return {savedCash:173,manualSlots:3,homeProtected:true,loadValidated:true,settingsReturn:'resumes with delayed unlock; Escape preserves origin',mode:GameMenu.getMode()};
   })()`);
   // Native Escape reaches settings capture even though Chromium key defaults are suppressed.
   win.webContents.send('game:escape');await new Promise(resolve=>setTimeout(resolve,60));

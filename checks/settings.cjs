@@ -36,7 +36,9 @@ app.whenReady().then(async()=>{let win;const errors=[];try{
  set('muted',false);await new Promise(r=>setTimeout(r,200));check(audio.master.gain.value>.3&&audio.fx.gain.value>.35,'Volumes control real audio nodes');check(audio.room.gain.value<.01&&audio.flow.gain.value<.01,'Menu silences ambience and pouring');
  const loaded=loadPreferences();check(loaded.bindings.forward.code==='KeyI'&&loaded.volume===37&&loaded.quality==='high'&&loaded.fps===30,'Settings survive save and reload');
  check(state.cash===cash&&state.time===time,'Settings preserve game state');
- $('settingsClose').click();check(!$('settingsModal').open&&GameMenu.getMode()==='pause','Close settings returns pause');GameMenu.resume();
+ $('settingsClose').click();await new Promise(r=>setTimeout(r,60));
+ check(!$('settingsModal').open&&GameMenu.getMode()==='play'&&!paused,'Returning from settings resumes the game');
+ check(BarInput.isLooking()&&locked===canvas,'Camera remains captured after the settings dialog and unlock events settle');
  camera={x:6,y:1.65,z:7,a:Math.PI,pitch:0};const z=camera.z;key('KeyW','w');movement(.1);key('KeyW','w','keyup');check(camera.z===z,'Old key inactive');key('KeyI','i');movement(.1);key('KeyI','i','keyup');check(camera.z<z,'Remapped key moves player');
  game.open();game.start('beer');game.step();key('KeyV','v');check(state.prep.pouring,'Remapped pour key starts flow');frame(performance.now());await new Promise(r=>setTimeout(r,200));check(audio.room.gain.value>.1&&audio.flow.gain.value>.25,'Pouring and ambience gains active in game: '+JSON.stringify({active:audio.active,pouring:audio.pouring,room:audio.room.gain.value,flow:audio.flow.gain.value,paused,menu:menusOpen(),open:state.open}));key('KeyV','v','keyup');check(!state.prep.pouring,'Remapped key releases flow');
  key('KeyP','p');check(paused,'Pause key');key('KeyP','p');check(!paused,'Resume key');

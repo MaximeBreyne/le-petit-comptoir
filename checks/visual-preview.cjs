@@ -130,7 +130,67 @@ app.whenReady().then(async()=>{
    return {camera:{...camera},averageRenderMs,glError,canvas:[canvas.width,canvas.height],staticVertices:renderer.count};
   })()`);
   await capture('preview-bar.png');
+  const serviceScene=await evaluate(`(()=>{
+   game.s=new Game().s;state=game.s;game.open();state.spawn=999;state.nextId=6;
+   const order=(id,name,recipe,tableId,phase,extra={})=>({id,name,recipe,tableId,slot:0,phase,patience:85,arrivalRemaining:0,drinkRemaining:0,paymentMethod:'cash',due:0,tender:0,cardRemaining:0,...extra});
+   state.orders=[
+    order(1,'Lucie','coffee',1,'awaiting-order'),
+    order(2,'Marc','beer',2,'preparing'),
+    order(3,'Nadia','wine',3,'drinking',{drinkRemaining:5,due:7}),
+    order(4,'Thomas','beer',4,'payment',{paymentMethod:'card',due:6}),
+    order(5,'Sophie','coffee',null,'cash-collected',{due:3,tender:10}),
+   ];
+   state.management.bartender=true;state.management.waiter=true;
+   state.staff.bartender={orderId:2,recipe:'beer',remaining:5,total:8};
+   state.staff.waiter={orderId:1,task:'take-order',remaining:4,total:6};
+   customerVisuals.clear();waiterVisual=null;visualTime=20;render();
+   for(let i=0;i<100;i++){visualTime+=.05;render()}
+   for(const order of state.orders.filter(order=>order.tableId)){
+    const seat=BarScene.tableSeat(order.tableId),visual=customerVisuals.get(order.id);
+    if(!visual||Math.hypot(visual.x-seat.x,visual.z-seat.z)>.001)throw Error('Seated customer is not on table chair '+order.tableId);
+   }
+   camera={x:2.9,y:1.55,z:5.1,a:Math.atan2(-.8,1.35),pitch:-.18};ui();render();
+   return {tables:4,employees:['bartender','waiter'],register:{x:2.65,z:2.0}};
+  })()`);
+  await capture('preview-tables.png');
+  const waiterTray=await evaluate(`(()=>{
+   state.staff.bartender=null;state.staff.waiter={orderId:2,task:'serve',recipe:'beer',drink:{recipe:'beer',quality:95,orderId:2},remaining:4,total:6};
+   for(let i=0;i<60;i++){visualTime+=.05;render()}
+   const p=alongRoute(waiterVisual.route,waiterVisual.progress),sn=Math.sin(p.angle),cs=Math.cos(p.angle);
+   const x=p.x-sn*.8+cs*1.5,z=p.z-cs*.8-sn*1.5;
+   camera={x,y:1.5,z,a:Math.atan2(p.x-x,p.z-z),pitch:-.16};render();
+   return {task:state.staff.waiter.task,recipe:state.staff.waiter.recipe,position:{x:p.x,z:p.z},camera:{...camera}};
+  })()`);
+  await capture('preview-waiter-tray.png');
+  await evaluate("state.staff.bartender={orderId:2,recipe:'beer',remaining:5,total:8};state.staff.waiter={orderId:1,task:'take-order',remaining:4,total:6};");
+  await evaluate('camera={x:6,y:1.68,z:7.3,a:Math.PI,pitch:-.04};render();');
+  await capture('preview-staff.png');
+  await evaluate('camera={x:2.65,y:1.64,z:1.82,a:0,pitch:-.12};render();');
+  await capture('preview-register.png');
+  await evaluate(`(()=>{game.pickupTerminal(camera);if(!state.payments.terminalCarried)throw Error('Terminal pickup failed at till');render()})()`);
+  await capture('preview-terminal-held.png');
+  await evaluate('game.returnTerminal(camera);render();');
   await win.webContents.removeInsertedCSS(hiddenHud);
+
+  const serviceUI=await evaluate(`(()=>{
+   camera={x:2.9,y:1.68,z:6.4,a:-Math.PI/2,pitch:-.1};paused=false;
+   if(!BarTablet.open('service',1))throw Error('Service tablet did not open');paused=true;BarTablet.refresh(true);
+   const take=document.querySelector('[data-service-order="1"] [data-tablet-order-action="take"]');
+   if(!take||take.disabled)throw Error('Nearby table order action unavailable');
+   return {tab:BarTablet.getTab(),nearTable:game.canReachOrder(1,camera),orderButton:take.textContent};
+  })()`);
+  await capture('preview-service.png');
+  const cashUI=await evaluate(`(()=>{
+   BarTablet.close({suspend:true});camera={x:2.65,y:1.64,z:1.82,a:0,pitch:-.12};paused=false;
+   if(!BarTablet.open('register',5))throw Error('Register tablet did not open');paused=true;
+   const input=document.querySelector('[data-change-input="5"]');
+   if(!input||input.disabled)throw Error('Cash change input unavailable');
+   input.value='7.00';input.focus({preventScroll:true});BarTablet.refresh(true);
+   const confirm=document.querySelector('[data-change-confirm="5"]');
+   if(!confirm||confirm.disabled||input.value!=='7.00')throw Error('Cash amount or confirm control changed on refresh');
+   return {tab:BarTablet.getTab(),nearTill:game.nearRegister(camera),received:10,due:3,selectedChange:Number(input.value)};
+  })()`);
+  await capture('preview-cash.png');
 
   const pause=await evaluate(`(()=>{
    if(typeof BarScene!=='undefined'&&BarScene.playCamera)camera={...BarScene.playCamera};
@@ -140,7 +200,7 @@ app.whenReady().then(async()=>{
   if(!pause.paused||pause.mode!=='pause'||!pause.overlayVisible)throw Error('Pause menu did not pause the game');
   await capture('preview-pause.png');
   if(errors.length)throw Error(errors.join('\n'));
-  const result={home,game:gameView,labels,detailViews,scene,pause};
+  const result={home,game:gameView,labels,detailViews,scene,serviceScene,waiterTray,serviceUI,cashUI,pause};
   fs.writeFileSync(path.join(artifacts,'visual-preview.json'),JSON.stringify(result,null,2));
   console.log('VISUAL PREVIEW OK',JSON.stringify(result));
   clearTimeout(timeout);win.destroy();app.exit(0);

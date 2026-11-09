@@ -17,10 +17,12 @@ window.BarInput=(()=>{
  function refresh(){
   document.body.dataset.interaction=mode;
   panel.hidden=suspended||!active();
-  label.textContent=BarScene.inStockroom(camera)?'Réserve':mode==='look'?'Caméra libre':'Au comptoir';
+  const target=interactionTarget();
+  label.textContent=BarScene.inStockroom(camera)?'Réserve':target?.section==='register'?'Caisse':mode==='look'?'Caméra libre':'Service';
   button.textContent=mode==='look'?'Curseur':'Caméra';
   button.setAttribute('aria-label',mode==='look'?'Libérer la souris pour gérer le comptoir':'Reprendre la caméra');
-  const text=fallback||(mode==='look'?(BarScene.inStockroom(camera)?'E : réapprovisionner le comptoir depuis la réserve.':'Tab : boissons et gestion · Maintenez Maj pour courir.'):'Préparez et servez à la souris. Cliquez sur le décor pour reprendre la caméra.');
+  const terminal=state.payments?.terminalCarried?' · Terminal sans fil en main.':'';
+  const text=fallback||((mode==='look'?(target?target.label:'Tab : service et gestion · Maintenez Maj pour courir.'):'Préparez et servez à la souris. Cliquez sur le décor pour reprendre la caméra.')+terminal);
   if(help.textContent!==text)help.textContent=text;
  }
  function release(){

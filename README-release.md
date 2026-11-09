@@ -44,6 +44,22 @@ servis et la trésorerie le permettent :
 | Licence cocktails | 8 clients servis | 120 € | Débloquer le mojito |
 | Agrandissement du comptoir | 12 clients servis | 180 € | Augmenter de 50 % le stock possible au comptoir |
 | Assistant de réserve | 18 clients servis | 220 € | Transférer automatiquement des ingrédients toutes les 12 secondes pendant le service ; salaire de 10 € par soir |
+| Préparateur de boissons | 24 clients encaissés | 300 € | Préparer les commandes avec le stock du comptoir ; salaire de 18 € par soir |
+| Serveur | 32 clients encaissés | 380 € | Prendre les commandes à table et apporter les boissons ; salaire de 22 € par soir |
+
+Les clients s’installent aux quatre tables numérotées ou aux trois places du
+comptoir. Approchez une table et appuyez sur **E** pour prendre sa commande
+dans **Service** sur la tablette. Apportez ensuite la boisson préparée.
+Le préparateur et le serveur peuvent effectuer ces tâches après recrutement ;
+les paiements restent à votre charge.
+
+Après la dégustation, prenez les espèces du client, comptez la monnaie à la
+**Caisse**, puis rapportez-la avec le ticket. Le tiroir contient initialement
+80 € inclus dans la trésorerie de 260 € ; son alimentation transfère de l’argent
+existant, sans créer de recettes. Pour une carte, prenez le terminal sans fil
+au comptoir et présentez-le au client ; la confirmation prend trois secondes.
+Les recettes et la progression ne sont acquises qu’une fois le règlement terminé.
+Les paiements et tâches en cours sont conservés dans les sauvegardes.
 
 Les anciennes sauvegardes gardent leurs ingrédients au comptoir et l’accès
 aux cocktails. Leur nouvelle réserve commence vide.
@@ -53,6 +69,8 @@ aux cocktails. Leur nouvelle réserve commence vide.
 reprendre, sauvegarder, charger, ouvrir les réglages, retourner au menu
 principal ou au bureau. Trois emplacements manuels complètent la sauvegarde
 automatique. Le retour au menu ou au bureau conserve la partie actuelle.
+Le bouton **Revenir au jeu** des paramètres reprend directement la partie et
+la caméra. Échap respecte l’écran d’origine (jeu, pause ou accueil).
 
 Le décor comporte une réserve dédiée, du parquet, des matériaux détaillés,
 des ombres et un éclairage chaud. Les chaises font face aux tables et la

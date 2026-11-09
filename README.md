@@ -24,15 +24,34 @@ Maintenir Maj en se déplaçant permet de courir. Cette touche est configurable
 dans Réglages, comme les autres commandes de déplacement.
 Tab ouvre ou range la tablette de gestion. Choisir une boisson sur la tablette
 libère le curseur pour la préparer ; cliquer sur le décor reprend la caméra.
-La tablette regroupe les boissons, les stocks, le bâtiment, les licences
-et l’équipe. Le service continue pendant son utilisation.
+La tablette regroupe le service, les boissons, la caisse, les stocks, le bâtiment,
+les licences et l’équipe. Le service continue pendant son utilisation.
 Ouvrir le bar, choisir une recette sur la tablette, suivre les étapes, maintenir pour doser,
-valider, poser sur le plateau puis servir le client correspondant.
+valider, poser sur le plateau puis rejoindre le client pour servir et encaisser.
 Les touches 1 à 4 ne sélectionnent plus les boissons.
 Les ingrédients sont prélevés au début de la préparation.
-35 euros de charges par soir, auxquels s’ajoute le salaire d’un employé recruté.
+35 euros de charges par soir, auxquels s’ajoutent les salaires des employés recrutés.
 Une trésorerie négative termine la partie.
 Le bouton Aide détaille les commandes et le fonctionnement.
+
+SERVICE À TABLE ET ENCAISSEMENTS
+Les clients occupent les quatre tables numérotées ou les trois places au comptoir.
+Rejoignez une table et appuyez sur E : la rubrique Service permet de prendre la
+commande sur la tablette. Revenez avec la boisson sur le plateau pour la servir.
+Après la dégustation, le client demande à payer en espèces ou par carte.
+
+Espèces : prenez l’argent auprès du client, revenez à la caisse derrière le bar
+et appuyez sur E. Choisissez les pièces et billets à rendre, validez le montant,
+puis rapportez la monnaie et le ticket au client. Un montant incorrect est refusé.
+La caisse commence avec 80 euros, inclus dans les 260 euros de trésorerie initiale.
+Vous pouvez alimenter son tiroir depuis la trésorerie disponible hors caisse.
+
+Carte : prenez le terminal sans fil sur son socle près de la caisse, rejoignez
+le client et présentez-le depuis la tablette. La validation prend trois secondes.
+Vous gardez le terminal jusqu’à son retour sur le socle. Les recettes et la
+progression sont comptées à la confirmation du règlement, sans double paiement.
+Les commandes, encaissements en cours et tâches des employés sont sauvegardés.
+Le bilan du soir attend la fin des commandes et des paiements.
 
 RÉSERVE ET STOCKS
 La porte de la réserve se trouve à gauche, derrière le bar. Entrez dans la
@@ -51,6 +70,11 @@ de 50 % sa capacité de stockage des ingrédients.
 Assistant de réserve : 18 clients servis et 220 euros. Il réapprovisionne
 automatiquement le comptoir depuis la réserve toutes les 12 secondes
 pendant le service et coûte 10 euros de salaire par soir.
+Préparateur de boissons : 24 clients encaissés et 300 euros, puis 18 euros par soir.
+Il prépare les commandes prises en consommant les ingrédients du comptoir et
+dépose les boissons sur le plateau, dans la limite de sa capacité.
+Serveur : 32 clients encaissés et 380 euros, puis 22 euros par soir. Il prend les
+commandes à table et apporte les boissons. Les encaissements restent à votre charge.
 Les anciennes sauvegardes gardent l’accès aux cocktails.
 
 MENU DE PAUSE
@@ -59,6 +83,8 @@ rangée, Échap arrête le temps et ouvre le menu : Reprendre la partie, Sauvega
 Charger une sauvegarde, Réglages, Retour au menu principal ou Retour au bureau.
 Échap depuis ce menu reprend la partie. Le retour au menu principal ou au
 bureau enregistre la progression actuelle.
+Dans les paramètres, « Revenir au jeu » reprend immédiatement la partie et la caméra.
+Échap revient à l’écran depuis lequel les paramètres ont été ouverts.
 
 SAUVEGARDE
 Automatique toutes les 5 secondes et après les actions importantes.

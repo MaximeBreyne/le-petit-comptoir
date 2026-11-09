@@ -11,9 +11,9 @@
   game.s.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90},{id:2,name:'Marc',recipe:'wine',patience:90}];ui();
   BarTablet.open('drinks');const recipe=document.querySelector('[data-tablet-recipe="beer"]');BarTablet.refresh(true);check(recipe&&recipe===document.querySelector('[data-tablet-recipe="beer"]'),'Stable tablet catalogue nodes');BarTablet.close();
   visualTime=0;customerVisuals.clear();render();visualTime=4;render();
-  const previousCamera={...camera};camera.x=4.6;camera.z=4.85;walk(0,-.8);check(camera.z>=4.75&&camera.z<=4.85,'Swept movement stops at the waiting customer');camera=previousCamera;
+  const previousCamera={...camera},waiting=customerVisuals.get(1);camera.x=waiting.x;camera.z=waiting.z+.6;walk(0,-.9);check(camera.z-waiting.z>=.38&&camera.z-waiting.z<=.46,'Swept movement stops before crossing the waiting customer');camera=previousCamera;
   const slot=customerVisuals.get(2).slot;state.orders.shift();render();check(customerVisuals.get(2).slot===slot,'Waiting customer keeps place');
-  visualTime=8;render();check(!customerVisuals.has(1),'Departed customer removed');
+  const leaving=customerVisuals.get(1);visualTime=leaving.left+leaving.departureTime+.1;render();check(!customerVisuals.has(1),'Departed customer removed after walking its route');
   const probe=document.createElement('canvas');probe.style.cssText='width:200px;height:200px';document.body.append(probe);
   const near={x:0,y:0,z:2,w:1,h:1,d:.3,c:'#ff0000',castShadow:false},far={x:0,y:0,z:4,w:4,h:4,d:.3,c:'#0000ff',castShadow:false};
   const r=new BarRenderer(probe,[near,far]),cam={x:0,y:0,z:0,a:0,pitch:0};
