@@ -7,19 +7,21 @@ window.BarInput=(()=>{
  const heading=document.createElement('div');heading.className='interaction-heading';
  const label=document.createElement('strong');label.id='interactionLabel';
  const button=document.createElement('button');button.type='button';button.id='interactionToggle';button.setAttribute('aria-describedby','interactionHelp');
+ const tabletButton=document.createElement('button');tabletButton.type='button';tabletButton.id='interactionTablet';tabletButton.textContent='Tab · Tablette';tabletButton.addEventListener('click',()=>window.BarTablet?.open());
  const help=document.createElement('p');help.id='interactionHelp';help.setAttribute('role','status');
- heading.append(label,button);panel.append(heading,help);document.body.append(panel);
+ heading.append(label,tabletButton,button);panel.append(heading,help);document.body.append(panel);
 
- function active(){return window.GameMenu?.getMode()==='play'&&!paused&&!$('modal').open&&!$('settingsModal').open}
+ function active(){return window.GameMenu?.getMode()==='play'&&!paused&&!$('modal').open&&!$('settingsModal').open&&!window.BarTablet?.isOpen()}
  function stopActions(){keys={};game.setPour(false)}
  function cancelRecovery(){if(recoveryTimer!==null)clearTimeout(recoveryTimer);recoveryTimer=null}
  function refresh(){
   document.body.dataset.interaction=mode;
   panel.hidden=suspended||!active();
-  label.textContent=mode==='look'?'Caméra libre':'Gestion du comptoir';
-  button.textContent=mode==='look'?'Tab · Comptoir':'Tab · Caméra';
+  label.textContent=BarScene.inStockroom(camera)?'Réserve':mode==='look'?'Caméra libre':'Au comptoir';
+  button.textContent=mode==='look'?'Curseur':'Caméra';
   button.setAttribute('aria-label',mode==='look'?'Libérer la souris pour gérer le comptoir':'Reprendre la caméra');
-  help.textContent=fallback||(mode==='look'?'1–4 : choisir une boisson · Tab : cliquer sur les commandes':'Choisissez, préparez et servez à la souris. Tab reprend la caméra.');
+  const text=fallback||(mode==='look'?(BarScene.inStockroom(camera)?'E : réapprovisionner le comptoir depuis la réserve.':'Tab : boissons et gestion · Maintenez Maj pour courir.'):'Préparez et servez à la souris. Cliquez sur le décor pour reprendre la caméra.');
+  if(help.textContent!==text)help.textContent=text;
  }
  function release(){
   if(document.pointerLockElement!==canvas||releasing)return;

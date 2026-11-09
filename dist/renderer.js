@@ -21,7 +21,7 @@ class BarRenderer {
   const fragment=`${derivatives?'#extension GL_OES_standard_derivatives : enable':''}
    precision highp float;
    varying vec3 tint;varying vec3 world;varying vec3 faceNormal;varying float surface;varying vec2 labelUV;varying float viewDepth;
-   uniform mediump vec3 camera;uniform float brightness;uniform sampler2D labels;uniform sampler2D shadowMap;uniform vec2 shadowInfo;uniform vec4 people[3];
+   uniform mediump vec3 camera;uniform float brightness;uniform sampler2D labels;uniform sampler2D shadowMap;uniform vec2 shadowInfo;uniform vec4 people[4];
    ${shadowPosition}
    float hash(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
    float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -75,7 +75,7 @@ class BarRenderer {
     vec3 v=normalize(camera-world),linear=pow(max(base,vec3(.001)),vec3(2.2));
     float visibility=shadow();
     float contact=1.0;
-    if(world.y<.04){for(int i=0;i<3;i++){vec2 d=(world.xz-people[i].xy)/max(people[i].z,.01);contact*=1.0-people[i].w*.40*exp(-dot(d,d)*1.8);}}
+    if(world.y<.04){for(int i=0;i<4;i++){vec2 d=(world.xz-people[i].xy)/max(people[i].z,.01);contact*=1.0-people[i].w*.40*exp(-dot(d,d)*1.8);}}
     // Cool daylight through the frontage, balanced with warm local pendant lights.
     vec3 ambient=mix(vec3(.30,.31,.33),vec3(.43,.47,.52),n.y*.5+.5);
     vec3 light=ambient*(.65+.35*visibility)*contact;
@@ -106,7 +106,7 @@ class BarRenderer {
   this.shadowAttribute=gl.getAttribLocation(this.shadowProgram,'position');
   this.staticBuffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.shadowBuffer=gl.createBuffer();
   this.labelTexture=gl.createTexture();this.shadowTexture=gl.createTexture();this.shadowFramebuffer=gl.createFramebuffer();this.shadowDepth=gl.createRenderbuffer();
-  this.people=new Float32Array(12);this.shadowSize=0;this.shadowDirty=true;
+  this.people=new Float32Array(16);this.shadowSize=0;this.shadowDirty=true;
   this.setScene(boxes);
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.lost=true;const error=document.getElementById('graphicsError');if(error)error.hidden=false;});
   canvas.addEventListener('webglcontextrestored',()=>location.reload());
@@ -225,7 +225,7 @@ class BarRenderer {
   const focal=1/Math.tan(settings.fov*Math.PI/360);
   gl.uniform3f(this.uniforms.camera,camera.x,camera.y,camera.z);gl.uniform2f(this.uniforms.angle,camera.a,camera.pitch||0);gl.uniform2f(this.uniforms.projection,focal/(this.canvas.width/this.canvas.height),focal);gl.uniform1f(this.uniforms.brightness,settings.brightness/100);
   this.people.fill(0);let person=0;
-  for(const b of dynamic){if(b.mat===8&&b.y>.85&&b.y<1.4&&b.w>.25&&person<3){this.people[person*4]=b.x;this.people[person*4+1]=b.z;this.people[person*4+2]=.43;this.people[person*4+3]=1;person++}}
+  for(const b of dynamic){if(b.contactShadow&&person<4){this.people[person*4]=b.x;this.people[person*4+1]=b.z;this.people[person*4+2]=.43;this.people[person*4+3]=1;person++}}
   gl.uniform4fv(this.uniforms['people[0]'],this.people);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.labelTexture);gl.uniform1i(this.uniforms.labels,0);
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);gl.uniform1i(this.uniforms.shadowMap,1);gl.uniform2f(this.uniforms.shadowInfo,settings.quality!=='low'&&this.shadowSupported?1:0,1/this.shadowSize);

@@ -1,7 +1,7 @@
 # Installateur Windows et mises à jour locales
 
-Installez la version 0.5.4 en ouvrant
-`release-final/Le-Petit-Comptoir-Bar-0.5.4-Setup.exe`.
+Installez la version 0.6.0 en ouvrant
+`release-final/Le-Petit-Comptoir-Bar-0.6.0-Setup.exe`.
 Sur le PC qui a fabriqué l’installateur, le jeu connaît déjà le dossier
 `release-final` de ce projet : aucune configuration supplémentaire n’est nécessaire.
 Le jeu détecte les versions supérieures construites dans ce dossier et les
@@ -13,29 +13,51 @@ Les sauvegardes et réglages restent dans le profil de l’application, séparé
 de ses fichiers installés. Les anciennes installations antérieures à ce système
 doivent recevoir une fois ce nouvel installateur.
 
-## Jouer à la version 0.5.4
+## Jouer à la version 0.6.0
 
 Le jeu démarre en plein écran sur son écran d’accueil. Choisissez **Nouvelle
 partie**, **Continuer la partie** ou **Charger une sauvegarde**. **F11** permet
 de passer du plein écran au mode fenêtré.
 
 La souris commande la caméra dès l’entrée ou la reprise de la partie.
-**Tab** libère le curseur pour choisir les boissons, les préparer et servir
-les clients, sans mettre le jeu en pause. Appuyez de nouveau sur **Tab** pour
-reprendre la caméra.
+Maintenez **Maj** en vous déplaçant pour courir. La touche de course est
+configurable dans les réglages.
 
-Les touches **1**, **2**, **3** et **4** choisissent respectivement la bière,
-le vin, l’espresso et le mojito, puis libèrent le curseur pour la préparation.
-La rangée des chiffres fonctionne sans Maj sur AZERTY ; le pavé numérique
-est également accepté.
+**Tab** ouvre ou range la tablette. Ses rubriques regroupent les boissons,
+les stocks, le bâtiment, les licences et l’équipe. Choisissez la boisson sur
+la tablette : le curseur reste libre pour la préparation et le service.
+Cliquez sur le décor pour reprendre la caméra. Les raccourcis boissons
+**1 à 4** sont remplacés par ce catalogue ; le service continue pendant
+l’utilisation de la tablette.
 
-Pendant la partie, **Échap** arrête le temps et ouvre le menu de pause :
+La réserve est une pièce accessible par la porte à gauche, derrière le bar.
+Appuyez sur **E** dans cette pièce pour la gérer. Les achats arrivent en
+réserve après **10 secondes de jeu** ; transférez-les ensuite vers le comptoir
+depuis la réserve. Une nouvelle partie y dispose d’un lot de chaque ingrédient.
+
+Les améliorations s’achètent depuis la tablette lorsque le nombre de clients
+servis et la trésorerie le permettent :
+
+| Achat | Condition | Prix | Effet |
+| --- | --- | --- | --- |
+| Plateau | 5 clients servis | 100 € | Porter 4 boissons |
+| Licence cocktails | 8 clients servis | 120 € | Débloquer le mojito |
+| Agrandissement du comptoir | 12 clients servis | 180 € | Augmenter de 50 % le stock possible au comptoir |
+| Assistant de réserve | 18 clients servis | 220 € | Transférer automatiquement des ingrédients toutes les 12 secondes pendant le service ; salaire de 10 € par soir |
+
+Les anciennes sauvegardes gardent leurs ingrédients au comptoir et l’accès
+aux cocktails. Leur nouvelle réserve commence vide.
+
+**Échap** range d’abord la tablette si elle est ouverte. Lorsqu’elle est rangée,
+**Échap** arrête le temps et ouvre le menu de pause :
 reprendre, sauvegarder, charger, ouvrir les réglages, retourner au menu
 principal ou au bureau. Trois emplacements manuels complètent la sauvegarde
 automatique. Le retour au menu ou au bureau conserve la partie actuelle.
 
-Le décor comporte désormais du parquet, des matériaux plus détaillés, des
-ombres et un éclairage chaud. Les personnages restent stylisés.
+Le décor comporte une réserve dédiée, du parquet, des matériaux détaillés,
+des ombres et un éclairage chaud. Les chaises font face aux tables et la
+machine à café possède un espace distinct pour la tasse en préparation.
+Les personnages restent stylisés.
 
 Le logo original vert et doré est présent dans l’accueil, la barre du jeu,
 l’application Windows, le raccourci et les assistants d’installation et de

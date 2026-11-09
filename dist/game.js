@@ -6,13 +6,12 @@ let saved=null;try{saved=JSON.parse(localStorage.getItem('comptoir-bar-v2'))}cat
 const game=new Game(saved);let state=game.s,client=null,paused=false,last=performance.now(),elapsed=0,toastTimer,saveFailed=false;
 function save(force=false){if(force!==true&&window.GameMenu&&!GameMenu.canAutosave())return;try{localStorage.setItem('comptoir-bar-v2',JSON.stringify(game.s));saveFailed=false;window.GameMenu?.didAutosave()}catch{if(!saveFailed){toast('Sauvegarde indisponible : vérifiez l’espace disque.');saveFailed=true}}}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,4000)}
-function modal(title,html){game.setPour(false);keys={};if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();$('modalTitle').textContent=title;$('modalContent').innerHTML=html;$('modal').showModal()}
+function modal(title,html){game.setPour(false);keys={};window.BarTablet?.close({suspend:true});if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();$('modalTitle').textContent=title;$('modalContent').innerHTML=html;$('modal').showModal()}
 function act(fn){if(paused){toast('Reprenez la partie pour continuer.');return}const result=fn();toast(result);audio.chime(typeof result==='string'&&result.startsWith('Servi !')?'sale':'click');state=game.s;save();ui()}
 function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;const t=Math.min(1440,state.time);$('clock').textContent=t>=1440?'00:00':String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('pause').textContent=paused?'Reprendre':'Pause';$('mission').textContent=state.gameOver?'Trésorerie épuisée. Commencez un nouveau bar.':state.totalSold<5?`Servez 5 clients pour agrandir le plateau (${state.totalSold}/5).`:`${state.totalSold} clients servis · Soignez le dosage pour gagner des pourboires.`;$('progress').style.setProperty('--progress',Math.min(100,state.totalSold*20)+'%');$('serviceStatus').textContent=state.closing?'DERNIÈRE TOURNÉE':state.open?'OUVERT':'FERMÉ';$('open').disabled=state.open||state.gameOver;$('open').textContent=state.open?'Service en cours':'Ouvrir le bar';$('end').disabled=!state.open||state.closing;
  updateHTML($('customers'),state.orders.length?state.orders.map(o=>`<div class="customer"><strong>${o.name}</strong> · ${recipes[o.recipe].name}<small>${money(recipes[o.recipe].price)} · ${Math.ceil(o.patience)} s de patience</small><div class="patience"><i style="width:${Math.max(0,Math.ceil(o.patience))}%"></i></div><button data-serve="${o.id}" ${!state.tray.some(t=>t.recipe===o.recipe)?'disabled':''}>Servir la boisson</button></div>`).join(''):'<p class="empty">'+(state.open?'Un instant de calme. Préparez votre prochain service.':'Ouvrez à 17 h et accueillez vos premiers habitués.')+'</p>');
- updateHTML($('stock'),Object.entries(ingredients).map(([k,i])=>`<div class="row"><span>${i.name}</span><b>${Math.round(state.stock[k]*10)/10} ${i.unit}</b></div>`).join('')+state.deliveries.map(d=>`<p class="delivery">Livraison : ${ingredients[d.key].name} · ${Math.ceil(d.remaining)} s</p>`).join(''));
- $('upgrade').disabled=state.upgraded||state.totalSold<5||state.cash<100||state.gameOver;$('upgrade').textContent=state.upgraded?'Installé':'Agrandir · 100 €';$('upgradeText').textContent=state.upgraded?'Plateau de 4 boissons installé.':'Un plateau de 4 boissons, après 5 clients servis.';$('trayCount').textContent=`PLATEAU ${state.tray.length}/${state.capacity}`;
- updateHTML($('recipes'),Object.entries(recipes).map(([id,r],index)=>`<button class="recipe ${state.prep?.recipe===id?'active':''}" data-recipe="${id}" aria-keyshortcuts="${index+1}" ${!state.open||state.prep||!game.canMake(id)||state.tray.length>=state.capacity?'disabled':''}><kbd class="recipe-key">${index+1}</kbd><b>${r.name}</b>${money(r.price)}<small>${r.station}</small></button>`).join(''));
+ updateHTML($('stock'),Object.entries(ingredients).map(([k,i])=>`<div class="row"><span>${i.name}<br><small>Réserve : ${Math.round((state.reserve?.[k]||0)*10)/10} ${i.unit}</small></span><b>${Math.round(state.stock[k]*10)/10} ${i.unit}</b></div>`).join('')+state.deliveries.map(d=>`<p class="delivery">Vers la réserve : ${ingredients[d.key].name} · ${Math.ceil(d.remaining)} s</p>`).join(''));
+ $('upgrade').disabled=false;$('upgrade').textContent='Gérer';$('upgradeText').textContent=state.upgraded?'Plateau de 4 boissons installé.':'Améliorations, licences et équipe dans la tablette.';$('trayCount').textContent=`PLATEAU ${state.tray.length}/${state.capacity}`;
  const p=state.prep;let html='<p class="empty">Choisissez une boisson. Sélectionnez le récipient, puis réalisez les étapes de la recette. Les ingrédients sont prélevés dès le début.</p>';
  if(p){let r=recipes[p.recipe];html=`<div class="sectionTitle"><strong>${r.name}</strong><span>${r.glass}</span></div><p class="steps">${r.steps.map((s,i)=>i===p.step?'<strong>'+s+'</strong>':s).join(' → ')}</p>`;
  if(p.ready)html+=`<p>Dosage : <strong>${p.quality}%</strong> · ${p.quality<40?'La boisson sera refusée.':p.quality>=85?'Excellent ! Pourboire possible.':'Boisson acceptable.'}</p><div class="actions"><button class="primary" data-action="plate">Poser sur le plateau</button>`;
@@ -23,20 +22,22 @@ function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').text
  const viewKey=p?`${p.recipe}:${p.step}:${p.ready}`:'empty';if($('prep').dataset.view!==viewKey){$('prep').innerHTML=html;$('prep').dataset.view=viewKey}
  if(p&&game.isPour()){$('amount').textContent=p.amount.toFixed(1)+' '+recipes[p.recipe].unit;$('fill').style.width=Math.min(100,p.amount/(recipes[p.recipe].target*1.5)*100)+'%'}
  updateHTML($('tray'),state.tray.length?state.tray.map((t,i)=>`<span class="drink">${recipes[t.recipe].name} · ${t.quality}% <button data-remove="${i}" aria-label="Jeter cette boisson">×</button></span>`).join(''):'<span class="empty">Plateau vide · Les boissons restent ici jusqu’au service.</span>');
+ window.BarTablet?.refresh();
+ if(window.BarInput&&typeof camera!=='undefined')BarInput.refresh();
 }
-$('open').onclick=()=>act(()=>game.open());$('end').onclick=()=>act(()=>game.close());$('upgrade').onclick=()=>act(()=>game.upgrade());$('recipes').onclick=e=>{let b=e.target.closest('[data-recipe]');if(b&&!b.disabled){window.BarInput?.enterCursor();act(()=>game.start(b.dataset.recipe))}};$('customers').onclick=e=>{let b=e.target.closest('[data-serve]');if(b)act(()=>game.serve(+b.dataset.serve))};$('tray').onclick=e=>{let b=e.target.closest('[data-remove]');if(b)act(()=>game.discard(+b.dataset.remove))};
+$('open').onclick=()=>act(()=>game.open());$('end').onclick=()=>act(()=>game.close());$('upgrade').onclick=()=>BarTablet.open('building');$('chooseDrink').onclick=$('tablet').onclick=()=>BarTablet.open('drinks');$('customers').onclick=e=>{let b=e.target.closest('[data-serve]');if(b)act(()=>game.serve(+b.dataset.serve))};$('tray').onclick=e=>{let b=e.target.closest('[data-remove]');if(b)act(()=>game.discard(+b.dataset.remove))};
 $('prep').onclick=e=>{const b=e.target.closest('[data-action]');if(!b||b.dataset.action==='pour')return;act(()=>{switch(b.dataset.action){case 'step':if(game.s.prep.recipe==='mojito'&&game.s.prep.step===5)game.finishMix();else game.step();break;case 'finish':game.finishPour();break;case 'plate':return game.plate();case 'discard':return game.discard()}})};
 $('prep').onpointerdown=e=>{let b=e.target.closest('#pour');if(b&&!paused){b.setPointerCapture(e.pointerId);game.setPour(true);e.preventDefault()}};$('prep').onpointerup=$('prep').onpointercancel=()=>game.setPour(false);
-function supplier(){modal('Cave & fournisseur',`<p>Livraison en 10 secondes de jeu. Le jeu est en pause pendant la commande.</p>${Object.entries(ingredients).map(([k,i])=>`<div class="row"><span>${i.name}<br><small>${i.pack} ${i.unit} par lot</small></span><button data-buy="${k}">${money(i.cost)} · Commander</button></div>`).join('')}<p id="orderFeedback">Disponible : ${money(state.cash)}</p>`)}
-$('order').onclick=supplier;$('modalContent').onclick=e=>{const b=e.target.closest('[data-buy]');if(b){if(paused){$('orderFeedback').textContent='Reprenez la partie avant de commander.';return}$('orderFeedback').textContent=game.buy(b.dataset.buy)+' Disponible : '+money(state.cash);save();ui()}if(e.target.id==='confirmReset'){game.s=new Game().s;state=game.s;paused=false;customerVisuals.clear();camera={...BarScene.playCamera};$('prep').dataset.view='';save();$('modal').close();ui();toast('Votre nouveau bar est prêt.')}};$('close').onclick=()=>$('modal').close();$('pause').onclick=()=>{paused=!paused;game.setPour(false);keys={};ui()};
-$('help').onclick=()=>modal('Bienvenue derrière le bar',`<p>1. Ouvrez le bar. Les clients commandent au comptoir.</p><p>2. Choisissez leur boisson, puis le bon récipient. Pour un mojito, ajoutez et préparez les ingrédients dans l’ordre.</p><p>3. Maintenez le bouton pour doser. Relâchez à la quantité cible, puis validez. Un écart important provoque un refus.</p><p>4. Posez la boisson sur le plateau, puis cliquez sur « Servir » sous la commande du client.</p><p>Surveillez les stocks et commandez avant la rupture. Les livraisons arrivent après 10 secondes de jeu. Les boissons jetées consomment leurs ingrédients.</p><p>Le bar ferme à minuit. Vous pouvez demander la dernière tournée plus tôt. Les clients restants doivent être servis ou partir avant le bilan. Frais : 35 € par soir.</p><p>La caméra s’active en lançant ou en reprenant la partie. Tab libère la souris pour cliquer sur les boissons, préparer et servir sans mettre le jeu en pause. Appuyez de nouveau sur Tab pour regarder autour de vous. Les touches 1, 2, 3 et 4 choisissent la bière, le vin, le café et le mojito (pavé numérique ou rangée du haut, sans Maj sur AZERTY). Échap ouvre le menu de pause. F11 bascule le plein écran. Le jeu se met en pause si vous changez de fenêtre.</p>`);
-$('reset').onclick=()=>modal('Commencer un nouveau bar ?',`<p>Cette action remplace la sauvegarde actuelle. Vous repartez au premier soir avec 260 € et les ingrédients de départ.</p><button id="confirmReset">Confirmer le nouveau bar</button>`);
+function supplier(){BarTablet.open('reserve')}
+$('order').onclick=supplier;$('close').onclick=()=>$('modal').close();
+$('help').onclick=()=>modal('Bienvenue derrière le bar',`<p><strong>Tab : votre tablette.</strong> Ouvrez le service, cherchez une boisson dans la carte et choisissez « Préparer ». Le curseur est alors disponible pour suivre les étapes, doser et servir. Cliquez sur le décor pour reprendre la caméra.</p><p>Maintenez la touche de dosage puis relâchez à la quantité cible. Validez et posez la boisson sur le plateau avant de servir le client. Un dosage précis peut rapporter un pourboire.</p><p><strong>Maj : courir.</strong> La touche se personnalise dans les réglages. Échap ouvre la pause ; depuis la tablette, Échap la range. F11 bascule le plein écran.</p><p><strong>La réserve est derrière le bar.</strong> Passez par la porte à gauche des étagères, puis appuyez sur E pour gérer les stocks. Les commandes arrivent dans cette pièce après 10 secondes de jeu. Réapprovisionnez ensuite le comptoir pour pouvoir préparer les boissons.</p><p><strong>Faites progresser votre établissement.</strong> Les rubriques Bâtiment, Licences et Équipe indiquent le nombre de clients à servir et le prix de chaque achat. La licence cocktails débloque le mojito. Un employé de réserve peut réapprovisionner le bar automatiquement, avec un salaire par soir.</p><p>Le service continue pendant la consultation de la tablette. Le bar ferme à minuit ; les derniers clients doivent être servis ou partir avant le bilan. Charges de base : 35 € par soir, plus les éventuels salaires.</p>`);
 // Static architecture and dynamic props use the same depth-tested scene.
 const canvas=$('world');let camera={...BarScene.playCamera},keys={};const boxes=BarScene.create();
 let renderer=null,visualTime=0;const customerVisuals=new Map();
 try{renderer=new BarRenderer(canvas,boxes)}catch(error){$('graphicsError').hidden=false;$('graphicsError').textContent=error.message;console.error(error)}
 function render(){if(!renderer)return;const dynamic=[];
- if(state.upgraded)dynamic.push({x:10,y:.6,z:5,w:1.5,h:1.2,d:1,c:'#71563b'},{x:10,y:1.45,z:5,w:.7,h:.5,d:.5,c:'#c5bbaa'});
+ BarScene.storageVisuals(dynamic,state);
+ if(state.management?.assistant)BarScene.customer(dynamic,{x:3.0,z:-2.1,id:52,time:visualTime,moving:false,patience:100});
  const activeIds=new Set(state.orders.map(o=>o.id));
  for(const [id,v]of customerVisuals)if(!activeIds.has(id)&&v.active){v.active=false;v.left=visualTime}
  for(const [i,customer]of state.orders.entries()){
@@ -51,14 +52,30 @@ function render(){if(!renderer)return;const dynamic=[];
   BarScene.customer(dynamic,{x,z,id,time:visualTime,moving,departing:!v.active,patience:state.orders.find(o=>o.id===id)?.patience??100});
  }
  const props=BarScene.geometry(dynamic),p=state.prep;
- if(p){const x=p.recipe==='beer'?4.15:p.recipe==='coffee'?8.43:6.5,z=p.recipe==='coffee'?2.52:3.05;
-  BarScene.glass(props,p.recipe,x,1.115,z,Math.min(1,p.amount/recipes[p.recipe].target));
-  if(p.pouring&&p.recipe!=='coffee')props.cylinder(x,1.51,z,.015,.24,.015,recipes[p.recipe].color,6);
+ if(p){const {x,y,z,stream}=BarScene.prepStation(p.recipe);
+  BarScene.glass(props,p.recipe,x,y,z,Math.min(1,p.amount/recipes[p.recipe].target));
+  if(p.pouring&&stream)props.cylinder(stream.x,stream.y,stream.z,.012,stream.h,.012,recipes[p.recipe].color,6);
  }
- state.tray.forEach((t,i)=>BarScene.glass(props,t.recipe,5.25+i*.28,1.115,3.15));
+ state.tray.forEach((t,i)=>BarScene.glass(props,t.recipe,5.25+i*.28,1.102,3.15));
  renderer.render(window.GameMenu?.isHome()?BarScene.homeCamera:camera,dynamic,preferences);
 }
 const obstacles=boxes.filter(b=>b.solid&&b.y-b.h/2<1.7&&b.y+b.h/2>.2);
-function walk(dx,dz){let nx=camera.x+dx,nz=camera.z+dz;if(nx<.3||nx>11.7||nz<.4||nz>9.6)return;if(obstacles.some(b=>Math.abs(nx-b.x)<b.w/2+.2&&Math.abs(nz-b.z)<b.d/2+.2))return;if([...customerVisuals.values()].some(v=>v.active&&visualTime-v.born>=3&&Math.hypot(nx-(4.6+v.slot*1.4),nz-4.3)<.45))return;camera.x=nx;camera.z=nz}
+function walk(dx,dz){
+ if(!Number.isFinite(dx)||!Number.isFinite(dz))return;
+ // Short steps prevent running through thin door frames and chair backs.
+ const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.08));
+ for(let i=0;i<steps;i++){
+  const nx=camera.x+dx/steps,nz=camera.z+dz/steps;
+  if(!BarScene.containsWalkablePosition(nx,nz))break;
+  const blocked=obstacles.some(b=>{
+   const angle=b.ry||0,c=Math.cos(angle),s=Math.sin(angle),px=nx-b.x,pz=nz-b.z;
+   const localX=px*c-pz*s,localZ=px*s+pz*c;
+   if(b.round)return Math.hypot(localX/(b.w/2+.2),localZ/(b.d/2+.2))<1;
+   return Math.abs(localX)<b.w/2+.2&&Math.abs(localZ)<b.d/2+.2;
+  });
+  if(blocked||(state.management?.assistant&&Math.hypot(nx-3,nz+2.1)<.38)||[...customerVisuals.values()].some(v=>v.active&&visualTime-v.born>=3&&Math.hypot(nx-(4.6+v.slot*1.4),nz-4.3)<.45))break;
+  camera.x=nx;camera.z=nz;
+ }
+}
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!paused&&!menusOpen()){visualTime+=dt;movement(dt);const orderId=state.nextId;const report=game.tick(dt);if(state.nextId>orderId)audio.chime('arrival');if(report){save();modal('Bilan du soir '+report.day,`<p>${report.sold} clients servis · ${report.lost} clients perdus · ${report.waste} boissons jetées</p><p>Recettes et pourboires : ${money(report.revenue)}</p><p>Achats et améliorations : ${money(report.expenses)}</p><p>Charges : ${money(report.charges)}</p><h2>Résultat : ${money(report.profit)}</h2><p>${state.gameOver?'Trésorerie épuisée. Vous pouvez commencer un nouveau bar.':'Le prochain service commence à 17 h. Votre partie est sauvegardée.'}</p>`)}elapsed+=dt;if(elapsed>.12){ui();elapsed=0}}audio.setState(!paused&&!menusOpen()&&state.open,!!state.prep?.pouring);if(now-lastRender>=1000/preferences.fps-.5){render();lastRender=now}requestAnimationFrame(frame)}
 ui();setInterval(save,5000);addEventListener('beforeunload',()=>{if(!window.GameMenu||GameMenu.hasSession())save(true)});

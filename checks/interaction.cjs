@@ -47,8 +47,8 @@ app.whenReady().then(async()=>{
    const angle=camera.a;document.dispatchEvent(new MouseEvent('mousemove',{movementX:-20,movementY:0}));check(camera.a<angle,'Automatic camera responds in the correct direction');
 
    key('Tab','Tab');await flush();
-   check(!locked&&BarInput.isCursorMode()&&!paused&&GameMenu.getMode()==='play','TAB frees the cursor without entering pause');
-   click('#open');check(state.open,'Open bar is usable in cursor mode');
+   check(!locked&&BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play','TAB opens the tablet without entering pause');
+   click('[data-tablet-action="service"]');check(state.open,'Open bar is usable in the tablet');
    state.spawn=999;const clock=state.time;last=performance.now()-30;frame(performance.now());check(state.time>clock,'Service time continues in cursor mode');
    const stillAngle=camera.a;document.dispatchEvent(new MouseEvent('mousemove',{movementX:40,movementY:20}));check(camera.a===stillAngle,'Cursor motion does not rotate the camera');
    const position={x:camera.x,z:camera.z};key(preferences.bindings.forward.code,'z');movement(.1);key(preferences.bindings.forward.code,'z','keyup');check(camera.x===position.x&&camera.z===position.z,'Cursor typing does not move the player');
@@ -60,25 +60,23 @@ app.whenReady().then(async()=>{
    key('Tab','Tab');key('Tab','Tab');key('Tab','Tab');key('Tab','Tab');await flush();
    check(locked===canvas&&BarInput.isLooking()&&!paused,'Four rapid TAB presses settle in camera mode');
 
-   const choices=[['Digit1','&','beer'],['Digit2','é','wine'],['Digit3','"','coffee'],['Digit4',"'",'mojito']];
-   for(const [code,label,recipe]of choices){
-    game.s=new Game().s;state=game.s;game.open();state.spawn=999;ui();
-    BarInput.enterLook();await flush();key(code,label);await flush();
-    check(state.prep?.recipe===recipe,'Physical recipe shortcut '+code+' works on AZERTY');
+   const choices=['beer','wine','coffee','mojito'];
+   for(const recipe of choices){
+    game.s=new Game().s;state=game.s;state.management.cocktails=true;game.open();state.spawn=999;ui();
+    BarInput.enterLook();await flush();key('Tab','Tab');await flush();click('[data-tablet-recipe="'+recipe+'"]');await flush();
+    check(state.prep?.recipe===recipe,'Tablet selects recipe '+recipe);
     check(BarInput.isCursorMode()&&!locked&&!paused&&GameMenu.getMode()==='play','Recipe selection opens usable cursor controls');
     check(document.querySelector('[data-action="step"]'),'Recipe preparation is available immediately');
    }
-   for(let index=1;index<=4;index++){
-    game.s=new Game().s;state=game.s;game.open();ui();key('Numpad'+index,String(index));await flush();
-    check(state.prep?.recipe===choices[index-1][2],'Numeric keypad recipe '+index);
-   }
+   game.s=new Game().s;state=game.s;game.open();ui();
+   for(let index=1;index<=4;index++){key('Digit'+index,String(index));key('Numpad'+index,String(index));check(state.prep===null,'Number shortcuts no longer select a recipe')}
 
    game.s=new Game().s;state=game.s;game.open();state.spawn=999;
    state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90}];state.nextId=2;ui();
-   key('Digit1','&');await flush();click('[data-action="step"]');
+   key('Tab','Tab');await flush();click('[data-tablet-recipe="beer"]');await flush();click('[data-action="step"]');
    key(preferences.bindings.pour.code,' ');check(state.prep.pouring,'Pour key works with cursor controls');
-   key('Tab','Tab');await flush();check(!state.prep.pouring&&BarInput.isLooking(),'Switching to camera releases held pouring');
-   key(preferences.bindings.pour.code,' ','keyup');key('Tab','Tab');await flush();
+   key('Tab','Tab');await flush();check(!state.prep.pouring&&BarTablet.isOpen(),'Opening the tablet releases held pouring');
+   key(preferences.bindings.pour.code,' ','keyup');click('[data-tablet-action="prep"]');await flush();
    key(preferences.bindings.pour.code,' ');for(let i=0;i<36;i++)game.tick(.1);key(preferences.bindings.pour.code,' ','keyup');ui();
    click('[data-action="finish"]');click('[data-action="plate"]');click('[data-serve="1"]');
    check(state.sold===1&&state.cash===266&&state.tray.length===0,'A drink can be selected, prepared and served without ESC');
@@ -86,9 +84,9 @@ app.whenReady().then(async()=>{
 
    // A modal is an intentional release, not an unexpected pointer loss.
    BarInput.enterLook();await flush();click('#order');await flush();
-   check($('modal').open&&GameMenu.getMode()==='play','Supplier opens without a pause overlay');
-   const beforeBuy=state.cash;click('[data-buy="rum"]');check(state.cash===beforeBuy-18,'Supplier remains usable after intentional unlock');
-   click('#close');await flush();check(!$('modal').open&&GameMenu.getMode()==='play','Close supplier returns to the active session');
+   check(BarTablet.isOpen()&&BarTablet.getTab()==='reserve'&&GameMenu.getMode()==='play','Supplier tablet opens without a pause overlay');
+   const beforeBuy=state.cash;click('[data-tablet-buy="rum"]');check(state.cash===beforeBuy-18,'Supplier remains usable after intentional unlock');
+   BarTablet.close();await flush();check(!BarTablet.isOpen()&&GameMenu.getMode()==='play','Close supplier returns to the active session');
 
    BarInput.enterLook();await flush();GameMenu.pause();await flush();
    check(paused&&!locked&&GameMenu.getMode()==='pause','Pause intentionally frees the cursor');
@@ -109,17 +107,17 @@ app.whenReady().then(async()=>{
    check(requests===requestsBeforeCancel&&!locked&&BarInput.isCursorMode()&&!paused,'Switching to the counter cancels pending Escape cooldown recovery');
 
    GameMenu.pause();GameMenu.openSettings();
-   for(const code of ['Tab','Digit1','Digit2','Digit3','Digit4','Numpad1','Numpad4']){
+   for(const code of ['Tab','KeyE','F11']){
     click('[data-bind="forward"]');const original=preferences.bindings.forward.code;key(code,code);
     check(capturing==='forward'&&preferences.bindings.forward.code===original,'Reserved shortcut cannot be rebound: '+code);key('Escape','Escape');
    }
-   const oldPreferences=defaultPreferences();oldPreferences.bindings.forward={code:'Tab',label:'Tab'};oldPreferences.bindings.pour={code:'Digit1',label:'1'};
+   const oldPreferences=defaultPreferences();oldPreferences.bindings.forward={code:'Tab',label:'Tab'};oldPreferences.bindings.pour={code:'KeyE',label:'E'};delete oldPreferences.bindings.sprint;
    localStorage.setItem(PREF_KEY,JSON.stringify(oldPreferences));const migrated=loadPreferences();
-   check(migrated.bindings.forward.code!=='Tab'&&!/^(Digit|Numpad)[1-4]$/.test(migrated.bindings.pour.code),'Existing bindings migrate away from new reserved shortcuts');
+   check(migrated.bindings.forward.code!=='Tab'&&migrated.bindings.pour.code!=='KeyE'&&migrated.bindings.sprint.code==='ShiftLeft','Existing bindings migrate away from reserved shortcuts and gain sprint');
    preferences=defaultPreferences();savePreferences();GameMenu.closeSettings();GameMenu.returnHome();await flush();
    check(!locked&&GameMenu.isHome(),'Returning home releases camera');
    const homePrep=state.prep;key('Digit4',"'");check(state.prep===homePrep,'Welcome rejects preparation shortcuts');
-   return {automaticCamera:true,cursorToggle:'without pause',recipes:'AZERTY and numeric keypad',fullService:'without ESC',lateCapture:'safe',bindingMigration:true,requests,exits};
+   return {automaticCamera:true,tablet:'without pause',recipes:'tablet catalogue',fullService:'without ESC',lateCapture:'safe',bindingMigration:true,requests,exits};
   })()`,true);
 
   // Reload restores the actual Chromium capture methods. In a hidden window,
@@ -162,14 +160,14 @@ app.whenReady().then(async()=>{
    await nativeClick('[data-menu-action="continue"]');
    await waitFor("document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused",'Focused Continue must capture the camera without a scene click');
    nativeKey('Tab');
-   await waitFor("!document.pointerLockElement&&BarInput.isCursorMode()&&!paused&&GameMenu.getMode()==='play'",'Native TAB must release capture without pause');
-   await nativeClick('[data-recipe="beer"]');
+   await waitFor("!document.pointerLockElement&&BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play'",'Native TAB must open the tablet without pause');
+   await nativeClick('[data-tablet-recipe="beer"]');
    await waitFor("state.prep?.recipe==='beer'&&!paused",'Native cursor click must choose a drink without ESC');
    await win.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
    await sleep(250);
    fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});
    fs.writeFileSync(path.join(__dirname,'artifacts','interaction-cursor.png'),(await win.webContents.capturePage()).toPNG());
-   nativeKey('Tab');
+   nativeKey('Tab');await waitFor("BarTablet.isOpen()",'Native TAB reopens the tablet');nativeKey('Tab');
    await waitFor("document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused",'Native TAB must recapture the camera');
    nativeKey('Escape');
    await waitFor("!document.pointerLockElement&&paused&&GameMenu.getMode()==='pause'",'Native ESC must pause and release capture');

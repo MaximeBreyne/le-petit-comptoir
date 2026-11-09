@@ -9,9 +9,9 @@
   document.dispatchEvent(new MouseEvent('mousemove',{movementX:30,movementY:0}));check(Math.abs(camera.a-a)<1e-9,'Mouse right looks right');
   delete document.pointerLockElement;
   game.s.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90},{id:2,name:'Marc',recipe:'wine',patience:90}];ui();
-  const recipe=document.querySelector('[data-recipe="beer"]');ui();check(recipe===document.querySelector('[data-recipe="beer"]'),'Stable interface nodes');
+  BarTablet.open('drinks');const recipe=document.querySelector('[data-tablet-recipe="beer"]');BarTablet.refresh(true);check(recipe&&recipe===document.querySelector('[data-tablet-recipe="beer"]'),'Stable tablet catalogue nodes');BarTablet.close();
   visualTime=0;customerVisuals.clear();render();visualTime=4;render();
-  const previousCamera={...camera};camera.x=4.6;camera.z=4.85;walk(0,-.2);check(camera.z===4.85,'Waiting customers block movement');camera=previousCamera;
+  const previousCamera={...camera};camera.x=4.6;camera.z=4.85;walk(0,-.8);check(camera.z>=4.75&&camera.z<=4.85,'Swept movement stops at the waiting customer');camera=previousCamera;
   const slot=customerVisuals.get(2).slot;state.orders.shift();render();check(customerVisuals.get(2).slot===slot,'Waiting customer keeps place');
   visualTime=8;render();check(!customerVisuals.has(1),'Departed customer removed');
   const probe=document.createElement('canvas');probe.style.cssText='width:200px;height:200px';document.body.append(probe);

@@ -1,5 +1,5 @@
 const {app,BrowserWindow}=require('electron'),path=require('node:path'),fs=require('node:fs');
-app.setPath('userData',path.resolve('.qa-settings-profile'));
+app.setPath('userData',fs.mkdtempSync(path.join(require('node:os').tmpdir(),'comptoir-settings-')));
 app.commandLine.appendSwitch('autoplay-policy','no-user-gesture-required');
 app.whenReady().then(async()=>{let win;const errors=[];try{
  win=new BrowserWindow({width:1440,height:960,show:false,webPreferences:{backgroundThrottling:false,sandbox:true,contextIsolation:true,nodeIntegration:false}});
@@ -9,8 +9,13 @@ app.whenReady().then(async()=>{let win;const errors=[];try{
  const check=(v,m)=>{if(!v)throw Error(m)};
  const key=(code,value,type='keydown')=>window.dispatchEvent(new KeyboardEvent(type,{code,key:value,bubbles:true,cancelable:true}));
  const set=(id,value)=>{const el=$(id);if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}))};
+ // Keep native hidden-window capture denial from cancelling the held audio
+ // control under test. Dedicated interaction checks cover capture failures.
+ let locked=null;Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>locked});
+ canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
+ document.exitPointerLock=()=>queueMicrotask(()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))});
  GameMenu.newGame();if(GameMenu.getMode()==='confirm')document.querySelector('[data-menu-action="confirm"]').click();preferences=defaultPreferences();settingsUI();render();
- check(renderer&&renderer.gl.isEnabled(renderer.gl.DEPTH_TEST),'Depth test enabled');
+ check(renderer&&renderer.gl.isEnabled(renderer.gl.DEPTH_TEST),'Depth test enabled');check(Object.keys(preferences.bindings).length===9&&preferences.bindings.sprint.code==='ShiftLeft','Sprint is included in configurable controls');
  // Intersecting, differently-sized objects must occlude identically regardless of insertion order.
  const probe=document.createElement('canvas');probe.style.cssText='width:200px;height:200px;position:fixed;left:-500px';document.body.append(probe);
  // Isolate depth from cached static shadows, whose lighting changes when a mesh becomes dynamic.

@@ -3,6 +3,30 @@ const BarScene=(()=>{
  const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10};
  const playCamera={x:6,y:1.68,z:1.55,a:0,pitch:-.06};
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
+ const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
+ const storageBins=[
+  {key:'beer',label:'BIERE',pack:500,x:1,y:.37,kind:'keg',color:'#8d9993'},
+  {key:'wine',label:'VIN',pack:75,x:2.25,y:.37,kind:'bottle',color:'#553b3c'},
+  {key:'rum',label:'RHUM',pack:70,x:3.5,y:.37,kind:'bottle',color:'#716340'},
+  {key:'coffee',label:'CAFE',pack:20,x:1,y:1.01,kind:'bag',color:'#9a7953'},
+  {key:'sugar',label:'SIROP',pack:100,x:2.25,y:1.01,kind:'bottle',color:'#b19c6e'},
+  {key:'soda',label:'EAU PETILLANTE',pack:100,x:3.5,y:1.01,kind:'bottle',color:'#78908c'},
+  {key:'lime',label:'CITRONS',pack:12,x:1,y:1.65,kind:'produce',color:'#7d8e45'},
+  {key:'mint',label:'MENTHE',pack:12,x:2.25,y:1.65,kind:'produce',color:'#4f754b'},
+  {key:'ice',label:'GLACONS',pack:20,x:3.5,y:1.65,kind:'bag',color:'#b3c8c2'},
+ ];
+ function containsWalkablePosition(x,z){
+  if(!Number.isFinite(x)||!Number.isFinite(z))return false;
+  return (x>=.3&&x<=11.7&&z>=.3&&z<=9.6)||
+   (x>=.3&&x<=4.3&&z>=-3.9&&z<=-.3)||
+   (x>=.55&&x<=1.35&&z>=-.35&&z<=.35);
+ }
+ const inStockroom=position=>!!position&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
+ function prepStation(recipe){
+  if(recipe==='coffee')return {x:8.43,y:1.152,z:2.47,stream:{x:8.43,y:1.316,z:2.47,h:.072}};
+  if(recipe==='beer')return {x:4.15,y:1.133,z:3.18,stream:{x:4.15,y:1.53,z:3.18,h:.18}};
+  return {x:6.5,y:1.133,z:3.05,stream:{x:6.5,y:1.51,z:3.05,h:.24}};
+ }
  function geometry(target){
   const box=(x,y,z,w,h,d,c,mat=0,extra={})=>{const p={x,y,z,w,h,d,c,mat,solid:false,...extra};target.push(p);return p};
   const cylinder=(x,y,z,w,h,d,c,mat=0,extra={})=>box(x,y,z,w,h,d,c,mat,{round:true,...extra});
@@ -20,11 +44,21 @@ const BarScene=(()=>{
  function glass(g,recipe,x,y,z,fill=1){
   const rim='#c4cfc9';
   if(recipe==='coffee'){
-   g.cylinder(x,y+.012,z,.21,.018,.21,'#d5cfc0');
-   g.cylinder(x,y+.07,z,.13,.11,.13,'#e3ded0',0,{topRadius:1.12});
-   g.cylinder(x,y+.128,z,.119,.004,.119,'#54341f');
-   g.cylinder(x,y+.131,z,.102,.003,.102,'#9c7040');
-   for(let i=0;i<8;i++){const a=i*Math.PI*2/8;g.sphere(x+.085+Math.sin(a)*.027,y+.076+Math.cos(a)*.032,z,.018,.018,.018,'#d9d3c5')}
+   g.cylinder(x,y+.009,z,.21,.018,.21,'#d5cfc0');
+   g.cylinder(x,y+.029,z,.107,.022,.107,'#e3ded0');
+   // An open cup made of thin walls: the liquid stays inside, beneath its rim.
+   for(let i=0;i<16;i++){
+    const a=i*Math.PI*2/16;
+    g.box(x+Math.sin(a)*.063,y+.085,z+Math.cos(a)*.063,.027,.116,.011,'#e3ded0',0,{ry:a});
+   }
+   const liquid=Math.min(1,Math.max(0,fill));
+   g.cylinder(x,y+.041+liquid*.082,z,.113,.003,.113,liquid>0?'#9c7040':'#c6bcaa');
+   // Continuous handle segments avoid the old disconnected bead silhouette.
+   for(let i=0;i<12;i++){
+    const a=i*Math.PI*2/12,b=(i+1)*Math.PI*2/12;
+    const ax=.079+Math.sin(a)*.034,ay=.086+Math.cos(a)*.036,bx=.079+Math.sin(b)*.034,by=.086+Math.cos(b)*.036;
+    g.cylinder(x+(ax+bx)/2,y+(ay+by)/2,z,.014,Math.hypot(bx-ax,by-ay)+.003,.014,'#ded7c7',0,{rz:-Math.atan2(bx-ax,by-ay)});
+   }
   }else if(recipe==='wine'){
    g.cylinder(x,y+.01,z,.14,.012,.14,rim,M.glass);
    g.cylinder(x,y+.077,z,.012,.13,.012,rim,M.glass);
@@ -52,7 +86,10 @@ const BarScene=(()=>{
   b(6,3.45,5,12,.18,10,'#b4aa96',M.plaster,noShadow);
   b(0,1.7,5,.2,3.4,10,'#807264',M.brick,{...solid,...noShadow});
   b(12,1.7,5,.2,3.4,10,'#b7b0a0',M.plaster,{...solid,...noShadow});
-  b(6,1.7,0,12,3.4,.2,'#b2ab98',M.plaster,{...solid,...noShadow});
+  // The former blank wall now has a real doorway to the stockroom.
+  b(.15,1.7,0,.3,3.4,.2,'#b2ab98',M.plaster,{...solid,...noShadow});
+  b(6.8,1.7,0,10.4,3.4,.2,'#b2ab98',M.plaster,{...solid,...noShadow});
+  b(.95,2.85,0,1.3,1.1,.2,'#b2ab98',M.plaster,noShadow);
   for(const x of [.12,11.88]){
    b(x,.58,5,.12,1.16,10,'#31453f',M.wood);
    b(x,1.18,5,.17,.06,10,'#615b48',M.wood);
@@ -60,7 +97,36 @@ const BarScene=(()=>{
    b(x,3.24,5,.18,.11,10,'#d5cbb4',M.plaster,noShadow);
   }
   b(6,3.24,.16,12,.11,.18,'#d5cbb4',M.plaster,noShadow);
-  b(6,.58,.15,12,1.16,.14,'#33443b',M.wood);
+  b(.15,.58,.15,.3,1.16,.14,'#33443b',M.wood);
+  b(6.8,.58,.15,10.4,1.16,.14,'#33443b',M.wood);
+  for(const x of [.29,1.61])b(x,1.16,.12,.075,2.32,.16,'#5a6758',M.wood,solid);
+  b(.95,2.33,.12,1.4,.09,.16,'#5a6758',M.wood);
+  b(.95,2.59,.122,1.18,.25,.035,'#263e36',0,{label:'RESERVE',labelFace:'back',labelSize:74,labelColor:'#dfcea5',castShadow:false});
+  b(.95,.013,0,1.2,.025,.24,'#8d9387',M.metal);
+  // A separate, fully enclosed room: rear shelves, clear aisle and inventory desk.
+  b(2.3,-.11,-2.1,4.6,.22,4.2,'#82877b',M.tile);
+  b(2.3,3.45,-2.1,4.6,.18,4.2,'#b9b9a8',M.plaster,noShadow);
+  b(0,1.7,-2.1,.2,3.4,4.2,'#a4a998',M.plaster,{...solid,...noShadow});
+  b(4.6,1.7,-2.1,.2,3.4,4.2,'#a4a998',M.plaster,{...solid,...noShadow});
+  b(2.3,1.7,-4.2,4.6,3.4,.2,'#b0b39f',M.plaster,{...solid,...noShadow});
+  for(const x of [.12,4.48])b(x,.08,-2.1,.08,.16,4.2,'#566252',M.paint);
+  b(2.3,.08,-4.08,4.36,.16,.08,'#566252',M.paint);
+  b(2.3,3.3,-2.1,.55,.055,1.3,'#5e6861',M.metal,noShadow);
+  b(2.3,3.264,-2.1,.45,.016,1.18,'#e7e5c9',M.light,noShadow);
+  for(const x of [.35,2.25,4.15])for(const z of [-4.04,-3.42])b(x,1.25,z,.055,2.5,.055,'#4b5a53',M.metal,solid);
+  for(const y of [.35,.99,1.63,2.27])b(2.25,y,-3.73,3.85,.04,.68,'#9b9c85',M.paint,solid);
+  // Whole rack footprint stays collidable even when every shelf is empty.
+  b(2.25,.17,-3.76,3.85,.3,.66,'#677063',M.paint,solid);
+  for(const bin of storageBins)b(bin.x,bin.y-.085,-3.38,.94,.12,.025,'#d6d1b6',0,{label:bin.label,labelFace:'back',labelSize:66,labelColor:'#344b3c',castShadow:false});
+  b(2.25,2.67,-4.075,2.4,.28,.025,'#2b4037',0,{label:'LA RESERVE',labelFace:'back',labelSize:74,labelColor:'#e1cca0',castShadow:false});
+  b(4.05,.93,-1.18,.76,.055,1.35,'#9e9479',M.wood,solid);
+  for(const x of [3.74,4.36])for(const z of [-1.74,-.62])b(x,.45,z,.05,.9,.05,'#48574e',M.metal,solid);
+  b(4.06,.964,-1.17,.34,.012,.48,'#d9d2ba',0,{label:'INVENTAIRE',labelFace:'top',labelSize:42,labelColor:'#405247',castShadow:false});
+  b(4.455,1.8,-1.18,1.25,.58,.024,'#2d473c',0,{ry:Math.PI/2,label:'STOCKS\nE : GERER LA RESERVE',labelSize:35,labelColor:'#dfd0a6',castShadow:false});
+  c(3.9,.3,-2.53,.6,.6,.6,'#637f75',M.metal,solid);
+  c(3.9,.614,-2.53,.62,.026,.62,'#9bad9d',M.metal);
+  b(3.9,.78,-2.53,.1,.3,.1,'#6c8174',M.metal);
+  b(3.9,.93,-2.53,.48,.05,.1,'#879b89',M.metal);
   b(6,3.13,9.98,12,.55,.2,'#a69d8d',M.plaster,noShadow);
   for(const x of [.12,4.25,7.75,11.88])b(x,1.6,9.96,.18,3.2,.2,'#273a38',M.metal,{...solid,...noShadow});
   for(const x of [2.16,9.84]){
@@ -119,8 +185,9 @@ const BarScene=(()=>{
   for(let x=1.72;x<10.4;x+=.13)b(x,.54,3.49,.065,.83,.04,'#796047',M.wood);
   c(6,.26,3.79,.044,8.5,.044,'#ae8a4d',M.metal,{rz:Math.PI/2});
   for(const x of [2.1,4.7,7.3,9.9])c(x,.22,3.64,.027,.33,.027,'#a88a52',M.metal,{rx:Math.PI/2});
-  b(1.75,.5,2.22,.7,1,1.55,'#45392c',M.wood,solid);
-  b(1.75,1.045,2.22,.93,.09,1.7,'#444941',M.paint,solid);
+  // A shorter return leaves a comfortable passage behind the bar to the reserve.
+  b(1.75,.5,2.45,.7,1,1,'#45392c',M.wood,solid);
+  b(1.75,1.045,2.45,.93,.09,1.1,'#444941',M.paint,solid);
   // Beer taps: mounted riser, arch, actual handles, no floating blocks.
   b(4.18,1.11,3.05,.92,.025,.5,'#343d3b',M.metal);
   for(let i=0;i<11;i++)b(3.82+i*.073,1.129,3.05,.014,.006,.35,'#a7b4ab',M.metal);
@@ -132,21 +199,25 @@ const BarScene=(()=>{
    c(4.15+dx,1.88,3.06,.055,.24,.055,'#34332c',M.wood,{topRadius:.78});
    s(4.15+dx,2.01,3.06,.075,.065,.075,'#bdaa7f',M.metal);
   }
-  // Espresso station: steel fascia, gauges, group heads, cup warmer.
-  b(8.75,1.36,2.98,1.28,.51,.6,'#283c38',M.metal);
-  b(8.75,1.39,2.65,1.18,.31,.025,'#adb7ac',M.metal);
-  b(8.75,1.11,2.72,1.28,.04,.62,'#a7afa4',M.metal);
+  // Espresso station has a recessed brewing bay, separated from the drip tray.
+  b(8.75,1.42,3.13,1.28,.62,.32,'#283c38',M.metal);
+  b(8.75,1.57,2.87,1.28,.32,.62,'#283c38',M.metal);
+  b(8.75,1.58,2.544,1.18,.27,.025,'#adb7ac',M.metal);
+  for(const x of [8.15,9.35])b(x,1.28,2.9,.08,.34,.5,'#334640',M.metal);
+  b(8.75,1.125,2.77,1.31,.04,.98,'#a7afa4',M.metal);
+  for(let i=0;i<16;i++)b(8.18+i*.075,1.149,2.49,.012,.006,.34,'#485b53',M.metal);
   for(const dx of [-.32,.32]){
-   c(8.75+dx,1.48,2.62,.105,.022,.105,'#dfd7b8',0,{rx:Math.PI/2});
-   b(8.75+dx,1.48,2.602,.007,.065,.01,'#4b5248',0,{rz:.45});
-   c(8.75+dx,1.24,2.62,.09,.12,.09,'#929d96',M.metal);
-   c(8.75+dx,1.24,2.51,.04,.24,.04,'#222e29',0,{rx:Math.PI/2});
-   glass(g,'coffee',8.75+dx,1.14,2.52);
+   c(8.75+dx,1.60,2.517,.105,.018,.105,'#dfd7b8',0,{rx:Math.PI/2});
+   b(8.75+dx,1.60,2.504,.007,.065,.006,'#4b5248',0,{rz:.45});
+   c(8.75+dx,1.415,2.55,.11,.095,.11,'#929d96',M.metal);
+   c(8.75+dx,1.35,2.47,.025,.04,.025,'#a8b8ab',M.metal);
+   c(8.75+dx,1.419,2.4,.035,.23,.035,'#222e29',0,{rx:Math.PI/2});
   }
-  for(const dx of [-.4,0,.4])c(8.75+dx,1.7,2.98,.14,.13,.14,'#dad3bf');
+  b(8.75,1.739,2.98,1.2,.018,.5,'#a8b2a7',M.metal);
+  for(const dx of [-.4,0,.4])glass(g,'coffee',8.75+dx,1.748,2.98,0);
   b(9.76,1.3,2.93,.28,.4,.33,'#47504a',M.metal);
-  c(9.76,1.66,2.93,.28,.3,.28,'#58412e',M.glass,{topRadius:.85});
-  c(9.76,1.82,2.93,.3,.035,.3,'#252e29');
+  c(9.76,1.65,2.93,.28,.3,.28,'#58412e',M.glass,{topRadius:.85});
+  c(9.76,1.8175,2.93,.3,.035,.3,'#252e29');
   // Preparation utensils, cutting board, produce and register.
   b(6.5,1.115,2.9,.69,.035,.4,'#ac9261',M.wood);
   for(let j=0;j<4;j++)s(6.33+j*.1,1.18,2.92,.09,.075,.09,'#71813c',0);
@@ -172,16 +243,16 @@ const BarScene=(()=>{
    const p=(dx,dz)=>[x+dx*cos+dz*sin,z-dx*sin+dz*cos];
    let [xx,zz]=p(0,0);b(xx,.48,zz,.48,.075,.47,'#6e4b3e',M.fabric,{solid:true,ry:angle});
    [xx,zz]=p(0,.21);b(xx,.78,zz,.47,.48,.055,'#586052',M.wood,{solid:true,ry:angle});
-   for(const dx of [-.19,.19])for(const dz of [-.18,.18]){[xx,zz]=p(dx,dz);b(xx,.23,zz,.038,.46,.038,'#343b33',M.metal)}
+   for(const dx of [-.19,.19])for(const dz of [-.18,.18]){[xx,zz]=p(dx,dz);const h=dz>0?.99:.46;b(xx,h/2,zz,.038,h,.038,'#343b33',M.metal)}
   }
   for(const [x,z] of [[1.65,6.4],[1.65,8.6],[10.22,6.5],[10.22,8.65]]){
    c(x,.75,z,1.05,.065,1.05,'#826c4d',M.wood,{solid:true});
    c(x,.38,z,.075,.72,.075,'#333c35',M.metal);
    c(x,.04,z,.53,.05,.53,'#303a33',M.metal);
-   chair(x-.78,z,Math.PI/2);chair(x+.78,z,-Math.PI/2);
-   c(x,.805,z,.09,.07,.09,'#b2a890');c(x,.9,z,.025,.16,.025,'#72804b');
+   chair(x-.78,z,-Math.PI/2);chair(x+.78,z,Math.PI/2);
+   c(x,.818,z,.09,.07,.09,'#b2a890');c(x,.9,z,.025,.16,.025,'#72804b');
    s(x+.025,.99,z,.13,.11,.08,'#61734b');
-   b(x-.2,.795,z+.18,.2,.008,.14,'#d7cdb4');
+   b(x-.2,.787,z+.18,.2,.008,.14,'#d7cdb4');
   }
   for(const x of [2.8,9.2]){
    c(x,.79,4.18,.4,.095,.4,'#785242',M.fabric,{solid:true});
@@ -195,21 +266,41 @@ const BarScene=(()=>{
    b(11.84,2.03,z,.055,1.0,.77,'#4b4436',M.wood);
    b(11.8,2.03,z,.63,.87,.02,'#a79266',0,{ry:Math.PI/2,label:word,labelSize:36,labelColor:'#263b34'});
   }
-  c(1.05,2.58,.2,.49,.055,.49,'#b8ac8c',M.metal,{rx:Math.PI/2});
-  c(1.05,2.58,.235,.43,.015,.43,'#e0d6bb',0,{rx:Math.PI/2});
-  b(1.05,2.66,.25,.016,.17,.015,'#394137');b(1.105,2.57,.25,.12,.015,.015,'#394137');
+  c(10.96,2.65,.2,.49,.055,.49,'#b8ac8c',M.metal,{rx:Math.PI/2});
+  c(10.96,2.65,.235,.43,.015,.43,'#e0d6bb',0,{rx:Math.PI/2});
+  b(10.96,2.73,.25,.016,.17,.015,'#394137');b(11.015,2.64,.25,.12,.015,.015,'#394137');
   for(const x of [3,6,9]){
    c(x,3.04,4.65,.018,.65,.018,'#273632',M.metal,noShadow);
    c(x,2.68,4.65,.61,.22,.61,'#364137',M.metal,{topRadius:.32});
    c(x,2.555,4.65,.54,.016,.54,'#f2d799',M.light,noShadow);
    s(x,2.53,4.65,.11,.08,.11,'#f9e4b7',M.light,noShadow);
   }
-  // Storage crates and a leafy plant fill otherwise empty corners.
-  for(let i=0;i<3;i++)b(.65,.18+i*.32,.75,.85,.3,.7,'#8a7751',M.wood,solid);
+  // Keep the stockroom entrance clear; the street-side plant stays in its corner.
   c(11.15,.24,9.15,.43,.48,.43,'#7b5a42',0,{topRadius:1.14});
   c(11.15,.57,9.15,.025,.44,.025,'#536243');
   for(let i=0;i<11;i++){const a=i*2.4;s(11.15+Math.sin(a)*.16,.61+(i%4)*.09,9.15+Math.cos(a)*.16,.24,.11,.12,['#526748','#637650','#405b42'][i%3],0,{ry:a,rz:.25*Math.sin(a)})}
   return items;
+ }
+ function storageVisuals(items,state){
+  const g=geometry(items),reserve=state?.reserve||{};
+  for(const bin of storageBins){
+   const quantity=Math.max(0,Number(reserve[bin.key])||0),count=Math.min(3,Math.ceil(quantity/bin.pack));
+   for(let i=0;i<count;i++){
+    const x=bin.x+(i-1)*.28,y=bin.y,z=-3.76;
+    if(bin.kind==='keg'){
+     g.cylinder(x,y+.225,z,.24,.45,.24,bin.color,M.metal);
+     for(const h of [.045,.405])g.cylinder(x,y+h,z,.257,.025,.257,'#b0b9ab',M.metal);
+     g.cylinder(x,y+.456,z,.08,.018,.08,'#5f7166',M.metal);
+    }else if(bin.kind==='bottle')bottle(g,x,y,z,bin.color,.96,'');
+    else if(bin.kind==='produce'){
+     g.box(x,y+.09,z,.25,.18,.34,'#8d7d58',M.wood);
+     for(let j=0;j<4;j++)g.sphere(x+(j%2-.5)*.09,y+.20,z+(Math.floor(j/2)-.5)*.12,.105,.075,.11,bin.color);
+    }else{
+     g.box(x,y+.17,z,.22,.34,.29,bin.color,0);
+     g.box(x,y+.17,z+.148,.15,.15,.005,'#d9d4b7',0,{castShadow:false});
+    }
+   }
+  }
  }
  function customer(items,{x,z,id,time,moving,departing=false,patience=100}){
   const g=geometry(items),skin=['#c4916d','#956c51','#d4b191','#b18061'][id%4];
@@ -222,7 +313,7 @@ const BarScene=(()=>{
   g.sphere=(...args)=>{args[8]={...args[8],shape:'sphere'};return g.box(...args)};
   const {box:b,cylinder:c,sphere:s}=g;
   // Separate joints, facial planes and layered clothing replace block silhouettes.
-  c(0,1.105,0,.40,.49,.25,shirt,M.fabric,{topRadius:1.12});
+  c(0,1.105,0,.40,.49,.25,shirt,M.fabric,{topRadius:1.12,contactShadow:true});
   s(0,.855,0,.35,.2,.25,'#333f43',M.fabric);
   c(0,1.425,0,.105,.13,.11,skin,M.skin);
   s(0,1.59,0,.19,.265,.205,skin,M.skin);
@@ -251,5 +342,5 @@ const BarScene=(()=>{
   }
   for(let y=.98;y<1.34;y+=.087)b(0,y,-.128,.012,.012,.009,'#c2b9a0',M.paint);
  }
- return {create,geometry,bottle,glass,customer,playCamera,homeCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

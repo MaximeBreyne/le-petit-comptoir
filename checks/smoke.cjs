@@ -1,5 +1,5 @@
 const {app,BrowserWindow}=require('electron');const path=require('node:path');const fs=require('node:fs');
-app.setPath('userData',path.resolve('.qa-profile'));
+app.setPath('userData',fs.mkdtempSync(path.join(require('node:os').tmpdir(),'comptoir-smoke-')));
 const errors=[];let win;
 app.whenReady().then(async()=>{try{
  win=new BrowserWindow({width:1440,height:960,show:false,webPreferences:{backgroundThrottling:false,nodeIntegration:false,contextIsolation:true,sandbox:true}});
@@ -12,7 +12,7 @@ app.whenReady().then(async()=>{try{
  GameMenu.newGame();if(GameMenu.getMode()==='confirm')document.querySelector('[data-menu-action="confirm"]').click();preferences=defaultPreferences();ui();check(renderer,'WebGL renderer initialized');
  $('open').click();check(state.open,'Open button');
  game.s.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90}];ui();
- document.querySelector('[data-recipe="beer"]').click();check(state.prep.recipe==='beer','Recipe click');
+ BarTablet.open('drinks');document.querySelector('[data-tablet-recipe="beer"]').click();check(state.prep.recipe==='beer','Tablet recipe click');
  document.querySelector('[data-action="step"]').click();check(game.isPour(),'Select glass');
  const pour=$('pour');pour.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',bubbles:true}));
  check(state.prep.pouring,'Held pour');for(let i=0;i<36;i++)game.tick(.1);
@@ -20,10 +20,12 @@ app.whenReady().then(async()=>{try{
  document.querySelector('[data-action="finish"]').click();check(state.prep.ready,'Validate dose');
  document.querySelector('[data-action="plate"]').click();check(state.tray.length===1,'Tray');
  document.querySelector('[data-serve="1"]').click();check(state.sold===1&&state.cash===266,'Serve and tip');
- $('order').click();check($('modal').open,'Supplier dialog');
- document.querySelector('[data-buy="rum"]').click();check(state.deliveries.length===1,'Order delivery');
- $('close').click();check(!$('modal').open,'Close dialog');
- for(let i=0;i<101;i++)game.tick(.1);check(state.stock.rum===140,'Delivery arrived');
+ $('order').click();check(BarTablet.isOpen()&&BarTablet.getTab()==='reserve','Supplier tablet');
+ document.querySelector('[data-tablet-buy="rum"]').click();check(state.deliveries.length===1,'Order delivery');
+ BarTablet.close({resumeLook:false});check(!BarTablet.isOpen(),'Close tablet');
+ for(let i=0;i<101;i++)game.tick(.1);check(state.reserve.rum===140&&state.stock.rum===70,'Delivery arrived in reserve');
+ camera={...BarScene.stockroomCamera};BarTablet.open('reserve');document.querySelector('[data-tablet-restock="rum"]').click();BarTablet.close({resumeLook:false});check(state.stock.rum===140&&state.reserve.rum===70,'Restock from the physical reserve');
+ state.management.cocktails=true;
  game.s.orders=[{id:2,name:'Nadia',recipe:'mojito',patience:80},{id:3,name:'Thomas',recipe:'wine',patience:65}];
  game.start('mojito');game.step();game.step();game.step();game.step();game.s.prep.amount=3.5;ui();
  save();const restored=new Game(JSON.parse(localStorage.getItem('comptoir-bar-v2')));check(restored.s.stock.rum===136,'Saved stock');

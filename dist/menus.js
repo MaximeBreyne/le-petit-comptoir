@@ -15,21 +15,23 @@ window.GameMenu=(()=>{
   if(s.day<1||s.day!==Math.floor(s.day)||s.time<0||!Number.isSafeInteger(s.nextId)||s.nextId<1)return false;
   if(!['open','closing','upgraded','gameOver'].every(k=>typeof s[k]==='boolean'))return false;
   if(!Object.keys(ingredients).every(k=>Number.isFinite(s.stock[k])&&s.stock[k]>=0))return false;
+  if(s.reserve!==undefined&&(!s.reserve||!Object.keys(ingredients).every(k=>Number.isFinite(s.reserve[k])&&s.reserve[k]>=0)))return false;
+  if(s.management!==undefined&&(!s.management||!['cocktails','counter','assistant'].every(k=>typeof s.management[k]==='boolean')||!Number.isFinite(s.management.restockTimer)||s.management.restockTimer<0))return false;
   if(!Array.isArray(s.orders)||s.orders.length>3||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
   if(!Array.isArray(s.tray)||s.tray.length>s.capacity||!s.tray.every(t=>t&&recipes[t.recipe]&&Number.isFinite(t.quality)&&t.quality>=0&&t.quality<=100))return false;
   if(!Array.isArray(s.deliveries)||!s.deliveries.every(d=>d&&ingredients[d.key]&&Number.isFinite(d.remaining)&&d.remaining>=0&&d.remaining<=10))return false;
   if(s.prep){const p=s.prep,r=recipes[p.recipe];if(!r||!Number.isInteger(p.step)||p.step<0||p.step>=r.steps.length||!Number.isFinite(p.amount)||p.amount<0||p.amount>r.target*1.60001||!Number.isFinite(p.quality)||p.quality<0||p.quality>100||typeof p.ready!=='boolean')return false}
   return true;
  }
- function validCamera(value){return value&&['x','y','z','a','pitch'].every(k=>Number.isFinite(value[k]))&&value.x>=.3&&value.x<=11.7&&value.z>=.4&&value.z<=9.6&&value.y>0&&value.y<3}
+ function validCamera(value){return value&&['x','y','z','a','pitch'].every(k=>Number.isFinite(value[k]))&&BarScene.containsWalkablePosition(value.x,value.z)&&value.y>0&&value.y<3}
  function snapshot(slot){
   if(slot==='auto'){const s=read(AUTO_KEY),meta=read(META_KEY);return validState(s)?{state:s,savedAt:meta?.savedAt,camera:meta?.camera}:null}
   const value=read(SLOT_PREFIX+slot);return value?.schema===1&&validState(value.state)?value:null;
  }
  function sessionLabel(s){return `Soir ${s.day} · ${money(s.cash)} · ${s.totalSold} clients servis`}
  function dateLabel(value){const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Dernière partie enregistrée'}
- function freeze(){paused=true;keys={};game.setPour(false);audio.setState(false,false);if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();last=performance.now();ui()}
- function closeDialogs(){for(const id of ['modal','settingsModal'])if($(id).open)$(id).close()}
+ function freeze(){paused=true;keys={};game.setPour(false);audio.setState(false,false);window.BarTablet?.close({suspend:true});if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();last=performance.now();ui()}
+ function closeDialogs(){window.BarTablet?.close({suspend:true});for(const id of ['modal','settingsModal'])if($(id).open)$(id).close()}
  function show(next){
   view=next;panel.hidden=next==='play';document.body.dataset.screen=sessionActive?'game':'home';document.body.dataset.menuOpen=String(next!=='play');
   for(const element of gameUI)element.inert=next!=='play';

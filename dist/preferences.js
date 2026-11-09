@@ -1,8 +1,25 @@
 const PREF_KEY='comptoir-bar-settings-v1';
-const isReservedGameKey=code=>/^(Escape|F11|Tab|Digit[1-4]|Numpad[1-4])$/.test(code);
-const defaultPreferences=()=>({quality:'medium',fps:60,fov:75,brightness:100,sensitivity:1,invertY:false,volume:70,effects:80,ambience:25,muted:false,bindings:{forward:{code:'KeyW',label:'Z / W'},back:{code:'KeyS',label:'S'},left:{code:'KeyA',label:'Q / A'},right:{code:'KeyD',label:'D'},turnLeft:{code:'ArrowLeft',label:'←'},turnRight:{code:'ArrowRight',label:'→'},pause:{code:'KeyP',label:'P'},pour:{code:'Space',label:'Espace'}}});
-function loadPreferences(){const result=defaultPreferences();try{const s=JSON.parse(localStorage.getItem(PREF_KEY));if(s){for(const k of ['quality','fps','fov','brightness','sensitivity','invertY','volume','effects','ambience','muted'])if(typeof s[k]===typeof result[k])result[k]=s[k];if(s.bindings){const codes=new Set();for(const k of Object.keys(result.bindings)){const v=s.bindings[k];if(v&&!isReservedGameKey(v.code)&&/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Enter|Backspace|Tab|Home|End|PageUp|PageDown)$/.test(v.code)&&!codes.has(v.code)){result.bindings[k]={code:v.code,label:String(v.label).slice(0,20)};codes.add(v.code)}}}}}catch{}
- if(!['low','medium','high'].includes(result.quality))result.quality='medium';if(![30,60,120].includes(result.fps))result.fps=60;for(const [k,min,max]of [['fov',60,100],['brightness',65,140],['sensitivity',.2,3],['volume',0,100],['effects',0,100],['ambience',0,100]])result[k]=Number.isFinite(result[k])?Math.min(max,Math.max(min,result[k])):defaultPreferences()[k];if(new Set(Object.values(result.bindings).map(b=>b.code)).size!==Object.keys(result.bindings).length)result.bindings=defaultPreferences().bindings;return result;
+const isReservedGameKey=code=>/^(Escape|F11|Tab|KeyE)$/.test(code);
+const defaultPreferences=()=>({quality:'medium',fps:60,fov:75,brightness:100,sensitivity:1,invertY:false,volume:70,effects:80,ambience:25,muted:false,bindings:{forward:{code:'KeyW',label:'Z / W'},back:{code:'KeyS',label:'S'},left:{code:'KeyA',label:'Q / A'},right:{code:'KeyD',label:'D'},turnLeft:{code:'ArrowLeft',label:'←'},turnRight:{code:'ArrowRight',label:'→'},sprint:{code:'ShiftLeft',label:'Maj'},pause:{code:'KeyP',label:'P'},pour:{code:'Space',label:'Espace'}}});
+function loadPreferences(){
+ const result=defaultPreferences(),defaults=result.bindings;let saved;
+ try{saved=JSON.parse(localStorage.getItem(PREF_KEY))}catch{}
+ if(saved){for(const k of ['quality','fps','fov','brightness','sensitivity','invertY','volume','effects','ambience','muted'])if(typeof saved[k]===typeof result[k])result[k]=saved[k]}
+ const used=new Set(),bindings={};
+ for(const action of Object.keys(defaults)){
+  const value=saved?.bindings?.[action];
+  if(value&&/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Enter|Backspace|Home|End|PageUp|PageDown)$/.test(value.code)&&!isReservedGameKey(value.code)&&!used.has(value.code)){
+   bindings[action]={code:value.code,label:String(value.label||value.code).slice(0,20)};used.add(value.code);
+  }
+ }
+ for(const action of Object.keys(defaults))if(!bindings[action]){
+  const code=[defaults[action].code,'ShiftLeft','ShiftRight','ControlLeft','ControlRight','KeyR','KeyT','KeyF','KeyG','KeyH','KeyJ'].find(code=>!used.has(code)&&!isReservedGameKey(code));
+  bindings[action]={code,label:code===defaults[action].code?defaults[action].label:code.startsWith('Shift')?'Maj':code.startsWith('Control')?'Ctrl':code.replace('Key','')};used.add(code);
+ }
+ result.bindings=bindings;
+ if(!['low','medium','high'].includes(result.quality))result.quality='medium';if(![30,60,120].includes(result.fps))result.fps=60;
+ for(const [k,min,max]of [['fov',60,100],['brightness',65,140],['sensitivity',.2,3],['volume',0,100],['effects',0,100],['ambience',0,100]])result[k]=Number.isFinite(result[k])?Math.min(max,Math.max(min,result[k])):defaultPreferences()[k];
+ return result;
 }
 let preferences=loadPreferences();
 function savePreferences(){try{localStorage.setItem(PREF_KEY,JSON.stringify(preferences));return true}catch{return false}}
