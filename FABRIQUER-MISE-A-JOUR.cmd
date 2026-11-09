@@ -18,6 +18,8 @@ call npm.cmd run dist:win
 if errorlevel 1 goto failed
 echo.
 echo Nouvelle version disponible dans release-final.
+echo Le nettoyage des anciennes versions est automatique apres verification.
+echo Les anciens fichiers bloques sont signales et leur suppression sera retentee au prochain build reussi.
 echo Le jeu installe detectera cette version, puis l'installera a sa fermeture.
 pause
 exit /b 0

@@ -1,7 +1,7 @@
 # Installateur Windows et mises à jour locales
 
-Installez la version 0.6.0 en ouvrant
-`release-final/Le-Petit-Comptoir-Bar-0.6.0-Setup.exe`.
+Installez le jeu en ouvrant le fichier `Le-Petit-Comptoir-Bar-<version>-Setup.exe`
+présent dans `release-final/` ; `<version>` correspond au numéro du dernier build réussi.
 Sur le PC qui a fabriqué l’installateur, le jeu connaît déjà le dossier
 `release-final` de ce projet : aucune configuration supplémentaire n’est nécessaire.
 Le jeu détecte les versions supérieures construites dans ce dossier et les
@@ -13,7 +13,7 @@ Les sauvegardes et réglages restent dans le profil de l’application, séparé
 de ses fichiers installés. Les anciennes installations antérieures à ce système
 doivent recevoir une fois ce nouvel installateur.
 
-## Jouer à la version 0.6.0
+## Jouer
 
 Le jeu démarre en plein écran sur son écran d’accueil. Choisissez **Nouvelle
 partie**, **Continuer la partie** ou **Charger une sauvegarde**. **F11** permet
@@ -87,6 +87,18 @@ Pour vérifier à nouveau ce résultat :
 node scripts/verify-release.cjs release-final/build-<date>
 ```
 
+Après chaque compilation réussie, vérifiée et publiée dans le dossier local,
+le nettoyage automatique conserve ce seul dossier `build-<date>` ainsi que
+l’installateur actuel, sa `.blockmap` et `latest.yml` à la racine de `release-final`.
+Il supprime les anciens dossiers de build, y compris les compilations incomplètes,
+et les installateurs et blockmaps des versions précédentes.
+
+Si la compilation ou sa vérification échoue, le précédent installateur reste
+disponible. Si Windows empêche la suppression d’un ancien fichier, notamment
+parce qu’il est utilisé, le script affiche un avertissement et réessaie lors du
+prochain build réussi. Les sources, sauvegardes, dépendances et caches de
+compilation sont conservés.
+
 ## Préparer la version suivante
 
 Après avoir modifié le jeu, double-cliquez sur `FABRIQUER-MISE-A-JOUR.cmd`.
@@ -112,5 +124,5 @@ installée : chaque nouvelle version doit être reconstruite avec un numéro sup
 Pour utiliser un autre dossier de mises à jour, copiez d’abord l’installateur et
 sa blockmap, puis `latest.yml` en dernier. Le dossier doit rester accessible au
 jeu ; si le dossier est absent ou indisponible, la version déjà installée reste
-utilisable. Les anciens installateurs peuvent être conservés, mais seul le
-manifeste `latest.yml` indique la nouvelle version à proposer.
+utilisable. Le manifeste `latest.yml` indique la nouvelle version à proposer.
+Le nettoyage automatique concerne le dossier `release-final` de ce projet.

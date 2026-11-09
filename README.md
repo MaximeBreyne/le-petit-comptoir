@@ -1,7 +1,8 @@
-LE PETIT COMPTOIR — BAR · Prototype 0.6.0
+LE PETIT COMPTOIR — BAR · Prototype
 
 WINDOWS 64 BITS
-Ouvrir release-final/Le-Petit-Comptoir-Bar-0.6.0-Setup.exe.
+Ouvrir l’installateur Le-Petit-Comptoir-Bar-VERSION-Setup.exe dans release-final.
+VERSION correspond au numéro du dernier build réussi.
 L’assistant permet de choisir le dossier et de créer un raccourci.
 Le jeu fonctionne hors ligne. Il est désinstallable depuis les paramètres Windows.
 L’exécutable de ce prototype n’est pas signé numériquement.
@@ -96,3 +97,9 @@ Sur ce PC, release-final est surveillé automatiquement ; si le dossier est
 déplacé, choisissez-le dans Réglages > Mises à jour du jeu.
 FABRIQUER-MISE-A-JOUR.cmd prépare la version suivante et actualise ce dossier.
 La nouvelle version disponible s’installe à la fermeture normale du jeu.
+Après un build réussi et vérifié, les anciennes versions et leurs fichiers de
+compilation sont supprimés automatiquement. Seuls le build actuel et ses fichiers
+de mise à jour restent dans release-final. En cas d’échec de compilation ou de
+vérification, le précédent installateur reste disponible.
+Un fichier ancien impossible à supprimer est signalé et le nettoyage est retenté
+au prochain build réussi. Les sauvegardes, sources, dépendances et caches sont conservés.
