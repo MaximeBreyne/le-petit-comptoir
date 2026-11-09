@@ -1,17 +1,14 @@
-const fs=require('fs'),vm=require('vm'),assert=require('assert');
-const elements={};const el=()=>({style:{setProperty(){}},dataset:{},open:false,showModal(){this.open=true},close(){this.open=false},getContext(){return {}},setPointerCapture(){}});
-const sandbox={document:{getElementById(id){return elements[id]??=el()},querySelectorAll(){return []},addEventListener(){},exitPointerLock(){}},localStorage:{getItem(){return null},setItem(k,v){JSON.parse(v)}},innerWidth:1280,innerHeight:800,performance:{now(){return 0}},requestAnimationFrame(){},setTimeout(){},clearTimeout(){},setInterval(){},console};
-vm.createContext(sandbox);vm.runInContext(fs.readFileSync('dist/game.js','utf8'),sandbox);
-vm.runInContext(`
-serve(); if(!state.open)throw Error('Ouverture');
-client={name:'Test',item:0,qty:2,patience:45};serve();
-if(state.cash!==374||state.stock[0]!==6||state.sales!==1)throw Error('Encaissement');
-client={name:'Test',item:0,qty:99,patience:45};serve();
-if(state.cash!==374||state.stock[0]!==6)throw Error('Stock insuffisant');
-document.getElementById('modalContent').onclick({target:{matches(){return true},dataset:{buy:'1'}}});
-if(state.cash!==362||state.stock[1]!==20)throw Error('Commande');
-state.sales=5;document.getElementById('upgrade').onclick();
-if(!state.coffee||state.cash!==182)throw Error('Amélioration');
-endDay();if(state.day!==2||state.cash!==147||state.minute!==480||state.open)throw Error('Fin de journée');
-`,sandbox);
-console.log('OK : ouverture, vente, rupture de stock, commande, amélioration, fin de journée et sauvegarde.');
+const {Game,recipes,ingredients}=require('./dist/engine.js');
+const assert=require('node:assert/strict');let tests=0;
+function test(name,fn){fn();tests++;console.log('OK '+name)}
+function prepare(g,id,quality=100){g.start(id);let p=g.s.prep;while(!g.isPour())g.step();p.amount=recipes[id].target*(quality===100?1:0);g.finishPour();if(id==='mojito')g.finishMix();g.plate()}
+test('Every recipe uses ingredients, follows preparation and can be served',()=>{for(let id of Object.keys(recipes)){let g=new Game();g.open();let before={...g.s.stock};prepare(g,id);assert.equal(g.s.tray[0].quality,100);for(let [k,n]of Object.entries(recipes[id].ingredients))assert.equal(g.s.stock[k],before[k]-n);g.s.orders=[{id:1,name:'Test',recipe:id,patience:60}];g.serve(1);assert.equal(g.s.cash,260+recipes[id].price+1);assert.equal(g.s.orders.length,0)}});
+test('Wrong drink cannot be served',()=>{let g=new Game();g.open();prepare(g,'wine');g.s.orders=[{id:1,recipe:'beer',patience:60}];g.serve(1);assert.equal(g.s.cash,260);assert.equal(g.s.tray.length,1)});
+test('Poor dose is refused without payment',()=>{let g=new Game();g.open();prepare(g,'beer',0);g.s.orders=[{id:1,recipe:'beer',patience:60}];g.serve(1);assert.equal(g.s.cash,260);assert.equal(g.s.lost,1)});
+test('Stock shortage and full tray block preparation without consuming ingredients',()=>{let g=new Game();g.open();g.s.stock.rum=0;g.start('mojito');assert.equal(g.s.prep,null);prepare(g,'beer');prepare(g,'beer');let stock=g.s.stock.beer;g.start('beer');assert.equal(g.s.prep,null);assert.equal(g.s.stock.beer,stock)});
+test('Delivery is paid once and arrives after 10 seconds',()=>{let g=new Game();g.buy('rum');assert.equal(g.s.cash,242);assert.equal(g.s.stock.rum,70);for(let i=0;i<99;i++)g.tick(.1);assert.equal(g.s.stock.rum,70);for(let i=0;i<3;i++)g.tick(.1);assert.equal(g.s.stock.rum,140);g.s.cash=0;g.buy('rum');assert.equal(g.s.deliveries.length,0)});
+test('Dose advances only while held and stops when released',()=>{let g=new Game();g.open();g.start('beer');g.step();g.setPour(true);g.tick(.1);assert.ok(Math.abs(g.s.prep.amount-1.4)<1e-9);g.setPour(false);g.tick(.1);assert.ok(Math.abs(g.s.prep.amount-1.4)<1e-9)});
+test('Timeout, closing, charges and report account for waste',()=>{let g=new Game();g.open();g.s.orders=[{id:1,recipe:'beer',patience:.01}];prepare(g,'wine');g.close();let report=g.tick(.1);assert.equal(report.lost,1);assert.equal(report.waste,1);assert.equal(g.s.cash,225);assert.equal(g.s.day,2);assert.equal(g.s.open,false)});
+test('Save restores an evening and stops pouring; old save ignored',()=>{let g=new Game();g.open();g.start('coffee');g.step();g.setPour(true);let restored=new Game(JSON.parse(JSON.stringify(g.s)));assert.equal(restored.s.stock.coffee,24);assert.equal(restored.s.prep.pouring,false);assert.equal(new Game({version:1}).s.cash,260)});
+test('Upgrade requires sales and sufficient cash; bankruptcy does not create debt',()=>{let g=new Game();g.upgrade();assert.equal(g.s.capacity,2);g.s.totalSold=5;g.upgrade();assert.equal(g.s.capacity,4);assert.equal(g.s.cash,160);g.s.cash=10;g.end();assert.equal(g.s.gameOver,true);g.open();assert.equal(g.s.open,false)});
+console.log(`${tests} gameplay checks passed.`);

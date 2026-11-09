@@ -1,0 +1,48 @@
+{
+  "name": "le-petit-comptoir-bar",
+  "version": "0.2.0",
+  "description": "Jeu de gestion de bar hors ligne",
+  "author": "Le Petit Comptoir",
+  "private": true,
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node check-game.cjs",
+    "dist:win": "node scripts/build-windows.cjs"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "be.lepetitcomptoir.bar",
+    "productName": "Le Petit Comptoir - Bar",
+    "directories": {
+      "output": "release-final"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Le-Petit-Comptoir-Bar-${version}-Setup.${ext}"
+    }
+  }
+}

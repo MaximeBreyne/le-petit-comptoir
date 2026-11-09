@@ -1,0 +1,8 @@
+node_modules/
+release/
+*.log
+.qa-profile/
+checks/artifacts/
+release-windows/
+release-final/
+.build/
