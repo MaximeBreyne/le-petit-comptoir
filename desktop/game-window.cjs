@@ -1,9 +1,11 @@
 'use strict';
+const path = require('node:path');
 
 function gameWindowOptions(preload) {
   return {
     width: 1440, height: 960, minWidth: 1100, minHeight: 760,
     fullscreen: true, backgroundColor: '#192f2a', show: false,
+    icon: path.join(__dirname, '../dist/assets/brand/icon.ico'),
     webPreferences: { preload, nodeIntegration: false, contextIsolation: true, sandbox: true },
   };
 }

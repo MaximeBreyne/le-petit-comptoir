@@ -1,17 +1,31 @@
-LE PETIT COMPTOIR — BAR · Prototype 0.5.0
+LE PETIT COMPTOIR — BAR · Prototype 0.5.4
 
 WINDOWS 64 BITS
-Ouvrir release-final/Le-Petit-Comptoir-Bar-0.5.0-Setup.exe.
+Ouvrir release-final/Le-Petit-Comptoir-Bar-0.5.4-Setup.exe.
 L’assistant permet de choisir le dossier et de créer un raccourci.
 Le jeu fonctionne hors ligne. Il est désinstallable depuis les paramètres Windows.
 L’exécutable de ce prototype n’est pas signé numériquement.
 
+LOGO
+Le nouveau logo vert et doré apparaît dans l’accueil et la barre du jeu,
+ainsi que sur l’application Windows, son raccourci et les assistants
+d’installation et de désinstallation.
+Source PNG : dist/assets/brand/logo.png.
+Icône Windows en plusieurs tailles : dist/assets/brand/icon.ico.
+Le visuel original a été créé avec la génération d’images intégrée ;
+sa consigne de création est conservée dans design/logo-prompt.txt.
+
 JOUER
 Le jeu démarre en plein écran sur l’écran d’accueil. Choisir Nouvelle partie,
 Continuer la partie ou Charger une sauvegarde. F11 permet de passer en fenêtre.
+La souris commande la caméra dès l’entrée ou la reprise de la partie.
+Tab libère le curseur pour utiliser le comptoir sans mettre le jeu en pause ;
+Tab à nouveau rend le contrôle de la caméra.
 Ouvrir le bar, choisir une recette, suivre les étapes, maintenir pour doser,
 valider, poser sur le plateau puis servir le client correspondant.
-Recettes : bière pression, vin rouge, espresso et mojito.
+Raccourcis : 1 bière pression, 2 vin rouge, 3 espresso, 4 mojito.
+Ces touches choisissent la boisson et libèrent le curseur pour la préparer.
+La rangée des chiffres fonctionne sans Maj sur AZERTY ; le pavé numérique aussi.
 Les ingrédients sont prélevés au début de la préparation.
 Les livraisons prennent 10 secondes de jeu. Les dialogues et Pause arrêtent le temps.
 35 euros de charges par soir. Une trésorerie négative termine la partie.

@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 const yaml = require('js-yaml');
 const asar = require('@electron/asar');
+const { verifyAppIcon } = require('./verify-app-icon.cjs');
 
 function verifyRelease(directory, expectedPackage = require('../package.json')) {
   const root = path.resolve(directory);
@@ -36,10 +37,17 @@ function verifyRelease(directory, expectedPackage = require('../package.json')) 
   const archive = path.join(resources, 'app.asar');
   const packed = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   assert.equal(packed.version, expectedPackage.version, 'La version installée diffère du manifeste.');
+  const iconPath = path.resolve(__dirname, '..', expectedPackage.build.win.icon);
+  verifyAppIcon(path.join(root, 'win-unpacked', `${expectedPackage.build.productName}.exe`), iconPath);
+  verifyAppIcon(path.join(root, installer), iconPath);
+  for (const name of ['logo.png', 'icon.ico', 'app-icon.png', 'logo-128.png', 'favicon.png']) {
+    const file = path.join('dist', 'assets', 'brand', name);
+    assert.ok(asar.extractFile(archive, file).equals(fs.readFileSync(path.resolve(__dirname, '..', file))), `Logo embarqué incorrect : ${name}.`);
+  }
   assert.ok(packed.dependencies?.['electron-updater'], 'electron-updater doit être une dépendance de production.');
   const updater = JSON.parse(asar.extractFile(archive, path.join('node_modules', 'electron-updater', 'package.json')).toString('utf8'));
   assert.equal(updater.version, expectedPackage.dependencies['electron-updater'], 'La version embarquée du programme de mise à jour est incorrecte.');
-  for (const file of ['desktop/updater.cjs', 'desktop/local-update-source.cjs', 'desktop/preload.cjs', 'desktop/game-window.cjs', 'dist/updates.js', 'dist/scene.js', 'dist/renderer.js', 'dist/menus.js', 'dist/menus.css', 'dist/hud.css']) {
+  for (const file of ['desktop/updater.cjs', 'desktop/local-update-source.cjs', 'desktop/preload.cjs', 'desktop/game-window.cjs', 'dist/updates.js', 'dist/scene.js', 'dist/renderer.js', 'dist/menus.js', 'dist/menus.css', 'dist/hud.css', 'dist/interaction.js', 'dist/interaction.css']) {
     assert.ok(asar.extractFile(archive, path.normalize(file)).length > 0, `Fichier du jeu absent : ${file}.`);
   }
   return { version: metadata.version, installer, artifacts: [installer, installer + '.blockmap', 'latest.yml'] };

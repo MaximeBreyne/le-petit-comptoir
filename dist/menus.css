@@ -5,6 +5,10 @@ body[data-screen="home"] > header,body[data-screen="home"] > aside,body[data-scr
 .menu-ambient{position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(0deg,#080e10b3,transparent 22%,transparent 75%,#080e1055);box-shadow:inset 0 0 200px #0003}
 .menu-content{position:relative;width:min(540px,100%);padding:12px 0}
 .menu-eyebrow{font-size:10px;font-weight:600;letter-spacing:.25em;color:#cfb482;margin:0 0 24px;text-transform:uppercase}
+.menu-brand{display:flex;align-items:center;gap:18px;margin-bottom:18px}
+.menu-logo{display:block;width:64px;height:64px;object-fit:contain;flex:none}
+.menu-brand .menu-eyebrow{margin:0;max-width:230px;line-height:1.8}
+.game-menu-compact .menu-logo{width:38px;height:38px}
 .game-menu h1{font-family:Georgia,'Times New Roman',serif;font-size:clamp(60px,6.5vw,106px);font-weight:400;line-height:.98;letter-spacing:-.055em;margin:0 0 26px;color:#f3eee2;text-wrap:balance}
 .game-menu h1 span{color:#dfc493}
 .menu-intro{font-size:15px;color:#adb6b1;line-height:1.7;max-width:410px;margin:0 0 30px}
@@ -43,3 +47,4 @@ body[data-menu-open="true"] #toast{z-index:45}
 @media(max-width:900px){.menu-scene-note{display:none}.game-menu{background:linear-gradient(90deg,#0a1011f5,#0a1011bb 65%,#0a101180)}.menu-footer span:last-child{display:none}}
 @media(max-width:650px){.game-menu{padding:32px 25px 75px;align-items:flex-start}.game-menu h1{font-size:64px}.game-menu-compact h1{font-size:43px}.menu-content{padding-top:30px}.menu-footer{left:25px;right:25px}.game-menu .menu-slot{grid-template-columns:1fr}.menu-slot small{text-align:left}.menu-eyebrow{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.game-menu .menu-button,.game-menu .menu-button::after{transition:none}}
+@media(max-height:800px){.menu-brand{margin-bottom:18px}.game-menu-home .menu-logo{width:52px;height:52px}}

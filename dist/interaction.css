@@ -1,0 +1,13 @@
+/* Tab releases the mouse without interrupting service. */
+#interactionMode{position:fixed;left:285px;bottom:48px;width:min(350px,calc(100vw - 800px));z-index:12;padding:11px 13px;border:1px solid #b5b99c45;border-radius:6px;background:#14221fe8;box-shadow:0 6px 25px #0002;backdrop-filter:blur(8px)}
+#interactionMode[hidden]{display:none}
+.interaction-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#interactionLabel{font-size:11px;font-weight:500;color:#e4d2aa}
+#interactionToggle{flex-shrink:0;font-size:10px;padding:7px 9px;background:#d4b57b;color:#172822;border-color:#d4b57b}
+#interactionToggle:hover{background:#e2c58e}
+#interactionHelp{font-size:10px;line-height:1.6;color:#bdc9bf;margin:8px 0 0}
+body[data-interaction="cursor"] #workbench{border-color:#d4b57b9c}
+.recipe-key{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;margin:0 0 7px;padding:0 5px;border:1px solid #c5b17d66;border-radius:3px;background:#d4b57b19;color:#e8c98e;font:600 10px 'Segoe UI',sans-serif}
+body[data-screen="home"] #interactionMode,body[data-menu-open="true"] #interactionMode,body:has(dialog[open]) #interactionMode{display:none}
+@media(max-width:1000px){#interactionMode{left:50%;top:84px;bottom:auto;transform:translateX(-50%);width:min(330px,calc(100vw - 32px))}}
+@media(max-width:650px){#interactionMode{position:relative;left:auto;top:auto;transform:none;width:auto;margin:18px}}

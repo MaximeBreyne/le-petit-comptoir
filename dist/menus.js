@@ -28,7 +28,7 @@ window.GameMenu=(()=>{
  }
  function sessionLabel(s){return `Soir ${s.day} · ${money(s.cash)} · ${s.totalSold} clients servis`}
  function dateLabel(value){const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Dernière partie enregistrée'}
- function freeze(){paused=true;keys={};game.setPour(false);audio.setState(false,false);document.exitPointerLock?.();last=performance.now();ui()}
+ function freeze(){paused=true;keys={};game.setPour(false);audio.setState(false,false);if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();last=performance.now();ui()}
  function closeDialogs(){for(const id of ['modal','settingsModal'])if($(id).open)$(id).close()}
  function show(next){
   view=next;panel.hidden=next==='play';document.body.dataset.screen=sessionActive?'game':'home';document.body.dataset.menuOpen=String(next!=='play');
@@ -47,7 +47,7 @@ window.GameMenu=(()=>{
   if(!window.desktopGame&&!document.fullscreenElement&&navigator.userActivation?.isActive)document.documentElement.requestFullscreen?.().catch(()=>{});
  }
  function enterSession(s,savedCamera){
-  browserFullscreen();closeDialogs();game.s=new Game(s).s;state=game.s;sessionActive=true;resetView(savedCamera);show('play');paused=false;last=performance.now();ui();audio.setState(state.open,false);canvas.tabIndex=-1;canvas.focus({preventScroll:true});save(true);
+  closeDialogs();game.s=new Game(s).s;state=game.s;sessionActive=true;resetView(savedCamera);show('play');paused=false;last=performance.now();ui();audio.setState(state.open,false);canvas.tabIndex=-1;canvas.focus({preventScroll:true});save(true);window.BarInput?.enterLook();browserFullscreen();
  }
  function continueGame(){const current=snapshot('auto');if(!current){notify('Aucune sauvegarde automatique valide. Commencez une nouvelle partie.');return}enterSession(current.state,current.camera)}
  function newGame(){
@@ -57,7 +57,7 @@ window.GameMenu=(()=>{
   }else enterSession(new Game().s);
  }
  function pause(){if(!sessionActive)return;closeDialogs();show('pause')}
- function resume(){if(!sessionActive)return;closeDialogs();show('play');paused=false;keys={};last=performance.now();ui();audio.setState(state.open,false);canvas.focus({preventScroll:true})}
+ function resume(){if(!sessionActive)return;closeDialogs();show('play');paused=false;keys={};last=performance.now();ui();audio.setState(state.open,false);canvas.focus({preventScroll:true});window.BarInput?.enterLook()}
  function returnHome(){
   if(sessionActive&&!persistCurrent()){notify('La sauvegarde a échoué. Votre partie reste ouverte.');return}
   closeDialogs();sessionActive=false;show('home');
@@ -109,7 +109,9 @@ window.GameMenu=(()=>{
   panel.replaceChildren();
   const ambient=document.createElement('div');ambient.className='menu-ambient';ambient.setAttribute('aria-hidden','true');panel.append(ambient);
   const content=document.createElement('div');content.className='menu-content';panel.append(content);
-  const eyebrow=document.createElement('p');eyebrow.className='menu-eyebrow';eyebrow.textContent=home?'SIMULATION DE BAR · ÉDITION LOCALE':sessionActive?`LE PETIT COMPTOIR · SOIR ${state.day}`:'LE PETIT COMPTOIR';content.append(eyebrow);
+  const brand=document.createElement('div');brand.className='menu-brand';
+  const emblem=document.createElement('img');emblem.className='menu-logo';emblem.src='assets/brand/logo-128.png';emblem.alt='';emblem.width=72;emblem.height=72;
+  const eyebrow=document.createElement('p');eyebrow.className='menu-eyebrow';eyebrow.textContent=home?'SIMULATION DE BAR · ÉDITION LOCALE':sessionActive?`LE PETIT COMPTOIR · SOIR ${state.day}`:'LE PETIT COMPTOIR';brand.append(emblem,eyebrow);content.append(brand);
   const title=document.createElement('h1');title.id='menuTitle';
   if(home){title.innerHTML='Le Petit<br><span>Comptoir.</span>'}else title.textContent={pause:'Une petite pause.',load:'Retrouver votre soirée.',save:'Garder une trace.',confirm:confirmation?.title}[view]||'Le Petit Comptoir';
   content.append(title);

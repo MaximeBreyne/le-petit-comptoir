@@ -35,6 +35,7 @@ test('each new game window starts in native fullscreen with isolated renderer', 
   const options = gameWindowOptions('C:\\game\\desktop\\preload.cjs');
   assert.equal(options.fullscreen, true);
   assert.equal(options.show, false);
+  assert.ok(options.icon.endsWith(require('node:path').join('assets', 'brand', 'icon.ico')));
   assert.deepEqual(options.webPreferences, {
     preload: 'C:\\game\\desktop\\preload.cjs', nodeIntegration: false, contextIsolation: true, sandbox: true,
   });

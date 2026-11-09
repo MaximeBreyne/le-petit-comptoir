@@ -1,7 +1,7 @@
 # Installateur Windows et mises à jour locales
 
-Installez la version 0.5.0 en ouvrant
-`release-final/Le-Petit-Comptoir-Bar-0.5.0-Setup.exe`.
+Installez la version 0.5.4 en ouvrant
+`release-final/Le-Petit-Comptoir-Bar-0.5.4-Setup.exe`.
 Sur le PC qui a fabriqué l’installateur, le jeu connaît déjà le dossier
 `release-final` de ce projet : aucune configuration supplémentaire n’est nécessaire.
 Le jeu détecte les versions supérieures construites dans ce dossier et les
@@ -13,11 +13,21 @@ Les sauvegardes et réglages restent dans le profil de l’application, séparé
 de ses fichiers installés. Les anciennes installations antérieures à ce système
 doivent recevoir une fois ce nouvel installateur.
 
-## Jouer à la version 0.5.0
+## Jouer à la version 0.5.4
 
 Le jeu démarre en plein écran sur son écran d’accueil. Choisissez **Nouvelle
 partie**, **Continuer la partie** ou **Charger une sauvegarde**. **F11** permet
 de passer du plein écran au mode fenêtré.
+
+La souris commande la caméra dès l’entrée ou la reprise de la partie.
+**Tab** libère le curseur pour choisir les boissons, les préparer et servir
+les clients, sans mettre le jeu en pause. Appuyez de nouveau sur **Tab** pour
+reprendre la caméra.
+
+Les touches **1**, **2**, **3** et **4** choisissent respectivement la bière,
+le vin, l’espresso et le mojito, puis libèrent le curseur pour la préparation.
+La rangée des chiffres fonctionne sans Maj sur AZERTY ; le pavé numérique
+est également accepté.
 
 Pendant la partie, **Échap** arrête le temps et ouvre le menu de pause :
 reprendre, sauvegarder, charger, ouvrir les réglages, retourner au menu
@@ -26,6 +36,12 @@ automatique. Le retour au menu ou au bureau conserve la partie actuelle.
 
 Le décor comporte désormais du parquet, des matériaux plus détaillés, des
 ombres et un éclairage chaud. Les personnages restent stylisés.
+
+Le logo original vert et doré est présent dans l’accueil, la barre du jeu,
+l’application Windows, le raccourci et les assistants d’installation et de
+désinstallation. Le PNG source est `dist/assets/brand/logo.png` et l’icône
+Windows multirésolution est `dist/assets/brand/icon.ico`. La consigne utilisée
+avec la génération d’images intégrée figure dans `design/logo-prompt.txt`.
 
 ## Fabriquer l’installateur localement
 

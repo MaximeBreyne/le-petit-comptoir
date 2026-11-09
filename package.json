@@ -1,6 +1,6 @@
 {
   "name": "le-petit-comptoir-bar",
-  "version": "0.5.1",
+  "version": "0.5.5",
   "description": "Jeu de gestion de bar hors ligne",
   "author": "Le Petit Comptoir",
   "private": true,
@@ -50,7 +50,8 @@
           ]
         }
       ],
-      "signExecutable": false
+      "signExecutable": false,
+      "icon": "dist/assets/brand/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -58,7 +59,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Le-Petit-Comptoir-Bar-${version}-Setup.${ext}"
+      "artifactName": "Le-Petit-Comptoir-Bar-${version}-Setup.${ext}",
+      "installerIcon": "dist/assets/brand/icon.ico",
+      "uninstallerIcon": "dist/assets/brand/icon.ico",
+      "installerHeaderIcon": "dist/assets/brand/icon.ico"
     }
   }
 }

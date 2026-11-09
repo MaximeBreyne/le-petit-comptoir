@@ -1,4 +1,5 @@
 /* Compact service controls keep the room and customers in view. */
+.brand .logo{display:block;width:44px;height:44px;padding:0;background:none;border-radius:0;object-fit:contain;flex:none}
 @media(min-width:900px){
  body>header{padding:17px 23px;background:linear-gradient(#0c1a19dd,transparent)}
  .brand{font-size:12px;letter-spacing:1.6px}.brand small{font-size:8px;letter-spacing:2px}
