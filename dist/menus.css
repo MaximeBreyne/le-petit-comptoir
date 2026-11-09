@@ -1,0 +1,45 @@
+/* The room remains visible behind the menu, with warm type and restrained chrome. */
+body[data-screen="home"] > header,body[data-screen="home"] > aside,body[data-screen="home"] > footer,body[data-screen="home"] > #workbench{visibility:hidden;pointer-events:none}
+.game-menu{position:fixed;inset:0;z-index:40;overflow:auto;isolation:isolate;background:linear-gradient(90deg,rgba(10,16,17,.97) 0%,rgba(10,16,17,.91) 31%,rgba(10,16,17,.56) 57%,rgba(10,16,17,.13) 100%);color:#f2eee5;display:flex;align-items:center;padding:60px clamp(36px,7vw,132px) 95px;box-sizing:border-box}
+.game-menu[hidden]{display:none}
+.menu-ambient{position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(0deg,#080e10b3,transparent 22%,transparent 75%,#080e1055);box-shadow:inset 0 0 200px #0003}
+.menu-content{position:relative;width:min(540px,100%);padding:12px 0}
+.menu-eyebrow{font-size:10px;font-weight:600;letter-spacing:.25em;color:#cfb482;margin:0 0 24px;text-transform:uppercase}
+.game-menu h1{font-family:Georgia,'Times New Roman',serif;font-size:clamp(60px,6.5vw,106px);font-weight:400;line-height:.98;letter-spacing:-.055em;margin:0 0 26px;color:#f3eee2;text-wrap:balance}
+.game-menu h1 span{color:#dfc493}
+.menu-intro{font-size:15px;color:#adb6b1;line-height:1.7;max-width:410px;margin:0 0 30px}
+.menu-actions{display:flex;flex-direction:column;align-items:stretch;gap:7px;max-width:360px}
+.game-menu .menu-button{position:relative;display:block;text-align:left;padding:13px 17px;border:1px solid transparent;background:transparent;border-radius:3px;font-size:14px;font-weight:400;color:#d4d9d4;transition:background .16s,color .16s,border-color .16s;min-height:45px;letter-spacing:.01em}
+.game-menu .menu-button:hover:not(:disabled),.game-menu .menu-button:focus-visible{background:#ffffff0d;color:#fff;border-color:#a8b7b133;outline-offset:3px}
+.game-menu .menu-button::after{content:'→';position:absolute;right:15px;opacity:0;color:#d8bd8b;transition:opacity .16s}
+.game-menu .menu-button:hover:not(:disabled)::after,.game-menu .menu-button:focus-visible::after{opacity:1}
+.game-menu .menu-button-primary{background:#d4b57b;color:#162321;border-color:#d4b57b;font-weight:600;margin-bottom:7px;box-shadow:0 4px 28px #0002}
+.game-menu .menu-button-primary:hover:not(:disabled),.game-menu .menu-button-primary:focus-visible{background:#e2c58e;color:#101d1b;border-color:#e2c58e}
+.game-menu .menu-button-primary::after{color:#253f35}
+.game-menu .menu-button:disabled{color:#7c8580;opacity:.55;cursor:default;background:#ffffff08;border-color:#ffffff0a;box-shadow:none}
+.game-menu .menu-button-quiet{font-size:12px;color:#929e98;margin-top:9px;border-top:1px solid #ffffff12;padding-top:16px}
+.menu-save-summary{font-size:11px;color:#8b9991;letter-spacing:.02em;line-height:1.6;margin:18px 0 0}
+.menu-feedback{font-size:12px;color:#dfc493;line-height:1.6;min-height:20px;margin-top:15px;max-width:420px}
+.menu-footer{position:fixed;bottom:27px;left:clamp(36px,7vw,132px);right:clamp(36px,7vw,132px);border-top:1px solid #e0dfcb1c;padding-top:19px;display:flex;align-items:center;justify-content:space-between;font-size:9px;letter-spacing:.18em;color:#809189;text-transform:uppercase;pointer-events:none}
+.menu-footer span:last-child{letter-spacing:.04em;text-transform:none;font-size:11px}
+.menu-scene-note{position:fixed;right:7vw;bottom:130px;max-width:280px;border-left:1px solid #d5c39e7a;padding-left:23px;text-shadow:0 2px 15px #000}
+.menu-scene-note > span{font-size:9px;letter-spacing:.15em;color:#dcc899}
+.menu-scene-note p{font-family:Georgia,serif;font-size:21px;line-height:1.5;color:#e5e4d8;margin:12px 0 0}
+.game-menu-compact{background:linear-gradient(90deg,#0a1011f7,#0a1011e8 40%,#0a101199 75%,#0a101177);backdrop-filter:blur(5px)}
+.game-menu-compact .menu-content{width:min(620px,100%)}
+.game-menu-compact h1{font-size:clamp(42px,4.5vw,64px);line-height:1.08;letter-spacing:-.045em;max-width:580px}
+.game-menu-compact .menu-actions{max-width:410px}
+.game-menu-compact .menu-intro{margin-bottom:23px}
+.game-menu .menu-slots{max-width:530px;gap:10px}
+.game-menu .menu-slot{padding:15px 18px;background:#ffffff05;border:1px solid #c6d1be25;display:grid;grid-template-columns:1fr auto;gap:6px 15px;min-height:78px}
+.menu-slot strong{font-weight:500;color:#e7d8b9;font-size:13px;grid-column:1 / -1}
+.menu-slot span{font-size:11px;color:#b1beb5;line-height:1.5}
+.menu-slot small{font-size:10px;color:#8f9e95;line-height:1.5;text-align:right}
+.game-menu .menu-slot::after{display:none}
+body[data-menu-open="true"] #toast{z-index:45}
+#settingsModal{background:#13201f;color:#e7e6dc;border-color:#b4a27c55;box-shadow:0 32px 100px #0008}
+#settingsModal::backdrop{background:#071011aa;backdrop-filter:blur(9px)}
+@media(max-height:800px){.game-menu{padding-top:35px;padding-bottom:66px}.game-menu-home h1{font-size:70px}.menu-eyebrow{margin-bottom:18px}.menu-intro{margin-bottom:20px}.menu-feedback{margin:10px 0 0}.menu-actions{gap:3px}.game-menu .menu-button{padding-top:10px;padding-bottom:10px;min-height:40px}.menu-footer{bottom:18px}.menu-scene-note{bottom:98px}}
+@media(max-width:900px){.menu-scene-note{display:none}.game-menu{background:linear-gradient(90deg,#0a1011f5,#0a1011bb 65%,#0a101180)}.menu-footer span:last-child{display:none}}
+@media(max-width:650px){.game-menu{padding:32px 25px 75px;align-items:flex-start}.game-menu h1{font-size:64px}.game-menu-compact h1{font-size:43px}.menu-content{padding-top:30px}.menu-footer{left:25px;right:25px}.game-menu .menu-slot{grid-template-columns:1fr}.menu-slot small{text-align:left}.menu-eyebrow{font-size:8px}}
+@media(prefers-reduced-motion:reduce){.game-menu .menu-button,.game-menu .menu-button::after{transition:none}}

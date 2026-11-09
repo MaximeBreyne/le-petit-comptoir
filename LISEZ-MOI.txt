@@ -1,12 +1,14 @@
-LE PETIT COMPTOIR — BAR · Prototype 0.3.0
+LE PETIT COMPTOIR — BAR · Prototype 0.5.0
 
 WINDOWS 64 BITS
-Ouvrir release-final/Le-Petit-Comptoir-Bar-0.3.0-Setup.exe.
+Ouvrir release-final/Le-Petit-Comptoir-Bar-0.5.0-Setup.exe.
 L’assistant permet de choisir le dossier et de créer un raccourci.
 Le jeu fonctionne hors ligne. Il est désinstallable depuis les paramètres Windows.
 L’exécutable de ce prototype n’est pas signé numériquement.
 
 JOUER
+Le jeu démarre en plein écran sur l’écran d’accueil. Choisir Nouvelle partie,
+Continuer la partie ou Charger une sauvegarde. F11 active le mode fenêtré.
 Ouvrir le bar, choisir une recette, suivre les étapes, maintenir pour doser,
 valider, poser sur le plateau puis servir le client correspondant.
 Recettes : bière pression, vin rouge, espresso et mojito.
@@ -15,11 +17,20 @@ Les livraisons prennent 10 secondes de jeu. Les dialogues et Pause arrêtent le 
 35 euros de charges par soir. Une trésorerie négative termine la partie.
 Le bouton Aide détaille les commandes et le fonctionnement.
 
+MENU DE PAUSE
+Échap arrête le temps et ouvre le menu : Reprendre la partie, Sauvegarder,
+Charger une sauvegarde, Réglages, Retour au menu principal ou Retour au bureau.
+Échap depuis le menu de pause permet aussi de reprendre la partie.
+Le retour au menu principal ou au bureau enregistre la partie actuelle.
+
 SAUVEGARDE
 Automatique toutes les 5 secondes et après les actions importantes.
+Trois emplacements manuels sont disponibles dans le menu de pause.
+Le chargement propose la sauvegarde automatique et ces trois emplacements.
 Stockée dans le profil de l’application Windows, séparément de la version navigateur.
 La sauvegarde du bureau de tabac est conservée et n’est pas convertie.
-Le bouton Nouveau bar remplace uniquement la partie de bar après confirmation.
+Nouvelle partie remplace la sauvegarde automatique après confirmation,
+mais conserve les sauvegardes manuelles.
 
 DÉVELOPPEMENT
 npm install
@@ -27,10 +38,10 @@ npm test
 npm start
 npm run dist:win
 Les sources du jeu sont dans dist/, le lanceur Windows dans desktop/.
-La scène 3D et les personnages sont encore des représentations simplifiées.
+La scène et les personnages restent stylisés.
 
-RÉGLAGES (VERSION 0.3.0)
-Bouton Réglages dans la barre du haut, ou Échap hors des autres menus.
+RÉGLAGES (VERSION 0.5.0)
+Accessibles depuis l’accueil, le menu de pause ou la barre du haut.
 Touches personnalisables : déplacement, rotation, pause et dosage.
 Le jeu utilise la position physique des touches : ZQSD sur AZERTY, WASD sur QWERTY.
 Choisir une touche déjà utilisée affiche un message et conserve l’affectation actuelle.
@@ -43,7 +54,19 @@ Les réglages sont appliqués immédiatement et sauvegardés sans modifier la pa
 Le jeu se met en pause pendant les menus et lors d’un changement de fenêtre.
 
 RENDU
+Décor de bar retravaillé : parquet, bois, brique, métal, bouteilles et verres
+arrondis, enseignes, éclairage chaud et ombres selon la qualité choisie.
 Le rendu WebGL remplace le tri des faces et vérifie la profondeur à chaque pixel.
 Les surfaces proches masquent correctement les surfaces plus éloignées.
 Les déplacements glissent le long des obstacles et la vitesse diagonale est normalisée.
-La version reste un prototype graphique avec des personnages et décors simplifiés.
+Tourner la souris à gauche oriente le regard vers la gauche.
+La version reste un prototype graphique avec des personnages stylisés.
+
+MISES À JOUR LOCALES
+Le jeu surveille le dossier release-final de ce projet toutes les minutes.
+Quand une nouvelle version complète y est disponible, le jeu la prépare,
+puis l’installe à sa fermeture normale. Aucune publication en ligne n’est nécessaire.
+Si le dossier est déplacé, choisissez-le dans Réglages > Mises à jour du jeu.
+Pour fabriquer la version suivante après une modification, lancez
+FABRIQUER-MISE-A-JOUR.cmd. Une modification des sources seule ne suffit pas.
+Les sauvegardes et les réglages sont conservés dans le profil du jeu.

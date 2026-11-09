@@ -9,7 +9,7 @@ app.whenReady().then(async()=>{try{
  await new Promise(r=>setTimeout(r,1000));
  const result=await win.webContents.executeJavaScript(`(()=>{
  function check(v,m){if(!v)throw Error(m)}
- game.s=new Game().s;state=game.s;paused=false;preferences=defaultPreferences();ui();check(renderer,'WebGL renderer initialized');
+ GameMenu.newGame();if(GameMenu.getMode()==='confirm')document.querySelector('[data-menu-action="confirm"]').click();preferences=defaultPreferences();ui();check(renderer,'WebGL renderer initialized');
  $('open').click();check(state.open,'Open button');
  game.s.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90}];ui();
  document.querySelector('[data-recipe="beer"]').click();check(state.prep.recipe==='beer','Recipe click');

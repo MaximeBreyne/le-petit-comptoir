@@ -1,0 +1,23 @@
+/* Compact service controls keep the room and customers in view. */
+@media(min-width:900px){
+ body>header{padding:17px 23px;background:linear-gradient(#0c1a19dd,transparent)}
+ .brand{font-size:12px;letter-spacing:1.6px}.brand small{font-size:8px;letter-spacing:2px}
+ .logo{font-size:20px;padding:6px 11px}.stats{font-size:12px;gap:14px}.stats strong{font-size:21px}.stats button{padding:8px 12px;font-size:11px}
+ body>aside{left:23px;top:84px;width:238px;max-height:calc(100vh - 145px);padding:0;background:none;overflow:auto;border-radius:6px}
+ body>aside>h1,body>aside>.eyebrow{display:none}
+ #mission{background:#14221fda;padding:10px 13px;margin:0;border-radius:6px 6px 0 0;font-size:10px;line-height:1.5}
+ #progress{margin:0 0 11px;height:2px}
+ .card{background:#14221fe8;padding:13px;border-radius:6px;margin-bottom:9px;backdrop-filter:blur(8px);box-shadow:0 6px 25px #0002}
+ .barActions{margin:10px 0;gap:6px}.barActions button{padding:9px;font-size:11px}
+ .customer{font-size:11px;padding:9px 0}.customer small{font-size:10px}.customer button{font-size:10px;padding:6px}
+ .stock-fold summary{cursor:pointer;font-size:11px;color:#d7c193;list-style-position:inside;padding:2px 0}
+ .stock-fold[open] summary{margin-bottom:12px}.stock-fold .card{padding:0;margin:0;border:0;background:none;box-shadow:none;backdrop-filter:none}
+ .compact{font-size:10px;gap:7px}.compact button{padding:7px;font-size:9px}
+ #reset{font-size:10px;background:#13221ed9}
+ #workbench{right:23px;bottom:54px;width:440px;padding:16px;max-height:calc(100vh - 155px);background:#13221fe8;border-color:#a4b29b40;border-radius:7px}
+ #workbench .sectionTitle h2{font-size:20px}#workbench .eyebrow{font-size:8px;letter-spacing:1.5px}#trayCount{font-size:9px}
+ #recipes{gap:5px;margin:13px 0}.recipe{padding:8px 7px;font-size:10px}.recipe b{font-size:10px;margin-bottom:7px}.recipe small{font-size:8px;line-height:1.4;margin-top:5px}
+ #prep{min-height:64px}#prep p{font-size:11px;line-height:1.6}#prep .steps{font-size:9px}#prep .primary{padding:10px 12px}#prep button{font-size:10px}.pourbar{margin:10px 0;height:11px}
+ #tray{margin-top:11px;padding-top:10px}.empty{font-size:10px;line-height:1.6}.drink{font-size:10px;padding:6px}
+ body>footer{padding:12px 23px;font-size:8px;background:linear-gradient(transparent,#0d1c1bd9)}
+}

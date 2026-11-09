@@ -8,3 +8,4 @@ release-final/
 .build/
 
 .qa-settings-profile/
+checks/.realism-profile/

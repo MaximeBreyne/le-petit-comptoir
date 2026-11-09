@@ -9,11 +9,12 @@ app.whenReady().then(async()=>{let win;const errors=[];try{
  const check=(v,m)=>{if(!v)throw Error(m)};
  const key=(code,value,type='keydown')=>window.dispatchEvent(new KeyboardEvent(type,{code,key:value,bubbles:true,cancelable:true}));
  const set=(id,value)=>{const el=$(id);if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}))};
- paused=false;game.s=new Game().s;state=game.s;preferences=defaultPreferences();settingsUI();render();
+ GameMenu.newGame();if(GameMenu.getMode()==='confirm')document.querySelector('[data-menu-action="confirm"]').click();preferences=defaultPreferences();settingsUI();render();
  check(renderer&&renderer.gl.isEnabled(renderer.gl.DEPTH_TEST),'Depth test enabled');
  // Intersecting, differently-sized objects must occlude identically regardless of insertion order.
  const probe=document.createElement('canvas');probe.style.cssText='width:200px;height:200px;position:fixed;left:-500px';document.body.append(probe);
- const near={x:0,y:0,z:2,w:1,h:1,d:.3,c:'#ff0000'},far={x:0,y:0,z:4,w:4,h:4,d:.3,c:'#0000ff'};
+ // Isolate depth from cached static shadows, whose lighting changes when a mesh becomes dynamic.
+ const near={x:0,y:0,z:2,w:1,h:1,d:.3,c:'#ff0000',castShadow:false},far={x:0,y:0,z:4,w:4,h:4,d:.3,c:'#0000ff',castShadow:false};
  const testRenderer=new BarRenderer(probe,[near,far]),p=defaultPreferences(),cam={x:0,y:0,z:0,a:0,pitch:0};testRenderer.render(cam,[],p);const gl=testRenderer.gl;
  const pixel=()=>{const c=new Uint8Array(4);gl.readPixels(115,100,1,1,gl.RGBA,gl.UNSIGNED_BYTE,c);return Array.from(c)};
  const first=pixel();check(first[0]>120&&first[2]<30,'Near red object hides far blue object');testRenderer.setScene([far,near]);testRenderer.render(cam,[],p);check(JSON.stringify(first)===JSON.stringify(pixel()),'Draw order does not change occlusion');
@@ -30,7 +31,7 @@ app.whenReady().then(async()=>{let win;const errors=[];try{
  set('muted',false);await new Promise(r=>setTimeout(r,200));check(audio.master.gain.value>.3&&audio.fx.gain.value>.35,'Volumes control real audio nodes');check(audio.room.gain.value<.01&&audio.flow.gain.value<.01,'Menu silences ambience and pouring');
  const loaded=loadPreferences();check(loaded.bindings.forward.code==='KeyI'&&loaded.volume===37&&loaded.quality==='high'&&loaded.fps===30,'Settings survive save and reload');
  check(state.cash===cash&&state.time===time,'Settings preserve game state');
- $('settingsClose').click();check(!$('settingsModal').open,'Close settings');paused=false;
+ $('settingsClose').click();check(!$('settingsModal').open&&GameMenu.getMode()==='pause','Close settings returns pause');GameMenu.resume();
  camera={x:6,y:1.65,z:7,a:Math.PI,pitch:0};const z=camera.z;key('KeyW','w');movement(.1);key('KeyW','w','keyup');check(camera.z===z,'Old key inactive');key('KeyI','i');movement(.1);key('KeyI','i','keyup');check(camera.z<z,'Remapped key moves player');
  game.open();game.start('beer');game.step();key('KeyV','v');check(state.prep.pouring,'Remapped pour key starts flow');frame(performance.now());await new Promise(r=>setTimeout(r,200));check(audio.room.gain.value>.1&&audio.flow.gain.value>.25,'Pouring and ambience gains active in game: '+JSON.stringify({active:audio.active,pouring:audio.pouring,room:audio.room.gain.value,flow:audio.flow.gain.value,paused,menu:menusOpen(),open:state.open}));key('KeyV','v','keyup');check(!state.prep.pouring,'Remapped key releases flow');
  key('KeyP','p');check(paused,'Pause key');key('KeyP','p');check(!paused,'Resume key');
