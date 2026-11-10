@@ -1,7 +1,7 @@
 'use strict';
 
 // Capture the actual game UI and WebGL scene without showing a window or
-// modifying the player's profile. Run: electron checks/visual-preview.cjs
+// modifying the player's profile. Run: node node_modules/electron/cli.js checks/visual-preview.cjs
 const {app,BrowserWindow,ipcMain}=require('electron');
 const fs=require('node:fs');
 const path=require('node:path');
@@ -92,6 +92,18 @@ app.whenReady().then(async()=>{
    return {status:$('serviceStatus').textContent,remaining:$('dayRemaining').textContent,progress:$('dayProgress').value};
   })()`);
   await capture('preview-room.png');
+  const lighting={};
+  for(const [name,time]of [['day',1020],['night',1380]]){
+   lighting[name]=await evaluate(`(()=>{
+    state.time=${time};camera={...BarScene.homeCamera};ui();render();renderer.gl.finish();
+    const daylight=BarRenderer.daylightAt(state.time),uploadedDaylight=renderer.gl.getUniform(renderer.program,renderer.uniforms.daylight);
+    if(Math.abs(uploadedDaylight-daylight)>.00001)throw Error('Service time did not reach the lighting shader');
+    const glError=renderer.gl.getError();if(glError!==renderer.gl.NO_ERROR)throw Error('Lighting WebGL error '+glError);
+    return {time:state.time,daylight,uploadedDaylight,camera:{...camera},visualTime,glError};
+   })()`);
+   await capture('preview-room-'+name+'.png');
+  }
+  if(lighting.day.daylight!==1||lighting.night.daylight!==0||lighting.day.visualTime!==lighting.night.visualTime)throw Error('Day/night fixture must change lighting without moving customers');
   for(const [name,flags]of Object.entries({closed:{open:false,closing:false},open:{open:true,closing:false},closing:{open:true,closing:true}})){
    await evaluate('Object.assign(state,'+JSON.stringify(flags)+');camera={x:6.78,y:1.78,z:8.7,a:0,pitch:.12};ui();render();');
    await capture('preview-entrance-'+name+'.png');
@@ -132,6 +144,50 @@ app.whenReady().then(async()=>{
    await evaluate('camera='+JSON.stringify(view)+';render();');
    await capture('preview-'+name+'.png');
   }
+  const reserveExtension=await evaluate(`(()=>{
+   const keys=['whisky','gin','tonic','cola'];
+   for(const key of keys)state.reserve[key]=ingredients[key].pack*2;
+   camera={x:2.2,y:1.5,z:-1.65,a:-Math.PI/2,pitch:-.22};render();
+   const stockShapes=[];BarScene.storageVisuals(stockShapes,state);
+   return {camera:{...camera},stock:Object.fromEntries(keys.map(key=>[key,state.reserve[key]])),shapes:stockShapes.length};
+  })()`);
+  await capture('preview-reserve-extension.png');
+
+  const drinkComparisons=[];
+  await evaluate(`(()=>{
+   window.__previewBeforeDrinks={state:JSON.parse(JSON.stringify(state)),fov:preferences.fov};
+   state.orders=[];state.staff={bartender:null,waiter:null};state.management.assistant=false;state.management.bartender=false;state.management.waiter=false;
+   state.prep=null;state.tray=[];state.time=1020;customerVisuals.clear();waiterVisual=null;
+   window.__previewOriginalRender=renderer.render;window.__previewDrinkShapes=[];
+   renderer.render=function(view,dynamic,settings,time){return window.__previewOriginalRender.call(this,view,[...dynamic,...window.__previewDrinkShapes],settings,time)};
+   preferences.fov=50;camera={x:6.2,y:1.67,z:2.05,a:0,pitch:-.35};
+  })()`);
+  for(const ids of [['virginMojito','lemonade','whisky'],['ginTonic','ginFizz','cubaLibre']]){
+   const comparison=await evaluate(`(()=>{
+    const ids=${JSON.stringify(ids)};window.__previewDrinkShapes=[];const g=BarScene.geometry(window.__previewDrinkShapes),drinks=[];
+    ids.forEach((id,index)=>{
+     const x=5.7+index*.5,full=[],empty=[],partial=[];
+     BarScene.glass(BarScene.geometry(full),id,x-.12,1.102,3.08,1);
+     BarScene.glass(BarScene.geometry(empty),id,x+.12,1.102,3.08,0);
+     BarScene.glass(BarScene.geometry(partial),id,x-.12,1.102,3.08,.25);
+     const liquid=shape=>shape.round&&shape.c===recipes[id].color&&[BarScene.materials.glass,BarScene.materials.clearGlass].includes(shape.mat);
+     if(!full.some(liquid)||empty.some(liquid))throw Error('Full/empty liquid comparison failed for '+id);
+     const level=shapes=>Math.max(...shapes.filter(liquid).map(shape=>shape.y+shape.h/2));
+     if(!(level(full)>level(partial)))throw Error('Liquid level must rise with the dose for '+id);
+     if(id==='ginTonic'&&full.filter(liquid).some(shape=>shape.mat!==BarScene.materials.clearGlass))throw Error('Gin tonic must remain transparent');
+     window.__previewDrinkShapes.push(...full,...empty);
+     drinks.push({id,name:recipes[id].name,vessel:recipes[id].vessel,fullX:x-.12,emptyX:x+.12,fullShapes:full.length,emptyShapes:empty.length});
+    });
+    render();renderer.gl.finish();const glError=renderer.gl.getError();if(glError!==renderer.gl.NO_ERROR)throw Error('Drink WebGL error '+glError);
+    return {drinks,camera:{...camera},fov:preferences.fov,glError};
+   })()`);
+   const name='preview-drinks-'+ids.join('-')+'.png';await capture(name);drinkComparisons.push({...comparison,capture:name});
+  }
+  await evaluate(`(()=>{
+   renderer.render=window.__previewOriginalRender;preferences.fov=window.__previewBeforeDrinks.fov;
+   game.s=window.__previewBeforeDrinks.state;state=game.s;customerVisuals.clear();
+   delete window.__previewOriginalRender;delete window.__previewDrinkShapes;delete window.__previewBeforeDrinks;
+  })()`);
   const scene=await evaluate(`(()=>{
    camera=typeof BarScene!=='undefined'&&BarScene.homeCamera?{...BarScene.homeCamera}:{x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
    render();renderer.gl.finish();
@@ -185,6 +241,22 @@ app.whenReady().then(async()=>{
   await evaluate(`(()=>{game.pickupTerminal(camera);if(!state.payments.terminalCarried)throw Error('Terminal pickup failed at till');render()})()`);
   await capture('preview-terminal-held.png');
   await evaluate('game.returnTerminal(camera);render();');
+
+  const occupiedBar=await evaluate(`(()=>{
+   const prior=JSON.parse(JSON.stringify(state));
+   state.management.assistant=true;state.management.bartender=true;state.management.waiter=true;
+   state.staff.waiter=null;state.staff.bartender=null;state.time=1380;
+   state.orders=Array.from({length:7},(_,index)=>({id:index+1,name:'Client '+(index+1),recipe:['beer','wine','coffee'][index%3],patience:85,tableId:index<4?index+1:null,slot:index<4?null:index-4,phase:'preparing',arrivalRemaining:0,paymentMethod:'card'}));
+   customerVisuals.clear();waiterVisual=null;camera={...BarScene.homeCamera};
+   for(let frame=0;frame<4;frame++){render();renderer.gl.finish()}
+   const frames=12,start=performance.now();for(let frame=0;frame<frames;frame++){render();renderer.gl.finish()}
+   const averageRenderMs=(performance.now()-start)/frames,glError=renderer.gl.getError();
+   if(glError!==renderer.gl.NO_ERROR)throw Error('Occupied bar WebGL error '+glError);
+   window.__previewBeforeOccupied=prior;
+   return {customers:state.orders.length,employees:3,frames,averageRenderMs,quality:preferences.quality,canvas:[canvas.width,canvas.height],glError};
+  })()`);
+  await capture('preview-occupied-night.png');
+  await evaluate('game.s=window.__previewBeforeOccupied;state=game.s;customerVisuals.clear();waiterVisual=null;delete window.__previewBeforeOccupied;');
   await win.webContents.removeInsertedCSS(hiddenHud);
 
   const serviceUI=await evaluate(`(()=>{
@@ -207,6 +279,18 @@ app.whenReady().then(async()=>{
   })()`);
   await capture('preview-cash.png');
 
+  const licenseUI=await evaluate(`(()=>{
+   BarTablet.close({suspend:true});game.s=new Game().s;state=game.s;state.totalSold=36;state.cash=1000;
+   camera={...BarScene.playCamera};customerVisuals.clear();waiterVisual=null;paused=false;
+   if(!BarTablet.open('licenses'))throw Error('License tablet did not open');paused=true;BarTablet.refresh(true);
+   const signature=document.querySelector('[data-upgrade="signature"]'),button=signature?.querySelector('[data-tablet-upgrade="signature"]');
+   if(!signature||!button?.disabled||!signature.textContent.includes('Licence cocktails')||!signature.textContent.includes('Licence spiritueux'))throw Error('Signature prerequisites are not visible');
+   return {sales:state.totalSold,cash:state.cash,tab:BarTablet.getTab(),licenses:[...document.querySelectorAll('[data-upgrade]')].filter(card=>BarEngine.managementUpgrades[card.dataset.upgrade].category==='licenses').map(card=>({id:card.dataset.upgrade,text:card.textContent})),unmetPrerequisites:game.upgradeInfo('signature').unmetPrerequisites};
+  })()`);
+  await capture('preview-licenses.png');
+  await evaluate('document.querySelector(\'[data-upgrade="signature"]\').scrollIntoView({block:"end"});');
+  await capture('preview-license-prerequisites.png');
+
   const pause=await evaluate(`(()=>{
    if(typeof BarScene!=='undefined'&&BarScene.playCamera)camera={...BarScene.playCamera};
    paused=false;GameMenu.pause();render();
@@ -215,7 +299,7 @@ app.whenReady().then(async()=>{
   if(!pause.paused||pause.mode!=='pause'||!pause.overlayVisible)throw Error('Pause menu did not pause the game');
   await capture('preview-pause.png');
   if(errors.length)throw Error(errors.join('\n'));
-  const result={home,game:gameView,hud,labels,detailViews,scene,serviceScene,waiterTray,serviceUI,cashUI,pause};
+  const result={home,game:gameView,hud,lighting,labels,detailViews,reserveExtension,drinkComparisons,scene,serviceScene,waiterTray,occupiedBar,serviceUI,cashUI,licenseUI,pause};
   fs.writeFileSync(path.join(artifacts,'visual-preview.json'),JSON.stringify(result,null,2));
   console.log('VISUAL PREVIEW OK',JSON.stringify(result));
   clearTimeout(timeout);win.destroy();app.exit(0);

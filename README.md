@@ -69,13 +69,26 @@ La porte de la réserve se trouve à gauche, derrière le bar. Entrez dans la
 pièce et appuyez sur E pour gérer les stocks. Les achats arrivent dans la
 réserve après 10 secondes de jeu ; transférez ensuite les ingrédients vers
 le comptoir depuis cette pièce. La tablette distingue ces deux stocks.
-Une nouvelle partie commence avec un lot de chaque ingrédient en réserve.
+Une nouvelle partie commence avec un lot de chaque ingrédient de base en réserve.
+Le whisky, le gin, le tonic et le cola sont à commander après l’achat de leur
+licence. Ils sont rangés sur l’étagère latérale de la réserve.
 Les anciennes sauvegardes conservent leur stock au comptoir et commencent
 avec une réserve vide : aucun ingrédient existant n’est perdu.
 
 PROGRESSION SUR LA TABLETTE
 Plateau de 4 boissons : 5 clients servis et 100 euros.
 Licence cocktails : 8 clients servis et 120 euros, pour débloquer le mojito.
+Licence sans alcool : 12 clients servis et 90 euros, pour le virgin mojito
+et la limonade maison.
+Licence spiritueux : 20 clients servis et 210 euros, pour le whisky sur glace
+et le gin tonic, ainsi que leurs ingrédients chez le fournisseur.
+Licence créations maison : 36 clients servis et 360 euros, après l’achat des
+licences cocktails et spiritueux, pour le gin fizz et le cuba libre.
+Les licences s’achètent dans Tab > Licences. Chaque carte indique les boissons,
+le prix, le nombre de clients requis et les licences préalables éventuelles.
+Une boisson verrouillée propose un lien vers sa licence. Les achats sont
+définitifs ; les ingrédients restent à payer et à transférer depuis la réserve.
+Les clients commandent les nouvelles boissons seulement après leur déblocage.
 Agrandissement du comptoir : 12 clients servis et 180 euros, pour augmenter
 de 50 % sa capacité de stockage des ingrédients.
 Assistant de réserve : 18 clients servis et 220 euros. Il réapprovisionne
@@ -87,6 +100,9 @@ dépose les boissons sur le plateau, dans la limite de sa capacité.
 Serveur : 32 clients encaissés et 380 euros, puis 22 euros par soir. Il prend les
 commandes à table et apporte les boissons. Les encaissements restent à votre charge.
 Les anciennes sauvegardes gardent l’accès aux cocktails.
+Elles conservent aussi leur argent, stocks, employés, commandes et préparations.
+Les trois nouvelles licences restent à acheter et les quatre nouveaux stocks
+commencent à zéro : charger une ancienne partie ne donne aucun lot gratuit.
 
 MENU DE PAUSE
 Échap range d’abord la tablette si elle est ouverte. Une fois la tablette
@@ -116,6 +132,12 @@ La scène 3D comporte une réserve accessible, du parquet, des matériaux détai
 des ombres, des enseignes et des bouteilles et verres arrondis. Les personnages
 restent stylisés, avec des visages modelés : yeux, iris, pupilles, paupières,
 sourcils, nez, lèvres, oreilles et coiffures variées.
+Les silhouettes ont des épaules inclinées, un torse et une taille modelés.
+Les vitrages et parois de verre laissent voir le décor derrière eux ; le niveau
+des boissons suit le dosage et les cocktails reçoivent glaçons et garnitures.
+Le comptoir en pierre, le métal brossé, le parquet et les tissus ont des rendus
+distincts. La lumière de la rue baisse pendant le service, tandis que les
+suspensions gardent le bar éclairé jusqu’à minuit.
 Les clients arrivent et repartent en marchant,
 conservent leur place au comptoir et bloquent le passage lorsqu'ils attendent.
 Les chaises font face aux tables et la machine à café laisse un espace
@@ -130,6 +152,10 @@ npm test inclut les contrôles du rangement des textures de panneaux et de
 la géométrie mise en cache, en plus du moteur, des sauvegardes et du build.
 electron checks/hud.cjs vérifie l’interface, la progression de la journée
 et les interactions avec le panneau d’entrée dans une fenêtre masquée.
+electron checks/licenses-ui.cjs contrôle les achats de licences, les six nouvelles
+préparations dans la tablette et le chargement d’une sauvegarde antérieure.
+electron checks/graphics.cjs vérifie la transparence des vitrages, leur profondeur,
+la lumière du jour et de nuit, et mesure le rendu avec dix personnages.
 electron checks/visual-preview.cjs produit les aperçus du bar, du panneau
 et des visages dans checks/artifacts, sans modifier le profil du joueur.
 node checks/realism.cjs

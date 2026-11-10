@@ -14,8 +14,8 @@ window.GameMenu=(()=>{
   if(!['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','spawn','nextId'].every(k=>Number.isFinite(s[k])))return false;
   if(s.day<1||s.day!==Math.floor(s.day)||s.time<0||!Number.isSafeInteger(s.nextId)||s.nextId<1)return false;
   if(!['open','closing','upgraded','gameOver'].every(k=>typeof s[k]==='boolean'))return false;
-  if(!Object.keys(ingredients).every(k=>Number.isFinite(s.stock[k])&&s.stock[k]>=0))return false;
-  if(s.reserve!==undefined&&(!s.reserve||!Object.keys(ingredients).every(k=>Number.isFinite(s.reserve[k])&&s.reserve[k]>=0)))return false;
+  if(!BarEngine.isValidStock(s.stock))return false;
+  if(s.reserve!==undefined&&!BarEngine.isValidStock(s.reserve))return false;
   if(s.management!==undefined&&(!s.management||!['cocktails','counter','assistant'].every(k=>typeof s.management[k]==='boolean')||!Number.isFinite(s.management.restockTimer)||s.management.restockTimer<0))return false;
   if(!Array.isArray(s.orders)||s.orders.length>7||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
   if(!Array.isArray(s.tray)||s.tray.length>s.capacity||!s.tray.every(t=>t&&recipes[t.recipe]&&Number.isFinite(t.quality)&&t.quality>=0&&t.quality<=100))return false;

@@ -1,4 +1,7 @@
 /* A landscape tablet with a stable catalogue, separate from pause and preparation. */
+.tablet-recipe-foot{flex-wrap:wrap}.tablet-recipe-card[data-locked=true] .tablet-drink-symbol{filter:saturate(.45)}
+#tabletModal .tablet-license-menu{color:#53664f;font-size:11px;line-height:1.7;margin-top:10px}
+#tabletModal .tablet-stock-license{color:#957346;line-height:1.5}
 #tabletModal{width:min(1120px,calc(100vw - 64px));height:min(720px,calc(100vh - 58px));max-width:none;max-height:none;padding:11px;border:2px solid #59605a;border-radius:30px;background:#121a18;box-shadow:0 35px 100px #000a,0 0 0 1px #050908,inset 0 0 0 2px #030807;overflow:hidden;color:#233b32}
 #tabletModal::backdrop{background:#07100d8a;backdrop-filter:blur(5px)}
 #tabletModal[open]{display:block}

@@ -1,6 +1,6 @@
 /* Original shop geometry. Dimensions are in metres; static meshes are uploaded once. */
 const BarScene=(()=>{
- const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10};
+ const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10,clearGlass:11,stone:12};
  const playCamera={x:6,y:1.68,z:1.55,a:0,pitch:-.06};
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
  const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
@@ -20,6 +20,10 @@ const BarScene=(()=>{
   {key:'lime',label:'CITRONS',pack:12,x:1,y:1.65,kind:'produce',color:'#7d8e45'},
   {key:'mint',label:'MENTHE',pack:12,x:2.25,y:1.65,kind:'produce',color:'#4f754b'},
   {key:'ice',label:'GLAÇONS',pack:20,x:3.5,y:1.65,kind:'bag',color:'#b3c8c2'},
+  {key:'whisky',label:'WHISKY',pack:70,x:.43,y:.32,z:-1.12,side:true,kind:'bottle',color:'#8b6339'},
+  {key:'gin',label:'GIN',pack:70,x:.43,y:.32,z:-2.18,side:true,kind:'bottle',color:'#638477'},
+  {key:'tonic',label:'TONIC',pack:100,x:.43,y:1.02,z:-1.12,side:true,kind:'bottle',color:'#a1b9a3'},
+  {key:'cola',label:'COLA',pack:100,x:.43,y:1.02,z:-2.18,side:true,kind:'bottle',color:'#604536'},
  ];
  function containsWalkablePosition(x,z){
   if(!Number.isFinite(x)||!Number.isFinite(z))return false;
@@ -30,7 +34,7 @@ const BarScene=(()=>{
  const inStockroom=position=>!!position&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
  function prepStation(recipe){
   if(recipe==='coffee')return {x:8.43,y:1.152,z:2.47,stream:{x:8.43,y:1.316,z:2.47,h:.072}};
-  if(recipe==='beer')return {x:4.15,y:1.133,z:3.18,stream:{x:4.15,y:1.53,z:3.18,h:.18}};
+  if(recipe==='beer')return {x:4.15,y:1.133,z:2.72,stream:{x:4.15,y:1.53,z:2.72,h:.18}};
   return {x:6.5,y:1.133,z:3.05,stream:{x:6.5,y:1.51,z:3.05,h:.24}};
  }
  function geometry(target){
@@ -48,39 +52,79 @@ const BarScene=(()=>{
   if(label)g.box(x,y+.16*scale,z+r*.505,r*.8,.115*scale,.003,'#d4c9af',M.paint,{label,labelFace:'back',labelColor:'#37352c',castShadow:false});
  }
  function glass(g,recipe,x,y,z,fill=1){
-  const rim='#c4cfc9';
-  if(recipe==='coffee'){
+  const info=globalThis.BarEngine?.recipes?.[recipe]||{},rim='#b9ccc5';
+  const vessel=info.vessel||({coffee:'cup',wine:'wine',beer:'pint',whisky:'rocks',ginFizz:'coupe'}[recipe]||'highball');
+  const color=info.color||({coffee:'#71462b',wine:'#8e3c48',beer:'#d8a348',whisky:'#b8792e'}[recipe]||'#b8d28a');
+  const fillAmount=Number.isFinite(fill)?Math.min(1,Math.max(0,fill)):0;
+  // Thin tangent panels form genuinely open containers. They are transparent
+  // geometry, not a solid coloured cylinder with an opaque cap over its rim.
+  const ring=(height,radius,thickness=.002,ringHeight=.003)=>{
+   for(let i=0;i<16;i++){const a=i*Math.PI/8;g.box(x+Math.sin(a)*radius,y+height,z+Math.cos(a)*radius,2*radius*Math.tan(Math.PI/16),ringHeight,thickness,rim,M.clearGlass,{ry:a,castShadow:false});}
+  };
+  const walls=profile=>{
+   for(let j=1;j<profile.length;j++){
+    const [low,r0]=profile[j-1],[high,r1]=profile[j],radius=(r0+r1)/2;
+    for(let i=0;i<16;i++){const a=i*Math.PI/8;g.box(x+Math.sin(a)*radius,y+(low+high)/2,z+Math.cos(a)*radius,2*Math.max(r0,r1)*Math.tan(Math.PI/16),Math.hypot(high-low,r1-r0),.0018,rim,M.clearGlass,{rx:Math.atan2(r1-r0,high-low),ry:a,castShadow:false});}
+   }
+   const [height,radius]=profile[profile.length-1];ring(height,radius);
+  };
+  const contents=(profile,maxHeight)=>{
+   const level=profile[0][0]+fillAmount*(maxHeight-profile[0][0]);
+   if(fillAmount<=0)return level;
+   for(let i=1;i<profile.length;i++){
+    const [low,r0]=profile[i-1],[high,r1]=profile[i];if(level<=low)break;
+    const top=Math.min(level,high),radius=r0+(r1-r0)*(top-low)/(high-low),outer=Math.max(r0,radius)-.003;
+    if(outer>0)g.cylinder(x,y+(low+top)/2,z,outer*2,top-low,outer*2,color,recipe==='ginTonic'?M.clearGlass:M.glass,{topRadius:Math.max(.01,(radius-.003)/outer),bottomRadius:Math.max(.01,(r0-.003)/outer),castShadow:false});
+   }
+   return level;
+  };
+  if(vessel==='cup'){
    g.cylinder(x,y+.009,z,.21,.018,.21,'#d5cfc0');
    g.cylinder(x,y+.029,z,.107,.022,.107,'#e3ded0');
-   // An open cup made of thin walls: the liquid stays inside, beneath its rim.
    for(let i=0;i<16;i++){
-    const a=i*Math.PI*2/16;
+    const a=i*Math.PI/8;
     g.box(x+Math.sin(a)*.063,y+.085,z+Math.cos(a)*.063,.027,.116,.011,'#e3ded0',0,{ry:a});
    }
-   const liquid=Math.min(1,Math.max(0,fill));
-   g.cylinder(x,y+.041+liquid*.082,z,.113,.003,.113,liquid>0?'#9c7040':'#c6bcaa');
-   // Continuous handle segments avoid the old disconnected bead silhouette.
+   g.cylinder(x,y+.041+fillAmount*.082,z,.113,.003,.113,fillAmount>0?color:'#c6bcaa');
+   if(fillAmount>0){
+    for(const [dx,dz]of [[-.025,.012],[.014,-.019],[.025,.018]])g.sphere(x+dx,y+.043+fillAmount*.082,z+dz,.022,.0015,.012,'#c09a5d',0,{castShadow:false});
+   }
    for(let i=0;i<12;i++){
-    const a=i*Math.PI*2/12,b=(i+1)*Math.PI*2/12;
-    const ax=.079+Math.sin(a)*.034,ay=.086+Math.cos(a)*.036,bx=.079+Math.sin(b)*.034,by=.086+Math.cos(b)*.036;
+    const a=i*Math.PI/6,b=(i+1)*Math.PI/6,ax=.079+Math.sin(a)*.034,ay=.086+Math.cos(a)*.036,bx=.079+Math.sin(b)*.034,by=.086+Math.cos(b)*.036;
     g.cylinder(x+(ax+bx)/2,y+(ay+by)/2,z,.014,Math.hypot(bx-ax,by-ay)+.003,.014,'#ded7c7',0,{rz:-Math.atan2(bx-ax,by-ay)});
    }
-  }else if(recipe==='wine'){
-   g.cylinder(x,y+.01,z,.14,.012,.14,rim,M.glass);
-   g.cylinder(x,y+.077,z,.012,.13,.012,rim,M.glass);
-   g.sphere(x,y+.19,z,.16,.15,.16,fill>0?'#642c38':'#97a6a0',M.glass);
-   g.cylinder(x,y+.272,z,.12,.009,.12,rim,M.glass);
-   g.cylinder(x,y+.269,z,.102,.006,.102,'#542531',M.glass);
+   return;
+  }
+  let profile,level;
+  if(vessel==='wine'||vessel==='coupe'){
+   g.cylinder(x,y+.008,z,vessel==='coupe'?.15:.14,.009,vessel==='coupe'?.15:.14,rim,M.clearGlass,{castShadow:false});
+   g.cylinder(x,y+.066,z,.012,.12,.012,rim,M.clearGlass,{castShadow:false});
+   profile=vessel==='wine'?[[.12,.018],[.145,.060],[.195,.078],[.245,.065],[.275,.054]]:[[.12,.018],[.15,.070],[.18,.102],[.22,.109]];
+   walls(profile);level=contents(profile,vessel==='wine'?.226:.195);
   }else{
-   const h=recipe==='beer'?.29:.25,r=recipe==='beer'?.15:.12;
-   g.cylinder(x,y+.012,z,r*.85,.018,r*.85,rim,M.glass);
-   g.cylinder(x,y+h*.5,z,r,h,r,fill>0?(recipe==='beer'?'#b98231':'#a6b780'):'#7a9290',M.glass,{topRadius:1.1});
-   g.cylinder(x,y+h,z,r*1.1,.009,r*1.1,rim,M.glass);
-   g.cylinder(x,y+h+.004,z,r*.96,recipe==='beer'?.024:.005,r*.96,recipe==='beer'?'#eee1bc':'#a3ba78');
-   g.box(x-r*.35,y+h*.5,z-r*.41,.008,h*.78,.004,'#d0d6bb',M.glass,{castShadow:false});
-   if(recipe==='mojito'){
-    g.cylinder(x+.025,y+h+.045,z,.012,.15,.012,'#d5cfb1',0,{rz:.16});
-    g.sphere(x-.025,y+h+.009,z,.05,.012,.03,'#436a32');
+   const rocks=vessel==='rocks',pint=vessel==='pint',height=rocks?.15:pint?.29:.27;
+   profile=[[.012,rocks?.072:pint?.062:.052],[height,rocks?.076:pint?.078:.061]];
+   g.cylinder(x,y+.008,z,profile[0][1]*2,.012,profile[0][1]*2,rim,M.clearGlass,{castShadow:false});
+   walls(profile);level=contents(profile,rocks?.095:height-.023);
+   if(fillAmount>0&&pint)g.cylinder(x,y+level+.006,z,(.062+(.078-.062)*(level-.012)/(.29-.012))*.97*2,.012,(.062+(.078-.062)*(level-.012)/(.29-.012))*.97*2,'#ede1c5',M.paint,{castShadow:false});
+  }
+  if(fillAmount>0&&info.ingredients?.ice&&vessel!=='coupe'){
+   const iceY=Math.max(profile[0][0]+.018,level-.008),spread=vessel==='rocks'?.033:.024;
+   for(const [i,dx,dz]of [[0,-spread,.005],[1,spread,-.011],[2,.006,.028]]){
+    const cubeY=y+iceY+(i===2?.016:0),rotation={ry:.4+i*.7,rx:.13*i,castShadow:false};
+    g.box(x+dx,cubeY,z+dz,.033,.032,.033,'#d6e4dd',M.clearGlass,rotation);
+    g.box(x+dx,cubeY,z+dz,.015,.017,.016,'#dfe5dc',M.paint,rotation);
+   }
+  }
+  const garnish=info.garnish||(recipe==='mojito'?'mint-lime':null);
+  if(fillAmount>0&&garnish){
+   const [top,radius]=profile[profile.length-1],gx=x-radius*.72,gz=z+.01;
+   g.cylinder(gx,y+top+.014,gz,.064,.009,.064,'#607b36',M.paint,{rx:Math.PI/2,castShadow:false});
+   g.cylinder(gx,y+top+.014,gz-.005,.052,.002,.052,'#c4cd73',M.paint,{rx:Math.PI/2,castShadow:false});
+   for(let i=0;i<6;i++){const a=i*Math.PI/3;g.box(gx+Math.sin(a)*.011,y+top+.014+Math.cos(a)*.011,gz-.007,.0018,.025,.001,'#e1df9a',M.paint,{rz:-a,castShadow:false});}
+   if(garnish==='mint-lime'){
+    g.cylinder(x+.021,y+top+.026,z-.014,.007,.12,.007,'#bdac8b',M.wood,{rz:.14,castShadow:false});
+    for(const [dx,dz,a]of [[.012,.018,.4],[-.012,.012,-.6],[0,-.008,.1]])g.sphere(x+dx,y+level+.016,z+dz,.035,.006,.020,'#476237',M.paint,{ry:a,rz:.15,castShadow:false});
    }
   }
  }
@@ -123,7 +167,13 @@ const BarScene=(()=>{
   for(const y of [.35,.99,1.63,2.27])b(2.25,y,-3.73,3.85,.04,.68,'#9b9c85',M.paint,solid);
   // Whole rack footprint stays collidable even when every shelf is empty.
   b(2.25,.17,-3.76,3.85,.3,.66,'#677063',M.paint,solid);
-  for(const bin of storageBins)b(bin.x,bin.y-.085,-3.38,.94,.16,.025,'#eee8d5',0,{label:bin.label,labelFace:'back',labelColor:'#203c2c',castShadow:false});
+  for(const bin of storageBins.filter(bin=>!bin.side))b(bin.x,bin.y-.085,-3.38,.94,.16,.025,'#eee8d5',0,{label:bin.label,labelFace:'back',labelColor:'#203c2c',castShadow:false});
+  // The new bottles have their own shallow rack on the left wall. The aisle
+  // through the reserve door remains clear, including the player's collision radius.
+  for(const x of [.20,.68])for(const z of [-.67,-2.63])b(x,.87,z,.035,1.74,.035,'#4b5a53',M.metal,solid);
+  for(const y of [.30,1.00,1.70])b(.44,y,-1.65,.56,.035,2.02,'#939783',M.paint,solid);
+  b(.44,.15,-1.65,.56,.30,2.02,'#667064',M.paint,solid);
+  for(const bin of storageBins.filter(bin=>bin.side))b(.735,bin.y-.075,bin.z,.86,.14,.02,'#eee8d5',M.paint,{ry:Math.PI/2,label:bin.label,labelFace:'back',labelColor:'#203c2c',labelPixels:256,castShadow:false});
   // Mounted on the front of the rack so its uprights cannot mask the lettering.
   b(2.25,2.49,-3.37,2.6,.34,.03,'#243c30',0,{label:'LA RÉSERVE',labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f2e9cf',castShadow:false});
   b(4.05,.93,-1.18,.76,.055,1.35,'#9e9479',M.wood,solid);
@@ -142,10 +192,10 @@ const BarScene=(()=>{
    b(x,2.77,9.94,4.02,.07,.12,'#283c3b',M.metal,noShadow);
    b(x,1.75,9.94,.05,2.0,.12,'#283c3b',M.metal,noShadow);
    b(x,2.28,9.94,4,.045,.12,'#283c3b',M.metal,noShadow);
-   // Small glass transoms leave the main panes clear to the street geometry.
-   b(x,2.52,9.99,3.92,.42,.015,'#68827e',M.glass,noShadow);
+   b(x,1.50,9.99,3.92,1.48,.009,'#c0d1cf',M.clearGlass,noShadow);
+   b(x,2.52,9.99,3.92,.42,.009,'#c0d1cf',M.clearGlass,noShadow);
   }
-  b(6,1.41,10.02,2.9,2.82,.08,'#425854',M.glass,{...solid,...noShadow});
+  b(6,1.41,10.02,2.9,2.82,.018,'#b7cfca',M.clearGlass,{...solid,...noShadow});
   b(6,1.41,9.95,.07,2.82,.1,'#263a36',M.metal,noShadow);
   b(6,.15,9.91,2.9,.3,.1,'#293b34',M.wood);
   for(const x of [5.84,6.16])c(x,1.18,9.82,.026,.38,.026,'#b79d62',M.metal);
@@ -185,25 +235,31 @@ const BarScene=(()=>{
   b(6,3.02,.82,5.15,.34,.06,'#293a33',M.wood,{label:'LE PETIT COMPTOIR',labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f0dfb9',castShadow:false});
   // A narrow service counter with timber slats and brass foot rail.
   b(6,.5,3.02,8.8,1,.9,'#3f3329',M.wood,solid);
-  b(6,1.045,3.03,9.04,.09,1.12,'#363a35',M.paint,solid);
-  b(6,1.094,3.03,9.0,.016,1.09,'#454a43',M.paint);
+  b(6,1.045,3.03,9.04,.09,1.12,'#42453e',M.stone,solid);
+  b(6,1.094,3.03,9.0,.016,1.09,'#53564d',M.stone);
+  c(6,1.07,3.584,.026,9.02,.026,'#8c7750',M.metal,{rz:Math.PI/2});
   b(6,.08,3.51,8.85,.15,.055,'#202b28',M.metal);
   for(let x=1.72;x<10.4;x+=.13)b(x,.54,3.49,.065,.83,.04,'#796047',M.wood);
   c(6,.26,3.79,.044,8.5,.044,'#ae8a4d',M.metal,{rz:Math.PI/2});
   for(const x of [2.1,4.7,7.3,9.9])c(x,.22,3.64,.027,.33,.027,'#a88a52',M.metal,{rx:Math.PI/2});
   // A shorter return leaves a comfortable passage behind the bar to the reserve.
   b(1.75,.5,2.45,.7,1,1,'#45392c',M.wood,solid);
-  b(1.75,1.045,2.45,.93,.09,1.1,'#444941',M.paint,solid);
-  // Beer taps: mounted riser, arch, actual handles, no floating blocks.
-  b(4.18,1.11,3.05,.92,.025,.5,'#343d3b',M.metal);
-  for(let i=0;i<11;i++)b(3.82+i*.073,1.129,3.05,.014,.006,.35,'#a7b4ab',M.metal);
+  b(1.75,1.045,2.45,.93,.09,1.1,'#53564d',M.stone,solid);
+  // Beer taps face the staff aisle (-Z), with the glass and drip tray below the outlets.
+  b(4.18,1.11,2.85,.92,.025,.5,'#343d3b',M.metal);
+  for(let i=0;i<11;i++)b(3.82+i*.073,1.129,2.85,.014,.006,.35,'#a7b4ab',M.metal);
   c(4.15,1.45,2.95,.075,.68,.075,'#b59b60',M.metal);
+  c(4.15,1.126,2.95,.15,.031,.15,'#9d824c',M.metal);
+  c(4.15,1.157,2.95,.105,.023,.105,'#bba26b',M.metal);
   c(4.15,1.78,2.95,.075,.85,.075,'#b59b60',M.metal,{rz:Math.PI/2});
   for(const dx of [-.3,0,.3]){
-   c(4.15+dx,1.72,3.08,.045,.22,.045,'#b59b60',M.metal,{rx:Math.PI/2});
-   c(4.15+dx,1.67,3.18,.035,.11,.035,'#aeb8af',M.metal);
-   c(4.15+dx,1.88,3.06,.055,.24,.055,'#34332c',M.wood,{topRadius:.78});
-   s(4.15+dx,2.01,3.06,.075,.065,.075,'#bdaa7f',M.metal);
+   c(4.15+dx,1.72,2.82,.045,.22,.045,'#b59b60',M.metal,{rx:Math.PI/2});
+   c(4.15+dx,1.67,2.72,.035,.11,.035,'#aeb8af',M.metal);
+   c(4.15+dx,1.707,2.72,.057,.025,.057,'#9aab9f',M.metal);
+   c(4.15+dx,1.62,2.72,.039,.015,.039,'#5a6960',M.metal);
+   c(4.15+dx,1.88,2.84,.055,.24,.055,'#34332c',M.wood,{topRadius:.78});
+   s(4.15+dx,2.01,2.84,.075,.065,.075,'#bdaa7f',M.metal);
+   c(4.15+dx,1.895,2.810,.041,.006,.041,'#d9cfb4',M.paint,{rx:Math.PI/2});
   }
   // Espresso station has a recessed brewing bay, separated from the drip tray.
   b(8.75,1.42,3.13,1.28,.62,.32,'#283c38',M.metal);
@@ -215,6 +271,7 @@ const BarScene=(()=>{
   for(const dx of [-.32,.32]){
    c(8.75+dx,1.60,2.517,.105,.018,.105,'#dfd7b8',0,{rx:Math.PI/2});
    b(8.75+dx,1.60,2.504,.007,.065,.006,'#4b5248',0,{rz:.45});
+   for(let tick=0;tick<8;tick++){const a=tick*Math.PI/4;b(8.75+dx+Math.sin(a)*.037,1.60+Math.cos(a)*.037,2.505,.002,.009,.003,'#565d50',M.paint,{rz:-a,castShadow:false});}
    c(8.75+dx,1.415,2.55,.11,.095,.11,'#929d96',M.metal);
    c(8.75+dx,1.35,2.47,.025,.04,.025,'#a8b8ab',M.metal);
    c(8.75+dx,1.419,2.4,.035,.23,.035,'#222e29',0,{rx:Math.PI/2});
@@ -225,8 +282,14 @@ const BarScene=(()=>{
   c(9.76,1.65,2.93,.28,.3,.28,'#58412e',M.glass,{topRadius:.85});
   c(9.76,1.8175,2.93,.3,.035,.3,'#252e29');
   // Preparation utensils, cutting board, produce and register.
-  b(6.5,1.115,2.9,.69,.035,.4,'#ac9261',M.wood);
-  for(let j=0;j<4;j++)s(6.33+j*.1,1.18,2.92,.09,.075,.09,'#71813c',0);
+  b(6.5,1.115,2.79,.69,.035,.4,'#ac9261',M.wood);
+  for(let j=0;j<2;j++)s(6.64+j*.10,1.176,2.81+j*.07,.09,.075,.09,'#71813c',M.paint,{ry:j*.8});
+  c(6.44,1.143,2.83,.075,.016,.075,'#638036',M.paint);
+  c(6.44,1.152,2.83,.061,.003,.061,'#d4d48a',M.paint);
+  for(let j=0;j<6;j++){const a=j*Math.PI/3;b(6.44+Math.sin(a)*.012,1.155,2.83+Math.cos(a)*.012,.001,.002,.027,'#ece4b0',M.paint,{ry:a,castShadow:false});}
+  b(6.32,1.14,2.68,.19,.008,.034,'#bec4b9',M.metal,{ry:.15});
+  b(6.16,1.143,2.704,.12,.018,.035,'#4c4536',M.wood,{ry:.15});
+  b(7.96,1.115,2.61,.20,.018,.30,'#b6b69c',M.fabric,{ry:-.12});
   c(7.2,1.22,3.02,.18,.25,.18,'#aeb7aa',M.metal,{topRadius:.8});
   c(7.47,1.19,3.02,.14,.18,.14,'#abb3a8',M.metal);
   bottle(g,7.75,1.11,3.02,'#65724c',.75,'SIROP');
@@ -266,7 +329,7 @@ const BarScene=(()=>{
    c(x,.04,z,.53,.05,.53,'#303a33',M.metal);
    chair(x-.78,z,-Math.PI/2);chair(x+.78,z,Math.PI/2);
    c(x,.818,z,.09,.07,.09,'#b2a890');c(x,.9,z,.025,.16,.025,'#72804b');
-   s(x+.025,.99,z,.13,.11,.08,'#61734b');
+   for(let leaf=0;leaf<5;leaf++){const a=leaf*2.4;s(x+Math.sin(a)*.046,.91+leaf*.018,z+Math.cos(a)*.04,.078,.012,.036,['#6a7c51','#4d6843','#7b8a5c'][leaf%3],M.paint,{ry:a,rz:.32*Math.sin(a)});}
    b(x-.2,.787,z+.18,.2,.008,.14,'#d7cdb4');
    const inward=x<6?1:-1,signAngle=-inward*Math.PI/2;
    b(x+inward*.26,.794,z-.18,.24,.015,.07,'#867854',M.metal,{ry:signAngle});
@@ -304,7 +367,7 @@ const BarScene=(()=>{
   for(const bin of storageBins){
    const quantity=Math.max(0,Number(reserve[bin.key])||0),count=Math.min(3,Math.ceil(quantity/bin.pack));
    for(let i=0;i<count;i++){
-    const x=bin.x+(i-1)*.28,y=bin.y,z=-3.76;
+    const x=bin.side?bin.x:bin.x+(i-1)*.28,y=bin.y,z=bin.side?bin.z+(i-1)*.22:-3.76;
     if(bin.kind==='keg'){
      g.cylinder(x,y+.225,z,.24,.45,.24,bin.color,M.metal);
      for(const h of [.045,.405])g.cylinder(x,y+h,z,.257,.025,.257,'#b0b9ab',M.metal);
@@ -368,9 +431,12 @@ const BarScene=(()=>{
    const dx=end.x-a.x,dy=end.y-a.y,dz=end.z-a.z;
    c((a.x+end.x)/2,(a.y+end.y)/2,(a.z+end.z)/2,width,Math.hypot(dx,dy,dz),depth,color,color===skin?M.skin:M.fabric,{rx:Math.atan2(Math.hypot(dx,dz),dy),ry:Math.atan2(dx,dz)});
   };
-  // Separate joints, facial planes and layered clothing replace block silhouettes.
-  c(0,1.105,0,.40,.49,.25,shirt,M.fabric,{topRadius:1.12,contactShadow:true});
-  s(0,.855,0,.35,.2,.25,'#333f43',M.fabric);
+  // A shaped rib cage, waist and sloping shoulders replace the old barrel torso.
+  // Their silhouettes overlap beneath the clothing, with no exposed flat cap.
+  s(0,1.14,.004,.50,.50,.265,shirt,M.fabric,{contactShadow:true});
+  c(0,.935,.004,.31,.18,.22,shirt,M.fabric,{topRadius:1.07,bottomRadius:1.02});
+  s(0,.852,.004,.34,.17,.24,'#333f43',M.fabric);
+  c(0,.879,.004,.329,.027,.235,'#373c35',M.fabric);
   // Faces point towards local -Z. Layer the features beyond the skull surface:
   // putting the eyes at the skull centreline used to hide them inside the head.
   c(0,1.38,.014,.112,.10,.12,skin,M.skin);
@@ -423,9 +489,11 @@ const BarScene=(()=>{
    }
   }
   // A fitted neckline avoids floating collar rectangles cutting into the chest.
-  c(0,1.348,.014,.133,.018,.14,shirt,M.fabric,{topRadius:.94});
+  c(0,1.381,.014,.132,.016,.14,shirt,M.fabric,{topRadius:.94});
   for(const side of [-1,1]){
-   s(side*.185,1.30,0,.14,.14,.17,shirt,M.fabric);
+   s(side*.172,1.28,.018,.16,.11,.12,shirt,M.fabric,{rz:side*.16});
+   // A sleeve-sized round cap covers the arm's flat cylinder end at its joint.
+   s(side*(carrying&&!seated?.21:.245),1.305,0,.115,.07,.13,shirt,M.fabric);
    const stride=!seated&&moving?Math.sin(time*7.2+id+side*1.57)*.34:0;
    const kneeZ=seated?-.35:Math.sin(stride)*.39,kneeY=seated?.81:.865-Math.cos(stride)*.39;
    c(side*.105,(.865+kneeY)/2,kneeZ/2,.15,Math.hypot(.865-kneeY,kneeZ),.16,'#38444a',M.fabric,{rx:seated?Math.atan2(-kneeZ,.865-kneeY):-stride,topRadius:1.12});
@@ -451,12 +519,12 @@ const BarScene=(()=>{
     }
    }
   }
-  for(let y=.98;y<1.34;y+=.087)b(0,y,-.125*(1+.12*(y-.86)/.49)-.003,.012,.012,.009,'#c2b9a0',M.paint);
+  for(let y=.98;y<1.28;y+=.087){const chest=.1325*Math.sqrt(Math.max(0,1-((y-1.14)/.25)**2)),waist=y<1.025?.118:0;b(0,y,.004-Math.max(chest,waist)-.004,.009,.009,.006,'#bfb79e',M.paint);}
   if(staffKind){
    const apron=staffKind==='bartender'?'#254c3a':'#43566a';
-   b(0,1.16,-.133,.28,.30,.018,apron,M.fabric);
+   b(0,1.16,-.138,.25,.28,.014,apron,M.fabric);
    b(0,.90,-.145,.34,.28,.020,apron,M.fabric);
-   for(const side of [-1,1])b(side*.10,1.365,-.135,.026,.15,.015,apron,M.fabric,{rz:side*.18});
+   for(const side of [-1,1])b(side*.085,1.31,-.078,.024,.12,.012,apron,M.fabric,{rz:side*.16,rx:.62});
    b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
   }
  }

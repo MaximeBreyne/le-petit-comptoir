@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const root=path.resolve(__dirname,'..');
 const mockContext={fillRect(){},fillText(){},measureText(text){return {width:text.length*60,actualBoundingBoxAscent:74,actualBoundingBoxDescent:15}}};
 const context=vm.createContext({document:{createElement:()=>({getContext:()=>({...mockContext})})}});
-for(const file of ['renderer.js','scene.js','venue.js'])vm.runInContext(fs.readFileSync(path.join(root,'dist',file),'utf8'),context);
+for(const file of ['engine.js','renderer.js','scene.js','venue.js'])vm.runInContext(fs.readFileSync(path.join(root,'dist',file),'utf8'),context);
 const {Renderer,Scene,Venue}=vm.runInContext('({Renderer:BarRenderer,Scene:BarScene,Venue:BarVenue})',context);
 function renderer(limit){
  const result=Object.create(Renderer.prototype);
@@ -47,4 +47,40 @@ test('cached sphere topology keeps triangle order, exact endpoints and normalize
  // For the south-pole strip the first and fourth triangle corners coincide.
  for(let i=0;i<16;i++){const first=i*6*12;assert.deepEqual([...result.subarray(first,first+3)],[...result.subarray(first+36,first+39)]);}
  assert.deepEqual(r.mesh([box]),result,'Repeated frames produce the same geometry');
+});
+
+test('cached ellipsoids translate and recolor independently without unbounded growth',()=>{
+ const r=renderer(4096),a={x:1,y:2,z:3,w:.2,h:.3,d:.25,c:'#ff0000',shape:'sphere',ry:.2};
+ const first=r.mesh([a]).slice(),moved=r.mesh([{...a,x:5,c:'#0000ff',mat:9}]).slice();
+ assert.equal(r.sphereModels.size,1,'World position, material and tint do not duplicate the model');
+ for(let i=0;i<first.length;i+=12){assert.ok(Math.abs(moved[i]-first[i]-4)<1e-6);assert.equal(moved[i+1],first[i+1]);assert.equal(moved[i+2],first[i+2]);assert.equal(moved[i+3],0);assert.equal(moved[i+5],1);assert.equal(moved[i+6],9);}
+ for(let i=0;i<270;i++)r.sphereModel({...a,ry:i*.01});
+ assert.equal(r.sphereModels.size,256,'Continuously changing rotations obey the cache memory bound');
+ assert.deepEqual(r.mesh([a]),first,'An evicted model regenerates the same geometry');
+});
+
+test('window daylight fades through the evening while invalid or out-of-range times remain bounded',()=>{
+ assert.equal(Renderer.daylightAt(),1);
+ assert.ok(Renderer.daylightAt(1020)>Renderer.daylightAt(1200));
+ assert.ok(Renderer.daylightAt(1200)>Renderer.daylightAt(1350));
+ assert.equal(Renderer.daylightAt(1440),0);
+ assert.equal(Renderer.daylightAt(1700),0);
+ assert.equal(Renderer.daylightAt(-100),1);
+ assert.equal(Renderer.daylightAt(NaN),1);
+});
+
+test('all seven clients and three employees cast contacts that clear when people leave',()=>{
+ const r=renderer(4096);r.people=new Float32Array(40);
+ const people=Array.from({length:10},(_,index)=>({x:index+1,z:index/2,contactShadow:true}));
+ r.contactShadows([{x:100,z:100},...people]);
+ for(let i=0;i<10;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.equal(r.people[i*4+3],1);}
+ r.contactShadows([people[0]]);assert.equal(r.people[3],1);assert.ok([...r.people.subarray(4)].every(value=>value===0));
+});
+
+test('clear panes are separated from opaque depth and shadow geometry',()=>{
+ const r=renderer(4096),uploaded=[];r.gl.bufferData=(_target,data)=>uploaded.push(data.length/12);
+ const solid={x:0,y:1,z:3,w:1,h:1,d:.1,c:'#aa4433',mat:0};
+ const pane={...solid,z:2,mat:11};r.setScene([solid,pane]);
+ assert.equal(r.staticGlass.length,1);assert.equal(r.staticGlass[0],pane);
+ assert.equal(r.count,36);assert.equal(r.shadowCount,36);assert.deepEqual(uploaded,[36,36]);
 });

@@ -1,22 +1,38 @@
 (function(root){
 'use strict';
-const ingredients={beer:{name:'Bière pression',unit:'cl',pack:500,cost:16},wine:{name:'Vin rouge',unit:'cl',pack:75,cost:7},coffee:{name:'Café',unit:'dose',pack:20,cost:5},rum:{name:'Rhum',unit:'cl',pack:70,cost:18},lime:{name:'Citron vert',unit:'portion',pack:12,cost:4},mint:{name:'Menthe',unit:'portion',pack:12,cost:3},sugar:{name:'Sirop de sucre',unit:'cl',pack:100,cost:4},soda:{name:'Eau pétillante',unit:'cl',pack:100,cost:2},ice:{name:'Glaçons',unit:'portion',pack:20,cost:3}};
+const ingredients={beer:{name:'Bière pression',unit:'cl',pack:500,cost:16},wine:{name:'Vin rouge',unit:'cl',pack:75,cost:7},coffee:{name:'Café',unit:'dose',pack:20,cost:5},rum:{name:'Rhum',unit:'cl',pack:70,cost:18},lime:{name:'Citron vert',unit:'portion',pack:12,cost:4},mint:{name:'Menthe',unit:'portion',pack:12,cost:3},sugar:{name:'Sirop de sucre',unit:'cl',pack:100,cost:4},soda:{name:'Eau pétillante',unit:'cl',pack:100,cost:2},ice:{name:'Glaçons',unit:'portion',pack:20,cost:3},whisky:{name:'Whisky',unit:'cl',pack:70,cost:22,license:'spirits'},gin:{name:'Gin',unit:'cl',pack:70,cost:20,license:'spirits'},tonic:{name:'Tonic',unit:'cl',pack:100,cost:3,license:'spirits'},cola:{name:'Cola',unit:'cl',pack:100,cost:3,license:'signature'}};
 const ingredientKeys=Object.keys(ingredients);
+const coreIngredientKeys=Object.freeze(['beer','wine','coffee','rum','lime','mint','sugar','soda','ice']);
+const isValidStock=stock=>!!stock&&typeof stock==='object'&&!Array.isArray(stock)&&coreIngredientKeys.every(key=>Number.isFinite(stock[key])&&stock[key]>=0)&&ingredientKeys.every(key=>!Object.hasOwn(stock,key)||Number.isFinite(stock[key])&&stock[key]>=0);
 const serviceCapacities=Object.freeze(Object.fromEntries(ingredientKeys.map(key=>[key,ingredients[key].pack*2])));
 const normalizeReserve=value=>Object.fromEntries(ingredientKeys.map(key=>[key,Number.isFinite(value?.[key])&&value[key]>=0?value[key]:0]));
 const managementUpgrades=Object.freeze({
- tray:{name:'Plateau de service',category:'building',requiredSales:5,cost:100,description:'Passez de 2 à 4 boissons sur le plateau.'},
- cocktails:{name:'Licence cocktails',category:'licenses',requiredSales:8,cost:120,description:'Ajoutez le mojito à votre carte et aux commandes des clients.'},
- counter:{name:'Comptoir équipé',category:'building',requiredSales:12,cost:180,description:'Augmentez de 50 % la capacité de chaque ingrédient au comptoir.'},
- assistant:{name:'Aide de réserve',category:'team',requiredSales:18,cost:220,salary:10,description:'Réapprovisionne le comptoir depuis la réserve toutes les 12 secondes de service. Salaire : 10 € par soir.'},
- bartender:{name:'Préparateur de boissons',category:'team',requiredSales:24,cost:300,salary:18,description:'Prépare les commandes prises, avec les ingrédients du comptoir, puis les pose sur le plateau. Salaire : 18 € par soir.'},
- waiter:{name:'Serveur',category:'team',requiredSales:32,cost:380,salary:22,description:'Prend les commandes à table et apporte les boissons disponibles. Vous gérez les encaissements. Salaire : 22 € par soir.'}
+ tray:{name:'Plateau de service',category:'building',requiredSales:5,cost:100,requires:[],description:'Passez de 2 à 4 boissons sur le plateau.'},
+ cocktails:{name:'Licence cocktails',category:'licenses',requiredSales:8,cost:120,requires:[],description:'Ajoutez le mojito à votre carte et aux commandes des clients.'},
+ softDrinks:{name:'Licence sans alcool',category:'licenses',requiredSales:12,cost:90,requires:[],description:'Servez le virgin mojito et la limonade maison avec les ingrédients du bar.'},
+ spirits:{name:'Licence spiritueux',category:'licenses',requiredSales:20,cost:210,requires:[],description:'Ajoutez le whisky et le gin tonic à la carte. Commandez leurs ingrédients en réserve.'},
+ signature:{name:'Licence créations maison',category:'licenses',requiredSales:36,cost:360,requires:['cocktails','spirits'],description:'Proposez le gin fizz et le cuba libre après les licences cocktails et spiritueux.'},
+ counter:{name:'Comptoir équipé',category:'building',requiredSales:12,cost:180,requires:[],description:'Augmentez de 50 % la capacité de chaque ingrédient au comptoir.'},
+ assistant:{name:'Aide de réserve',category:'team',requiredSales:18,cost:220,salary:10,requires:[],description:'Réapprovisionne le comptoir depuis la réserve toutes les 12 secondes de service. Salaire : 10 € par soir.'},
+ bartender:{name:'Préparateur de boissons',category:'team',requiredSales:24,cost:300,salary:18,requires:[],description:'Prépare les commandes prises, avec les ingrédients du comptoir, puis les pose sur le plateau. Salaire : 18 € par soir.'},
+ waiter:{name:'Serveur',category:'team',requiredSales:32,cost:380,salary:22,requires:[],description:'Prend les commandes à table et apporte les boissons disponibles. Vous gérez les encaissements. Salaire : 22 € par soir.'}
 });
 function normalizeManagement(saved){
  const value=saved.management;
- return {cocktails:!Object.hasOwn(saved,'management')||value?.cocktails===true,counter:value?.counter===true,assistant:value?.assistant===true,bartender:value?.bartender===true,waiter:value?.waiter===true,restockTimer:Number.isFinite(value?.restockTimer)&&value.restockTimer>=0?Math.min(value.restockTimer,12):0};
+ return {cocktails:!Object.hasOwn(saved,'management')||value?.cocktails===true,softDrinks:value?.softDrinks===true,spirits:value?.spirits===true,signature:value?.signature===true,counter:value?.counter===true,assistant:value?.assistant===true,bartender:value?.bartender===true,waiter:value?.waiter===true,restockTimer:Number.isFinite(value?.restockTimer)&&value.restockTimer>=0?Math.min(value.restockTimer,12):0};
 }
-const recipes={beer:{name:'Bière pression',price:5,glass:'Pinte',station:'Tireuse',ingredients:{beer:50},target:50,unit:'cl',speed:14,color:'#d8a348',steps:['Choisir une pinte','Tirer 50 cl de bière']},wine:{name:'Verre de rouge',price:6,glass:'Verre à vin',station:'Bouteilles',ingredients:{wine:15},target:15,unit:'cl',speed:5,color:'#8e3c48',steps:['Choisir un verre à vin','Verser 15 cl de vin']},coffee:{name:'Espresso',price:3,glass:'Tasse',station:'Machine à café',ingredients:{coffee:1},target:25,unit:'ml',speed:8,color:'#71462b',steps:['Choisir une tasse','Extraire 25 ml de café']},mojito:{name:'Mojito maison',price:10,glass:'Verre haut',station:'Cocktails',ingredients:{rum:4,lime:1,mint:1,sugar:2,soda:10,ice:1},target:4,unit:'cl de rhum',speed:1.5,color:'#b8d28a',steps:['Choisir un verre haut','Ajouter citron et menthe','Piler avec le sirop','Ajouter les glaçons','Doser 4 cl de rhum','Compléter et mélanger']}};
+const recipes={
+ beer:{name:'Bière pression',price:5,glass:'Pinte',station:'Tireuse',license:null,pourStep:1,vessel:'pint',garnish:null,ingredients:{beer:50},target:50,unit:'cl',speed:14,color:'#d8a348',steps:['Choisir une pinte','Tirer 50 cl de bière']},
+ wine:{name:'Verre de rouge',price:6,glass:'Verre à vin',station:'Bouteilles',license:null,pourStep:1,vessel:'wine',garnish:null,ingredients:{wine:15},target:15,unit:'cl',speed:5,color:'#8e3c48',steps:['Choisir un verre à vin','Verser 15 cl de vin']},
+ coffee:{name:'Espresso',price:3,glass:'Tasse',station:'Machine à café',license:null,pourStep:1,vessel:'cup',garnish:null,ingredients:{coffee:1},target:25,unit:'ml',speed:8,color:'#71462b',steps:['Choisir une tasse','Extraire 25 ml de café']},
+ mojito:{name:'Mojito maison',price:10,glass:'Verre haut',station:'Cocktails',license:'cocktails',pourStep:4,finishStep:5,vessel:'highball',garnish:'mint-lime',ingredients:{rum:4,lime:1,mint:1,sugar:2,soda:10,ice:1},target:4,unit:'cl de rhum',speed:1.5,color:'#b8d28a',steps:['Choisir un verre haut','Ajouter citron et menthe','Piler avec le sirop','Ajouter les glaçons','Doser 4 cl de rhum','Compléter et mélanger']},
+ virginMojito:{name:'Virgin mojito',price:7,glass:'Verre haut',station:'Sans alcool',license:'softDrinks',pourStep:4,finishStep:5,vessel:'highball',garnish:'mint-lime',ingredients:{lime:1,mint:1,sugar:2,soda:10,ice:1},target:10,unit:'cl d’eau pétillante',speed:4,color:'#c3d99a',steps:['Choisir un verre haut','Ajouter citron et menthe','Piler avec le sirop','Ajouter les glaçons','Verser 10 cl d’eau pétillante','Mélanger doucement']},
+ lemonade:{name:'Limonade maison',price:5,glass:'Verre haut',station:'Sans alcool',license:'softDrinks',pourStep:2,finishStep:3,vessel:'highball',garnish:'lime',ingredients:{lime:2,sugar:2,soda:16,ice:1},target:16,unit:'cl d’eau pétillante',speed:6,color:'#e3d890',steps:['Choisir un verre haut','Ajouter citron, sirop et glaçons','Verser 16 cl d’eau pétillante','Mélanger la limonade']},
+ whisky:{name:'Whisky sur glace',price:8,glass:'Verre bas',station:'Spiritueux',license:'spirits',pourStep:1,vessel:'rocks',garnish:null,ingredients:{whisky:4,ice:1},target:4,unit:'cl de whisky',speed:1.5,color:'#b8792e',steps:['Choisir un verre bas avec des glaçons','Doser 4 cl de whisky']},
+ ginTonic:{name:'Gin tonic',price:10,glass:'Verre haut',station:'Spiritueux',license:'spirits',pourStep:2,finishStep:3,vessel:'highball',garnish:'lime',ingredients:{gin:4,tonic:12,lime:1,ice:1},target:4,unit:'cl de gin',speed:1.5,color:'#d7e3cb',steps:['Choisir un verre haut','Ajouter les glaçons et le citron','Doser 4 cl de gin','Compléter au tonic et mélanger']},
+ ginFizz:{name:'Gin fizz',price:12,glass:'Coupe',station:'Créations maison',license:'signature',pourStep:2,finishStep:3,vessel:'coupe',garnish:'lime',ingredients:{gin:4,lime:1,sugar:2,soda:8,ice:1},target:4,unit:'cl de gin',speed:1.5,color:'#e8e6c7',steps:['Choisir une coupe','Ajouter citron, sirop et glaçons au shaker','Doser 4 cl de gin','Secouer, filtrer et compléter à l’eau pétillante']},
+ cubaLibre:{name:'Cuba libre',price:11,glass:'Verre haut',station:'Créations maison',license:'signature',pourStep:2,finishStep:3,vessel:'highball',garnish:'lime',ingredients:{rum:4,cola:12,lime:1,ice:1},target:4,unit:'cl de rhum',speed:1.5,color:'#6b3c27',steps:['Choisir un verre haut','Ajouter les glaçons et le citron','Doser 4 cl de rhum','Compléter au cola et mélanger']}
+};
 const names=['Lucie','Marc','Nadia','Julien','Sophie','Thomas','Amélie','Émile'];
 const tables=Object.freeze([{id:1,x:1.65,z:6.4},{id:2,x:1.65,z:8.6},{id:3,x:10.22,z:6.5},{id:4,x:10.22,z:8.65}].map(Object.freeze));
 const registerPosition=Object.freeze({x:2.65,z:2.0});
@@ -25,12 +41,12 @@ const money=value=>Math.round((value+Number.EPSILON)*100)/100;
 const bounded=(value,min,max,fallback)=>Number.isFinite(value)?Math.min(max,Math.max(min,value)):fallback;
 const positionNear=(a,b,radius)=>!!a&&Number.isFinite(a.x)&&Number.isFinite(a.z)&&Math.hypot(a.x-b.x,a.z-b.z)<=radius;
 const freshPayments=()=>({till:80,terminalCarried:false,terminalOrderId:null,cashRevenue:0,cardRevenue:0,receipts:[]});
-const fresh=()=>({version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,ingredients[key].pack])),management:{cocktails:false,counter:false,assistant:false,bartender:false,waiter:false,restockTimer:0},payments:freshPayments(),staff:{bartender:null,waiter:null},orders:[],deliveries:[],prep:null,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
+const fresh=()=>({version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20,whisky:0,gin:0,tonic:0,cola:0},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{cocktails:false,softDrinks:false,spirits:false,signature:false,counter:false,assistant:false,bartender:false,waiter:false,restockTimer:0},payments:freshPayments(),staff:{bartender:null,waiter:null},orders:[],deliveries:[],prep:null,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
 class Game{
- constructor(saved){this.s=fresh();if(saved&&saved.version===2){const s=saved;const nums=['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','capacity','spawn','nextId'];if(nums.every(k=>Number.isFinite(s[k]))&&ingredientKeys.every(k=>Number.isFinite(s.stock?.[k])&&s.stock[k]>=0)&&Array.isArray(s.orders)&&s.orders.every(o=>o&&Object.hasOwn(recipes,o.recipe)&&Number.isFinite(o.patience))&&Array.isArray(s.tray)&&s.tray.every(t=>t&&Object.hasOwn(recipes,t.recipe))&&Array.isArray(s.deliveries)&&s.deliveries.every(d=>d&&Object.hasOwn(ingredients,d.key)&&Number.isFinite(d.remaining))&&(!s.prep||(Object.hasOwn(recipes,s.prep.recipe)&&Number.isFinite(s.prep.amount)))){this.s=JSON.parse(JSON.stringify(s));
+ constructor(saved){this.s=fresh();if(saved&&saved.version===2){const s=saved;const nums=['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','capacity','spawn','nextId'];if(nums.every(k=>Number.isFinite(s[k]))&&isValidStock(s.stock)&&Array.isArray(s.orders)&&s.orders.every(o=>o&&Object.hasOwn(recipes,o.recipe)&&Number.isFinite(o.patience))&&Array.isArray(s.tray)&&s.tray.every(t=>t&&Object.hasOwn(recipes,t.recipe))&&Array.isArray(s.deliveries)&&s.deliveries.every(d=>d&&Object.hasOwn(ingredients,d.key)&&Number.isFinite(d.remaining))&&(!s.prep||(Object.hasOwn(recipes,s.prep.recipe)&&Number.isFinite(s.prep.amount)))){this.s=JSON.parse(JSON.stringify(s));
   // Legacy saves already own their service stock. Migrating must not grant a
   // second starter supply, clamp existing quantities or mutate the saved object.
-  this.s.reserve=normalizeReserve(s.reserve);this.s.management=normalizeManagement(s);if(this.s.prep)this.s.prep.pouring=false;
+  this.s.stock=normalizeReserve(s.stock);this.s.reserve=normalizeReserve(s.reserve);this.s.management=normalizeManagement(s);if(this.s.prep)this.s.prep.pouring=false;
   this.normalizeService(s);
  }}}
  normalizeService(saved){
@@ -66,12 +82,14 @@ class Game{
  availableBank(){const uncredited=this.s.orders.filter(o=>o.phase==='change-ready').reduce((sum,o)=>sum+(o.due||0),0);return money(Math.max(0,this.s.cash-this.s.payments.till+uncredited))}
  spend(amount){this.s.cash=money(this.s.cash-amount);const uncredited=this.s.orders.filter(o=>o.phase==='change-ready').reduce((sum,o)=>sum+(o.due||0),0);this.s.payments.till=Math.min(this.s.payments.till,money(Math.max(0,this.s.cash)+uncredited))}
  fundTill(amount,position){if(!this.nearRegister(position))return 'Rejoignez la caisse au comptoir.';if(!Number.isFinite(amount)||amount<=0||money(amount)!==amount)return 'Choisissez un montant positif en euros.';if(amount>this.availableBank())return 'Le solde disponible hors caisse est insuffisant.';this.s.payments.till=money(this.s.payments.till+amount);return `${amount.toFixed(2)} € ajoutés au fond de caisse depuis votre trésorerie.`}
- canPrepare(id){return Object.hasOwn(recipes,id)&&(id!=='mojito'||this.s.management.cocktails)}
+ canPrepare(id){return Object.hasOwn(recipes,id)&&(!recipes[id].license||this.s.management[recipes[id].license]===true)}
+ canBuy(key){return Object.hasOwn(ingredients,key)&&(!ingredients[key].license||this.s.management[ingredients[key].license]===true)}
  canMake(id){return this.canPrepare(id)&&Object.entries(recipes[id].ingredients).every(([k,n])=>this.s.stock[k]>=n)}
  serviceCapacity(key){return Object.hasOwn(serviceCapacities,key)?serviceCapacities[key]*(this.s.management.counter?1.5:1):0}
- upgradeInfo(id){const item=managementUpgrades[id];if(!Object.hasOwn(managementUpgrades,id))return null;const owned=id==='tray'?this.s.upgraded:this.s.management[id];return {id,...item,owned:!!owned,unlocked:!!owned||this.s.totalSold>=item.requiredSales,affordable:this.s.cash>=item.cost&&!this.s.gameOver}}
+ upgradeInfo(id){const item=managementUpgrades[id];if(!Object.hasOwn(managementUpgrades,id))return null;const owned=id==='tray'?this.s.upgraded:this.s.management[id],unmetPrerequisites=item.requires.filter(required=>!this.s.management[required]);return {id,...item,unmetPrerequisites,owned:!!owned,unlocked:!!owned||this.s.totalSold>=item.requiredSales&&unmetPrerequisites.length===0,affordable:this.s.cash>=item.cost&&!this.s.gameOver}}
  purchaseUpgrade(id){
   const info=this.upgradeInfo(id),s=this.s;if(!info)return 'Amélioration inconnue.';if(s.gameOver)return 'La partie est terminée.';if(info.owned)return 'Déjà installé.';
+  if(info.unmetPrerequisites.length)return `Achetez d’abord : ${info.unmetPrerequisites.map(required=>managementUpgrades[required].name).join(', ')}.`;
   if(!info.unlocked)return `Servez ${info.requiredSales} clients pour débloquer cette amélioration.`;
   if(!info.affordable)return 'Trésorerie insuffisante.';
   this.spend(info.cost);s.expenses+=info.cost;
@@ -79,7 +97,7 @@ class Game{
   return id==='tray'?'Plateau agrandi : 4 boissons au lieu de 2.':`${info.name} : achat effectué.`;
  }
  open(){let s=this.s;if(s.gameOver)return 'La partie est terminée. Lancez un nouveau bar.';if(s.open)return 'Le bar est déjà ouvert.';s.open=true;s.closing=false;s.spawn=1;return 'Le bar est ouvert. Premier client en approche.'}
- buy(key){let s=this.s;if(!Object.hasOwn(ingredients,key))return 'Produit inconnu.';const i=ingredients[key];if(s.gameOver)return 'La partie est terminée.';if(s.cash<i.cost)return 'Trésorerie insuffisante.';this.spend(i.cost);s.expenses+=i.cost;s.deliveries.push({key,remaining:10});return 'Commande passée : livraison en réserve dans 10 secondes de jeu.'}
+ buy(key){let s=this.s;if(!Object.hasOwn(ingredients,key))return 'Produit inconnu.';const i=ingredients[key];if(s.gameOver)return 'La partie est terminée.';if(!this.canBuy(key))return `Achetez la ${managementUpgrades[i.license].name.toLocaleLowerCase('fr-BE')} dans la tablette pour commander ce produit.`;if(s.cash<i.cost)return 'Trésorerie insuffisante.';this.spend(i.cost);s.expenses+=i.cost;s.deliveries.push({key,remaining:10});return 'Commande passée : livraison en réserve dans 10 secondes de jeu.'}
  restock(key,amount){
   const s=this.s;if(!Object.hasOwn(ingredients,key))return 'Produit inconnu.';if(s.gameOver)return 'La partie est terminée.';
   if(amount!==undefined&&(!Number.isFinite(amount)||amount<=0))return 'Choisissez une quantité positive.';
@@ -89,12 +107,12 @@ class Game{
   s.reserve[key]-=quantity;s.stock[key]+=quantity;
   return `${ingredients[key].name} : ${quantity.toLocaleString('fr-BE',{maximumFractionDigits:2})} ${ingredients[key].unit} transférés au comptoir.`;
  }
- start(id){let s=this.s;if(!Object.hasOwn(recipes,id))return 'Boisson inconnue.';if(!s.open)return 'Ouvrez le bar avant de préparer.';if(s.prep)return 'Terminez ou jetez la préparation en cours.';if(s.tray.length+(s.staff.bartender?1:0)>=s.capacity)return 'Le plateau est plein ou réservé par le préparateur : servez une boisson.';if(!this.canPrepare(id))return 'Achetez la licence cocktails dans la tablette pour préparer le mojito.';if(!this.canMake(id))return 'Il manque des ingrédients. Réapprovisionnez le comptoir depuis la réserve.';for(const [k,n]of Object.entries(recipes[id].ingredients))s.stock[k]-=n;s.prep={recipe:id,step:0,amount:0,pouring:false,ready:false,quality:0};return 'Préparation commencée : '+recipes[id].name+'.'}
- step(){let p=this.s.prep;if(!p||p.ready)return;if(p.step<recipes[p.recipe].steps.length-1)p.step++}
- isPour(){let p=this.s.prep;return !!p&&!p.ready&&p.step===(p.recipe==='mojito'?4:1)}
+ start(id){let s=this.s;if(!Object.hasOwn(recipes,id))return 'Boisson inconnue.';if(!s.open)return 'Ouvrez le bar avant de préparer.';if(s.prep)return 'Terminez ou jetez la préparation en cours.';if(s.tray.length+(s.staff.bartender?1:0)>=s.capacity)return 'Le plateau est plein ou réservé par le préparateur : servez une boisson.';if(!this.canPrepare(id))return `Achetez la ${managementUpgrades[recipes[id].license].name.toLocaleLowerCase('fr-BE')} dans la tablette pour préparer cette boisson.`;if(!this.canMake(id))return 'Il manque des ingrédients. Réapprovisionnez le comptoir depuis la réserve.';for(const [k,n]of Object.entries(recipes[id].ingredients))s.stock[k]-=n;s.prep={recipe:id,step:0,amount:0,pouring:false,ready:false,quality:0};return 'Préparation commencée : '+recipes[id].name+'.'}
+ step(){let p=this.s.prep;if(!p||p.ready||this.isPour())return;if(p.step<recipes[p.recipe].steps.length-1)p.step++}
+ isPour(){let p=this.s.prep;return !!p&&!p.ready&&p.step===recipes[p.recipe].pourStep}
  setPour(v){if(this.isPour())this.s.prep.pouring=!!v;else if(this.s.prep)this.s.prep.pouring=false}
- finishPour(){let p=this.s.prep;if(!this.isPour())return;p.pouring=false;const r=recipes[p.recipe];p.quality=Math.max(0,Math.round(100-Math.abs(p.amount-r.target)/r.target*180));if(p.recipe==='mojito')p.step=5;else p.ready=true}
- finishMix(){let p=this.s.prep;if(p?.recipe==='mojito'&&p.step===5)p.ready=true}
+ finishPour(){let p=this.s.prep;if(!this.isPour())return;p.pouring=false;const r=recipes[p.recipe];p.quality=Math.max(0,Math.round(100-Math.abs(p.amount-r.target)/r.target*180));if(Number.isInteger(r.finishStep))p.step=r.finishStep;else p.ready=true}
+ finishMix(){let p=this.s.prep;if(p&&!p.ready&&Number.isInteger(recipes[p.recipe].finishStep)&&p.step===recipes[p.recipe].finishStep)p.ready=true}
  plate(){let s=this.s,p=s.prep;if(!p?.ready)return 'Terminez la préparation.';if(s.tray.length+(s.staff.bartender?1:0)>=s.capacity)return 'Le plateau est plein.';s.tray.push({recipe:p.recipe,quality:p.quality});s.prep=null;return 'Boisson déposée sur le plateau.'}
  discard(index){let s=this.s;if(index===undefined){if(!s.prep)return;s.prep=null;}else{if(!s.tray[index])return;s.tray.splice(index,1)}s.waste++;return 'Boisson jetée. Les ingrédients sont perdus.'}
  takeOrder(id,position){const order=this.s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous de la table pour prendre la commande.';if(this.orderPhase(order)!=='awaiting-order')return 'La commande a déjà été prise.';order.phase='preparing';order.patience=100;return `Table ${order.tableId} : ${recipes[order.recipe].name}. Commande envoyée au bar.`}
@@ -122,7 +140,7 @@ class Game{
   }
   if(s.management.bartender&&!s.staff.bartender&&s.tray.length+(s.prep?1:0)<s.capacity){
    const order=s.orders.find(order=>this.orderPhase(order)==='preparing'&&(order.arrivalRemaining||0)<=0&&this.canMake(order.recipe)&&s.prep?.recipe!==order.recipe&&this.trayDrinkIndex(order)<0&&!(s.staff.waiter?.task==='serve'&&s.staff.waiter.orderId===order.id));
-   if(order){for(const [key,amount]of Object.entries(recipes[order.recipe].ingredients))s.stock[key]-=amount;const total=order.recipe==='mojito'?12:8;s.staff.bartender={orderId:order.id,recipe:order.recipe,remaining:total,total}}
+   if(order){for(const [key,amount]of Object.entries(recipes[order.recipe].ingredients))s.stock[key]-=amount;const total=Math.max(8,recipes[order.recipe].steps.length*2);s.staff.bartender={orderId:order.id,recipe:order.recipe,remaining:total,total}}
   }
   job=s.staff.waiter;
   if(job){
@@ -159,5 +177,5 @@ class Game{
   }
   this.staffTick(dt);s.spawn-=dt;if(!s.closing&&s.orders.length<7&&s.spawn<=0)this.spawnCustomer();if(s.closing&&s.orders.length===0)return this.end()}
 }
-const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,tables,registerPosition};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
+const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,isValidStock,tables,registerPosition};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
