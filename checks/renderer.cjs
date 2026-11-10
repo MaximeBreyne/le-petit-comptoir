@@ -69,11 +69,13 @@ test('window daylight fades through the evening while invalid or out-of-range ti
  assert.equal(Renderer.daylightAt(NaN),1);
 });
 
-test('all seven clients and three employees cast contacts that clear when people leave',()=>{
- const r=renderer(4096);r.people=new Float32Array(40);
- const people=Array.from({length:10},(_,index)=>({x:index+1,z:index/2,contactShadow:true}));
+test('all ten clients and three employees cast contacts that clear when people leave',()=>{
+ assert.equal(Renderer.maxContactPeople,13);
+ const r=renderer(4096);r.people=new Float32Array(Renderer.maxContactPeople*4);
+ const people=Array.from({length:14},(_,index)=>({x:index+1,z:index/2,contactShadow:true}));
  r.contactShadows([{x:100,z:100},...people]);
- for(let i=0;i<10;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.equal(r.people[i*4+3],1);}
+ for(let i=0;i<13;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.equal(r.people[i*4+3],1);}
+ assert.equal(r.people.length,52,'Departing extras cannot grow the fixed GPU upload');
  r.contactShadows([people[0]]);assert.equal(r.people[3],1);assert.ok([...r.people.subarray(4)].every(value=>value===0));
 });
 

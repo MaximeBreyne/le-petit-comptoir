@@ -17,7 +17,7 @@ window.GameMenu=(()=>{
   if(!BarEngine.isValidStock(s.stock))return false;
   if(s.reserve!==undefined&&!BarEngine.isValidStock(s.reserve))return false;
   if(s.management!==undefined&&(!s.management||!['cocktails','counter','assistant'].every(k=>typeof s.management[k]==='boolean')||!Number.isFinite(s.management.restockTimer)||s.management.restockTimer<0))return false;
-  if(!Array.isArray(s.orders)||s.orders.length>7||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
+  if(!Array.isArray(s.orders)||s.orders.length>BarEngine.MAX_CUSTOMERS||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
   if(!Array.isArray(s.tray)||s.tray.length>s.capacity||!s.tray.every(t=>t&&recipes[t.recipe]&&Number.isFinite(t.quality)&&t.quality>=0&&t.quality<=100))return false;
   if(!Array.isArray(s.deliveries)||!s.deliveries.every(d=>d&&ingredients[d.key]&&Number.isFinite(d.remaining)&&d.remaining>=0&&d.remaining<=10))return false;
   if(s.prep){const p=s.prep,r=recipes[p.recipe];if(!r||!Number.isInteger(p.step)||p.step<0||p.step>=r.steps.length||!Number.isFinite(p.amount)||p.amount<0||p.amount>r.target*1.60001||!Number.isFinite(p.quality)||p.quality<0||p.quality>100||typeof p.ready!=='boolean')return false}

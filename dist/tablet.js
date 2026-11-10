@@ -33,6 +33,8 @@ window.BarTablet=(()=>{
  const service=pages.get('service'),serviceNote=make('div','tablet-reserve-note');
  const roomServiceNotice=make('div','tablet-service-notice'),roomServiceText=make('p'),roomServiceAction=button('Ouvrir le bar','service','tablet-button');roomServiceAction.id='tabletServiceToggle';roomServiceNotice.append(roomServiceText,roomServiceAction);
  const roomSummary=make('div','tablet-service-summary');service.append(roomServiceNotice,serviceNote,roomSummary);
+ const crowdPanel=make('div','tablet-crowd'),crowdTitle=make('strong'),crowdDetail=make('p'),crowdProgress=make('progress','tablet-unlock-progress');
+ crowdPanel.dataset.crowdProgress='';crowdProgress.setAttribute('aria-label','Progression vers la prochaine place au comptoir');crowdPanel.append(crowdTitle,crowdDetail,crowdProgress);service.append(crowdPanel);
  const tableGrid=make('div','tablet-service-grid'),counterGrid=make('div','tablet-service-grid');
  service.append(make('h3','tablet-group-title','Tables de la salle'),tableGrid,make('h3','tablet-group-title','Au comptoir'),counterGrid);
  const seats=new Map();let selectedOrderId=null;
@@ -49,21 +51,32 @@ window.BarTablet=(()=>{
   card.append(head,customer,detail,bill,patience,proximity,actions);grid.append(card);seats.set(key,{card,badge,customer,detail,bill,proximity,patience,buttons});
  }
  for(const table of BarEngine.tables||[{id:1},{id:2},{id:3},{id:4}])seatCard('table:'+table.id,'Table '+table.id,tableGrid);
- for(let slot=0;slot<3;slot++)seatCard('counter:'+slot,'Comptoir '+(slot+1),counterGrid);
+ for(const {slot}of BarEngine.counterSeats)seatCard('counter:'+slot,'Comptoir '+(slot+1),counterGrid);
  function orderPlace(order){return order.tableId?'Table '+order.tableId:'Comptoir '+((order.slot??0)+1)}
  function reachOrder(order){return !!game.canReachOrder?.(order.id,camera)}
  function refreshService(s){
-  const payments=s.payments||{},orders=s.orders||[];
+  const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo();
   serviceNote.textContent='Regardez un client et appuyez sur E ou cliquez pour prendre sa commande, servir sa boisson ou encaisser. La préparation se fait uniquement derrière le bar. Le panneau près de l’entrée ouvre et ferme le service.';
   roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
-  roomSummary.textContent=`${count} client${count>1?'s':''} · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalWithWaiter?'avec le serveur':payments.terminalCarried?'avec vous':'au comptoir'}`;
+  roomSummary.textContent=`${count} / ${crowd.capacity} clients · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalWithWaiter?'avec le serveur':payments.terminalCarried?'avec vous':'au comptoir'}`;
+  crowdTitle.textContent=`Fréquentation · ${crowd.counterSeatsUnlocked} / ${BarEngine.counterSeats.length} places au comptoir`;
+  crowdDetail.textContent=crowd.nextThreshold===null?'Toutes les places sont débloquées. Votre bar peut accueillir jusqu’à '+crowd.capacity+' clients à la fois.':`${crowd.totalSold} / ${crowd.nextThreshold} clients encaissés · Une place supplémentaire au prochain palier. Le déblocage est automatique.`;
+  crowdProgress.hidden=crowd.nextThreshold===null;crowdProgress.max=Math.max(1,(crowd.nextThreshold??crowd.currentThreshold)-crowd.currentThreshold);crowdProgress.value=crowd.totalSold-crowd.currentThreshold;
+  crowdProgress.setAttribute('aria-valuetext',crowd.nextThreshold===null?'Toutes les places sont débloquées':`${crowd.totalSold} clients encaissés sur ${crowd.nextThreshold}`);
   const counterOrders=orders.filter(order=>!order.tableId);
   for(const [key,entry]of seats){
    const [kind,index]=key.split(':'),order=kind==='table'?orders.find(order=>order.tableId===Number(index)):counterOrders.find((order,i)=>(order.slot??i)===Number(index));
+   const locked=kind==='counter'&&!order&&Number(index)>=crowd.counterSeatsUnlocked;
+   entry.card.dataset.serviceLocked=String(locked);
    entry.card.classList.toggle('tablet-seat-empty',!order);entry.card.classList.toggle('tablet-order-selected',!!order&&order.id===selectedOrderId);
    for(const item of Object.values(entry.buttons)){item.hidden=true;item.disabled=true;if(order)item.dataset.orderId=order.id;else delete item.dataset.orderId;}
-   if(!order){delete entry.card.dataset.serviceOrder;entry.badge.textContent='Libre';entry.badge.dataset.phase='free';entry.customer.textContent='Place disponible';entry.detail.textContent=kind==='table'?'Un client pourra s’y installer.':'Les commandes sont annoncées au comptoir.';entry.bill.hidden=entry.proximity.hidden=entry.patience.hidden=true;continue;}
+   if(!order){
+    delete entry.card.dataset.serviceOrder;entry.badge.textContent=locked?'À débloquer':'Libre';entry.badge.dataset.phase=locked?'locked':'free';entry.customer.textContent=locked?'La clientèle grandit avec votre bar':'Place disponible';
+    const threshold=locked?BarEngine.crowdStages.find(stage=>stage.counterSeatsUnlocked>Number(index))?.threshold:null;
+    entry.detail.textContent=locked?`Ce tabouret accueillera des clients à partir de ${threshold} clients encaissés.`:kind==='table'?'Un client pourra s’y installer.':'Les clients s’installent sur ce tabouret et annoncent leur commande.';
+    entry.bill.hidden=entry.proximity.hidden=entry.patience.hidden=true;continue;
+   }
    entry.card.dataset.serviceOrder=order.id;const phase=order.phase||'preparing',arriving=(order.arrivalRemaining||0)>0,near=reachOrder(order);
    entry.badge.textContent=arriving?'S’installe…':phaseNames[phase]||'En service';entry.badge.dataset.phase=phase;
    entry.customer.textContent=order.name||'Client';

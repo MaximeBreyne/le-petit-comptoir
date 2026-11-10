@@ -68,7 +68,9 @@ function alongRoute(route,progress){
 function customerRoute(order){
  const seat=BarScene.tableSeat(order.tableId);
  if(seat)return [{x:6,z:9.3},{x:6,z:seat.z+.65},{x:seat.x+(seat.x<6?.6:-.6),z:seat.z+.65},seat];
- const x=4.6+(order.slot||0)*1.4;return [{x:6,z:9.3},{x,z:6},{x,z:4.3}];
+ const counter=BarScene.counterSeat(order.slot);
+ // The central aisle and the gap in front of the tables stay clear at every seat.
+ return [{x:6,z:9.3},{x:6,z:5.45},{x:counter.x,z:5.45},counter];
 }
 function renderStaff(dynamic){
  if(state.management?.assistant)BarScene.customer(dynamic,{x:3.0,z:-2.1,id:52,time:visualTime,moving:false,patience:100});
@@ -81,7 +83,7 @@ function renderStaff(dynamic){
  const moving=!!job&&progress<1,terminal=!!state.payments.terminalWithWaiter;
  if(!moving){
   const order=job&&state.orders.find(order=>order.id===job.orderId),atCounter=['pickup-terminal','prepare-change','return-terminal'].includes(job?.task);
-  const focus=atCounter?{x:3.0,z:2.65}:order?(BarScene.tableSeat(order.tableId)||{x:4.6+(order.slot||0)*1.4,z:4.3}):null;
+  const focus=atCounter?{x:3.0,z:2.65}:order?(BarScene.tableSeat(order.tableId)||BarScene.counterSeat(game.counterSeat(order).slot)):null;
   p.angle=focus?Math.atan2(point.x-focus.x,point.z-focus.z):waiterVisual?.angle||0;
  }
  waiterVisual={...p,progress,key:job?job.orderId+':'+job.task:'idle'};
@@ -106,17 +108,19 @@ function render(){if(!renderer)return;const dynamic=[];
  renderStaff(dynamic);
  const activeIds=new Set(state.orders.map(o=>o.id));
  for(const [id,v]of customerVisuals)if(!activeIds.has(id)&&v.active){v.active=false;v.left=visualTime;v.departure=[{x:v.x,z:v.z},...v.route.slice(0,-1).reverse()];v.departureTime=Math.max(3,routeLength(v.departure)/1.5)}
- for(const [i,customer]of state.orders.entries()){
-  let v=customerVisuals.get(customer.id);if(!v){const slot=customer.slot??[0,1,2].find(slot=>![...customerVisuals.values()].some(c=>c.active&&!c.tableId&&c.slot===slot))??i;v={slot,tableId:customer.tableId,born:visualTime,active:true,route:customerRoute({...customer,slot})};customerVisuals.set(customer.id,v)}
+ for(const customer of state.orders){
+  let v=customerVisuals.get(customer.id);if(!v){const slot=customer.slot??BarEngine.counterSeats.find(seat=>![...customerVisuals.values()].some(c=>c.active&&!c.tableId&&c.slot===seat.slot))?.slot??0;v={slot,tableId:customer.tableId,born:visualTime,active:true,route:customerRoute({...customer,slot})};customerVisuals.set(customer.id,v)}
   v.active=true;v.customer=customer;
  }
  for(const [id,v]of customerVisuals){
   if(!v.active&&visualTime-v.left>=v.departureTime){customerVisuals.delete(id);continue}
   const o=v.customer,progress=Number.isFinite(o.arrivalRemaining)?1-o.arrivalRemaining/3:Math.min(1,(visualTime-v.born)/3);
-  const p=v.active?alongRoute(v.route,progress):alongRoute(v.departure,(visualTime-v.left)/v.departureTime),seated=!!v.tableId&&v.active&&progress>=1;
+  const p=v.active?alongRoute(v.route,progress):alongRoute(v.departure,(visualTime-v.left)/v.departureTime),seated=v.active&&progress>=1;
+  const seat=BarScene.tableSeat(v.tableId)||BarScene.counterSeat(v.slot);
   v.x=p.x;v.z=p.z;
-  BarScene.customer(dynamic,{...p,angle:seated?BarScene.tableSeat(v.tableId).angle:p.angle,id,time:visualTime,moving:progress<1||!v.active,seated,patience:o.patience});
+  BarScene.customer(dynamic,{...p,angle:seated?seat.angle:p.angle,id,time:visualTime,moving:progress<1||!v.active,seated,seatHeight:seat.seatHeight,patience:o.patience});
   if(v.active&&v.tableId&&!['awaiting-order','preparing'].includes(game.orderPhase(o))){const table=BarEngine.tables.find(t=>t.id===v.tableId);BarScene.glass(BarScene.geometry(dynamic),o.recipe,table.x,.788,table.z+.20,game.orderPhase(o)==='drinking'?.7:0)}
+  if(v.active&&!v.tableId&&!['awaiting-order','preparing'].includes(game.orderPhase(o)))BarScene.glass(BarScene.geometry(dynamic),o.recipe,seat.x,1.133,3.48,game.orderPhase(o)==='drinking'?.7:0);
  }
  const props=BarScene.geometry(dynamic),p=state.prep;
  if(p&&(!p.physical||p.vesselPlaced)){const {x,y,z,stream}=BarScene.prepStation(p.recipe);

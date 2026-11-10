@@ -35,6 +35,15 @@ const recipes={
 };
 const names=['Lucie','Marc','Nadia','Julien','Sophie','Thomas','Amélie','Émile'];
 const tables=Object.freeze([{id:1,x:1.65,z:6.4},{id:2,x:1.65,z:8.6},{id:3,x:10.22,z:6.5},{id:4,x:10.22,z:8.65}].map(Object.freeze));
+// Preserve the first three slot IDs and positions for existing saves.
+const counterSeats=Object.freeze([4.6,6,7.4,3.2,8.8,10.2].map((x,slot)=>Object.freeze({slot,x,z:4.3})));
+const MAX_CUSTOMERS=tables.length+counterSeats.length;
+const crowdStages=Object.freeze([
+ {threshold:0,counterSeatsUnlocked:3,spawnInterval:16},
+ {threshold:20,counterSeatsUnlocked:4,spawnInterval:15},
+ {threshold:45,counterSeatsUnlocked:5,spawnInterval:14},
+ {threshold:80,counterSeatsUnlocked:6,spawnInterval:12}
+].map(stage=>Object.freeze({...stage,capacity:tables.length+stage.counterSeatsUnlocked})));
 const registerPosition=Object.freeze({x:2.65,z:2.0});
 const phases=new Set(['awaiting-order','preparing','drinking','payment','cash-collected','change-ready','card-processing']);
 const money=value=>Math.round((value+Number.EPSILON)*100)/100;
@@ -73,10 +82,12 @@ class Game{
  }
  normalizeService(saved){
   const s=this.s,occupiedTables=new Set(),occupiedSlots=new Set();
-  s.orders=s.orders.slice(0,7).map((order,index)=>{
+  s.orders=s.orders.slice(0,MAX_CUSTOMERS).map((order,index)=>{
    const table=tables.find(table=>table.id===order.tableId&&!occupiedTables.has(table.id));
    if(table)occupiedTables.add(table.id);
-   let slot=null;if(!table){slot=Number.isInteger(order.slot)&&order.slot>=0&&order.slot<3&&!occupiedSlots.has(order.slot)?order.slot:[0,1,2].find(id=>!occupiedSlots.has(id));if(slot===undefined)return null;occupiedSlots.add(slot)}
+   // Existing customers keep their seats even when a restored save has not
+   // reached the corresponding attendance threshold yet.
+   let slot=null;if(!table){slot=counterSeats.some(seat=>seat.slot===order.slot)&&!occupiedSlots.has(order.slot)?order.slot:counterSeats.find(seat=>!occupiedSlots.has(seat.slot))?.slot;if(slot===undefined)return null;occupiedSlots.add(slot)}
    const phase=phases.has(order.phase)?order.phase:'preparing',recipe=recipes[order.recipe];
    const due=money(bounded(order.due,recipe.price,recipe.price+1,recipe.price));
    return {...order,id:Number.isSafeInteger(order.id)&&order.id>0?order.id:s.nextId+index,name:String(order.name||'Client').replace(/[<>]/g,'').slice(0,80),tableId:table?.id??null,slot,phase,patience:bounded(order.patience,0,100,100),arrivalRemaining:bounded(order.arrivalRemaining,0,3,0),drinkRemaining:bounded(order.drinkRemaining,0,10,phase==='drinking'?8:0),paymentMethod:order.paymentMethod==='cash'?'cash':'card',due,tender:money(bounded(order.tender,due,100,Math.ceil(due/5)*5)),cardRemaining:bounded(order.cardRemaining,0,3,phase==='card-processing'?3:0),tip:money(bounded(order.tip,0,1,Math.max(0,due-recipe.price)))};
@@ -122,8 +133,8 @@ class Game{
  }
  waiterDestination(task,order){
   if(['pickup-terminal','prepare-change','return-terminal'].includes(task))return {x:3,z:1.9};
-  const table=tables.find(table=>table.id===order?.tableId);
-  return table?{x:table.x+(table.x<6?1.35:-1.35),z:table.z}:order?{x:4.6+(order.slot||0)*1.4,z:4.8}:{x:1.05,z:4.5};
+  const table=tables.find(table=>table.id===order?.tableId),seat=this.counterSeat(order);
+  return table?{x:table.x+(table.x<6?1.35:-1.35),z:table.z}:order?{x:seat.x,z:seat.z+.5}:{x:1.05,z:4.5};
  }
  waiterRouteLength(route){return route.slice(1).reduce((length,p,index)=>length+Math.hypot(p.x-route[index].x,p.z-route[index].z),0)}
  waiterRoute(from,to){
@@ -131,10 +142,12 @@ class Game{
   const route=[{...from}],add=point=>{if(Math.hypot(point.x-route.at(-1).x,point.z-route.at(-1).z)>.001)route.push({...point})};
   if(from.z<3.5||to.z<3.5){
    if(from.z<3.5){add({x:from.x,z:1.9});if(to.z<3.5){add({x:to.x,z:1.9});add(to);if(route.length===1)route.push({...to});return route}add({x:.95,z:1.9});add({x:.95,z:4.9});}
-   if(to.z<3.5){if(from.z>=3.5){const aisle=from.x<6?3.1:8.8;add({x:aisle,z:from.z});add({x:aisle,z:4.9});add({x:.95,z:4.9});}add({x:.95,z:1.9});add({x:to.x,z:1.9});add(to);if(route.length===1)route.push({...to});return route;}
+   if(to.z<3.5){if(from.z>=3.5){const aisle=from.x<6?3.1:8.8;if(from.z<=5.15)add({x:from.x,z:4.9});add({x:aisle,z:route.at(-1).z});add({x:aisle,z:4.9});add({x:.95,z:4.9});}add({x:.95,z:1.9});add({x:to.x,z:1.9});add(to);if(route.length===1)route.push({...to});return route;}
   }
   const source=route.at(-1),a=source.x<6?3.1:8.8,b=to.x<6?3.1:8.8;
-  add({x:a,z:source.z});add({x:a,z:4.9});add({x:b,z:4.9});add({x:b,z:to.z});add(to);if(route.length===1)route.push({...to});return route;
+  // Step out from behind the stools before moving sideways past their backs.
+  if(source.z<=5.15)add({x:source.x,z:4.9});
+  add({x:a,z:route.at(-1).z});add({x:a,z:4.9});add({x:b,z:4.9});add({x:b,z:to.z});add(to);if(route.length===1)route.push({...to});return route;
  }
  assignWaiterJob(task,order,duration){
   const s=this.s,position=s.staff.waiterPosition||{x:1.05,z:4.5},target=this.waiterDestination(task,order),route=task==='wait-card'?[{...position},{...position}]:this.waiterRoute(position,target),travel=this.waiterRouteLength(route)/1.8;
@@ -162,7 +175,8 @@ class Game{
   return this.paymentHandledByWaiter(id)?'Le serveur s’occupe déjà de cet encaissement.':null;
  }
  orderPhase(order){return phases.has(order?.phase)?order.phase:'preparing'}
- orderPosition(order){return tables.find(table=>table.id===order?.tableId)||{x:4.6+(Number.isInteger(order?.slot)?order.slot:Math.max(0,this.s.orders.indexOf(order))%3)*1.4,z:2.1}}
+ counterSeat(order){return counterSeats.find(seat=>seat.slot===order?.slot)||counterSeats[Math.max(0,this.s.orders.indexOf(order))%crowdStages[0].counterSeatsUnlocked]}
+ orderPosition(order){return tables.find(table=>table.id===order?.tableId)||{x:this.counterSeat(order).x,z:2.1}}
  canReachOrder(id,position){const order=this.s.orders.find(order=>order.id===id);return !!order&&(order.arrivalRemaining||0)<=0&&positionNear(position,this.orderPosition(order),order.tableId?1.6:1.65)}
  nearRegister(position){return positionNear(position,registerPosition,1.25)}
  availableBank(){const uncredited=this.s.orders.filter(o=>o.phase==='change-ready').reduce((sum,o)=>sum+(o.due||0),0);return money(Math.max(0,this.s.cash-this.s.payments.till+uncredited))}
@@ -172,6 +186,10 @@ class Game{
  canBuy(key){return Object.hasOwn(ingredients,key)&&(!ingredients[key].license||this.s.management[ingredients[key].license]===true)}
  canMake(id){return this.canPrepare(id)&&Object.entries(recipes[id].ingredients).every(([k,n])=>this.s.stock[k]>=n)}
  serviceCapacity(key){return Object.hasOwn(serviceCapacities,key)?serviceCapacities[key]*(this.s.management.counter?1.5:1):0}
+ crowdInfo(){
+  const totalSold=Math.max(0,this.s.totalSold),index=crowdStages.findLastIndex(stage=>totalSold>=stage.threshold),stage=crowdStages[index];
+  return {totalSold,currentThreshold:stage.threshold,nextThreshold:crowdStages[index+1]?.threshold??null,counterSeatsUnlocked:stage.counterSeatsUnlocked,capacity:stage.capacity,spawnInterval:Math.min(stage.spawnInterval,this.s.upgraded?12:16),maxCapacity:MAX_CUSTOMERS};
+ }
  upgradeInfo(id){const item=managementUpgrades[id];if(!Object.hasOwn(managementUpgrades,id))return null;const owned=id==='tray'?this.s.upgraded:this.s.management[id],unmetPrerequisites=item.requires.filter(required=>!this.s.management[required]);return {id,...item,unmetPrerequisites,owned:!!owned,unlocked:!!owned||this.s.totalSold>=item.requiredSales&&unmetPrerequisites.length===0,affordable:this.s.cash>=item.cost&&!this.s.gameOver}}
  purchaseUpgrade(id){
   const info=this.upgradeInfo(id),s=this.s;if(!info)return 'Amélioration inconnue.';if(s.gameOver)return 'La partie est terminée.';if(info.owned)return 'Déjà installé.';
@@ -325,12 +343,14 @@ class Game{
   if(order){const assigned=this.assignWaiterJob(serving?'serve':'take-order',order);if(serving)assigned.drink=s.tray.splice(this.trayDrinkIndex(order),1)[0];}
  }
  spawnCustomer(){
-  const s=this.s,freeTables=tables.filter(table=>!s.orders.some(order=>order.tableId===table.id)),freeSlots=[0,1,2].filter(slot=>!s.orders.some(order=>!order.tableId&&(Number.isInteger(order.slot)?order.slot:s.orders.indexOf(order)%3)===slot));
+  const s=this.s,crowd=this.crowdInfo();
+  if(s.closing||s.gameOver||s.orders.length>=crowd.capacity)return;
+  const freeTables=tables.filter(table=>!s.orders.some(order=>order.tableId===table.id)),freeSlots=counterSeats.slice(0,crowd.counterSeatsUnlocked).filter(seat=>!s.orders.some(order=>!order.tableId&&this.counterSeat(order).slot===seat.slot)).map(seat=>seat.slot);
   if(!freeTables.length&&!freeSlots.length)return;
   const preferTable=(s.nextId%2===1&&freeTables.length)||!freeSlots.length,table=preferTable?freeTables[Math.floor(Math.random()*freeTables.length)]:null;
   const ids=Object.keys(recipes).filter(id=>this.canPrepare(id)),recipe=ids[Math.floor(Math.random()*ids.length)];
   s.orders.push({id:s.nextId++,name:names[Math.floor(Math.random()*names.length)],recipe,patience:100,tableId:table?.id??null,slot:table?null:freeSlots[0],phase:table?'awaiting-order':'preparing',arrivalRemaining:3,drinkRemaining:0,paymentMethod:Math.random()<.5?'cash':'card',due:0,tender:0,cardRemaining:0});
-  s.spawn=s.upgraded?12:16;
+  s.spawn=crowd.spawnInterval;
  }
  tick(dt){let s=this.s;if(!Number.isFinite(dt))return;dt=Math.min(.1,Math.max(0,dt));for(let d of s.deliveries){d.remaining-=dt;if(d.remaining<=0)s.reserve[d.key]+=ingredients[d.key].pack}s.deliveries=s.deliveries.filter(d=>d.remaining>0);if(!s.open)return;
   if(s.management.assistant){s.management.restockTimer+=dt;if(s.management.restockTimer>=12-1e-9){s.management.restockTimer=Math.max(0,s.management.restockTimer-12);for(const key of ingredientKeys)this.restock(key)}}
@@ -342,7 +362,9 @@ class Game{
    else if(phase==='drinking'){order.drinkRemaining=Math.max(0,(order.drinkRemaining||0)-dt);if(order.drinkRemaining<=1e-9)order.phase='payment'}
    else if(phase==='card-processing'){order.cardRemaining=Math.max(0,(order.cardRemaining||0)-dt);if(order.cardRemaining<=1e-9)this.finishPayment(order,'card')}
   }
-  this.staffTick(dt);s.spawn-=dt;if(!s.closing&&s.orders.length<7&&s.spawn<=0)this.spawnCustomer();if(s.closing&&s.orders.length===0)return this.end()}
+  this.staffTick(dt);
+  // Do not accumulate missed arrivals while all available seats are occupied.
+  s.spawn=Math.max(0,s.spawn-dt);if(!s.closing&&s.spawn<=1e-9)this.spawnCustomer();if(s.closing&&s.orders.length===0)return this.end()}
 }
-const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,isValidStock,tables,registerPosition,preparationLayout};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
+const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

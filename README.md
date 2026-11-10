@@ -53,7 +53,17 @@ Une trésorerie négative termine la partie.
 Le bouton Aide détaille les commandes et le fonctionnement.
 
 SERVICE À TABLE ET ENCAISSEMENTS
-Les clients occupent les quatre tables numérotées ou les trois places au comptoir.
+Six tabourets sont installés au comptoir, en plus des quatre tables numérotées.
+Au début, trois places au comptoir accueillent des clients : l’affluence initiale
+reste inchangée, avec au maximum sept clients présents. Les autres places
+s’ouvrent automatiquement après 20, 45 et 80 clients encaissés au total,
+pour atteindre respectivement huit, neuf et dix clients présents au maximum.
+Les arrivées restent espacées : 16 secondes au début, puis 15, 14 et 12 secondes
+selon le palier. Le plateau amélioré conserve son rythme de 12 secondes.
+Le premier client arrive seul, une seconde après l’ouverture du service.
+Tab > Service indique la fréquentation et la progression vers la prochaine place.
+Les clients s’assoient sur les tabourets, face au bar ; les places supplémentaires
+n’ajoutent aucun client au lancement d’une nouvelle partie.
 Rejoignez un client, regardez-le et appuyez sur E ou cliquez pour prendre sa
 commande. Revenez avec la boisson sur le plateau et interagissez de la même
 façon pour servir automatiquement la bonne boisson. La tablette conserve
@@ -180,6 +190,8 @@ electron checks/direct-service.cjs vérifie le service et les paiements directs,
 le comptage à la caisse et le terminal, sans ouvrir la tablette.
 electron checks/waiter-payments-ui.cjs vérifie les encaissements du serveur,
 le partage du terminal, les sauvegardes et les commandes disponibles au joueur.
+electron checks/crowd-ui.cjs vérifie les six tabourets, les paliers d’affluence,
+les interactions et la sauvegarde d’une salle de dix clients avec trois employés.
 electron checks/graphics.cjs vérifie la transparence des vitrages, leur profondeur,
 la lumière du jour et de nuit, et mesure le rendu avec dix personnages.
 electron checks/visual-preview.cjs produit les aperçus du bar, du panneau

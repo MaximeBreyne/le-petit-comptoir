@@ -16,6 +16,11 @@ const BarScene=(()=>{
   const inside=table.x<6?1:-1;
   return {x:table.x+inside*.78,z:table.z,angle:inside*Math.PI/2};
  }
+ const counterLocations=globalThis.BarEngine?.counterSeats||[4.6,6,7.4,3.2,8.8,10.2].map((x,slot)=>({slot,x,z:4.3}));
+ function counterSeat(slot){
+  const seat=counterLocations.find(seat=>seat.slot===slot);
+  return seat?{x:seat.x,z:seat.z,angle:0,seatHeight:.84}:null;
+ }
  const storageBins=[
   {key:'beer',label:'BIÈRE',pack:500,x:1,y:.37,kind:'keg',color:'#8d9993'},
   {key:'wine',label:'VIN',pack:75,x:2.25,y:.37,kind:'bottle',color:'#553b3c'},
@@ -434,10 +439,26 @@ const BarScene=(()=>{
    b(x+inward*.26,.794,z-.18,.24,.015,.07,'#867854',M.metal,{ry:signAngle});
    b(x+inward*.26,.85,z-.18,.23,.10,.018,'#203e30',M.paint,{ry:signAngle,label:'TABLE '+id,labelColor:'#f2e8c9',castShadow:false});
   }
-  for(const x of [2.8,9.2]){
-   c(x,.79,4.18,.4,.095,.4,'#785242',M.fabric,{solid:true});
-   for(const dx of [-.14,.14])for(const dz of [-.14,.14])c(x+dx,.39,4.18+dz,.029,.76,.029,'#354139',M.metal);
-   c(x,.28,4.18,.3,.025,.3,'#a78c54',M.metal);
+  // All six stools exist from the start. Progression only changes which seats
+  // guests use; the backrests face the room and leave the serving aisle clear.
+  for(const {x,z} of counterLocations){
+   c(x,.735,z,.43,.035,.43,'#4b4031',M.wood);
+   c(x,.795,z,.47,.09,.47,'#785242',M.fabric,{solid:true});
+   c(x,.764,z,.474,.009,.474,'#ad8964',M.fabric);
+   for(const dx of [-.175,.175])for(const dz of [-.175,.175]){
+    c(x+dx,.36,z+dz,.033,.72,.033,'#354139',M.metal,{solid:true,topRadius:1.2});
+    c(x+dx,.012,z+dz,.043,.024,.043,'#27302a',M.paint);
+   }
+   // The rear uprights meet the outer face, never protruding into the cushion.
+   for(const dx of [-.185,.185]){
+    c(x+dx,.94,z+.258,.026,.43,.026,'#354139',M.metal);
+    b(x+dx,.742,z+.211,.027,.025,.12,'#354139',M.metal);
+    b(x+dx,.3225,z-.265,.025,.024,.17,'#a78c54',M.metal);
+   }
+   b(x,1.045,z+.22,.44,.21,.05,'#586052',M.wood);
+   b(x,1.048,z+.191,.40,.155,.018,'#785242',M.fabric);
+   c(x,.3225,z-.35,.024,.40,.024,'#a78c54',M.metal,{rz:Math.PI/2});
+   c(x,.3225,z+.175,.023,.35,.023,'#354139',M.metal,{rz:Math.PI/2});
   }
   // Framed menu, wall art, clocks and pendant lamps.
   b(.24,2.1,4.35,.055,1.25,1.5,'#473f31',M.wood);
@@ -569,11 +590,12 @@ const BarScene=(()=>{
   }
   if(!state?.payments?.terminalCarried&&!state?.payments?.terminalWithWaiter)terminal(items);
  }
- function customer(items,{x,z,id,time,moving,departing=false,patience=100,seated=false,angle,staffKind,carrying=false,carryingTerminal=false}){
+ function customer(items,{x,z,id,time,moving,departing=false,patience=100,seated=false,seatHeight,angle,staffKind,carrying=false,carryingTerminal=false}){
   const g=geometry(items),skin=['#c4916d','#956c51','#d4b191','#b18061'][id%4];
   const shirt=staffKind?'#d1d0b8':['#555f61','#815c4b','#6b7058','#525f74','#927e68'][id%5];
   const hair=['#45352a','#302c26','#8b7750','#62564b'][id%4];
-  const turn=Number.isFinite(angle)?angle:departing?Math.PI:0,cs=Math.cos(turn),sn=Math.sin(turn),bob=!seated&&moving?Math.sin(time*11+id)*.012:Math.sin(time*1.7+id)*.006,seatOffset=seated?-.265:0;
+  const highSeat=seated&&Number.isFinite(seatHeight)&&seatHeight>.7;
+  const turn=Number.isFinite(angle)?angle:departing?Math.PI:0,cs=Math.cos(turn),sn=Math.sin(turn),bob=!seated&&moving?Math.sin(time*11+id)*.012:Math.sin(time*1.7+id)*.006,seatOffset=seated?(Number.isFinite(seatHeight)?seatHeight-.7825:-.265):0;
   const original=g.box;
   g.box=(ox,y,oz,w,h,d,c,mat=0,extra={})=>original(x+ox*cs+oz*sn,y+bob+seatOffset,z-ox*sn+oz*cs,w,h,d,c,mat,{...extra,ry:(extra.ry||0)+turn});
   g.cylinder=(...args)=>{args[8]={...args[8],round:true};return g.box(...args)};
@@ -647,7 +669,7 @@ const BarScene=(()=>{
    // A sleeve-sized round cap covers the arm's flat cylinder end at its joint.
    s(side*((carrying||carryingTerminal)&&!seated?.21:.245),1.305,0,.115,.07,.13,shirt,M.fabric);
    const stride=!seated&&moving?Math.sin(time*7.2+id+side*1.57)*.34:0;
-   const kneeZ=seated?-.35:Math.sin(stride)*.39,kneeY=seated?.81:.865-Math.cos(stride)*.39;
+   const kneeZ=seated?-.35:Math.sin(stride)*.39,kneeY=seated?(highSeat?.865:.81):.865-Math.cos(stride)*.39;
    c(side*.105,(.865+kneeY)/2,kneeZ/2,.15,Math.hypot(.865-kneeY,kneeZ),.16,'#38444a',M.fabric,{rx:seated?Math.atan2(-kneeZ,.865-kneeY):-stride,topRadius:1.12});
    s(side*.105,kneeY,kneeZ,.13,.12,.14,'#354147',M.fabric);
    const lower=stride+Math.max(0,-stride)*.8,ankleZ=seated?kneeZ:kneeZ+Math.sin(lower)*.38,ankleY=seated?.34:kneeY-Math.cos(lower)*.38;
@@ -662,6 +684,11 @@ const BarScene=(()=>{
     const shoulder={x:side*.21,y:1.31,z:0},elbow={x:side*.20,y:1.08,z:-.15},wrist={x:side*.145,y:1.05,z:-.34};
     armSegment(shoulder,elbow,.115,.13,shirt);s(elbow.x,elbow.y,elbow.z,.104,.105,.105,skin,M.skin);
     armSegment(elbow,wrist,.085,.095,skin);s(wrist.x,1.06,-.34,.09,.055,.10,skin,M.skin);
+   }else if(highSeat){
+    // Rest the hands on the thighs while sitting back from the counter.
+    const shoulder={x:side*.245,y:1.31,z:0},elbow={x:side*.245,y:1.08,z:-.09},wrist={x:side*.13,y:.92,z:-.29};
+    armSegment(shoulder,elbow,.115,.13,shirt);s(elbow.x,elbow.y,elbow.z,.104,.105,.105,skin,M.skin);
+    armSegment(elbow,wrist,.085,.095,skin);s(wrist.x,wrist.y,wrist.z,.07,.055,.10,skin,M.skin);
    }else{
     const swing=moving?-stride*.8:(patience<30?Math.sin(time*2.8)*.12:.02),elbowY=seated?1.1:1.31-Math.cos(swing)*.27,elbowZ=seated?-.19:Math.sin(swing)*.27;
     c(side*.245,(1.31+elbowY)/2,elbowZ/2,.115,Math.hypot(1.31-elbowY,elbowZ),.13,shirt,M.fabric,{rx:seated?Math.atan2(-elbowZ,1.31-elbowY):-swing});
@@ -684,5 +711,5 @@ const BarScene=(()=>{
    b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
   }
  }
- return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,counterSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

@@ -1,5 +1,6 @@
 ﻿/* Offline WebGL renderer: procedural materials, area lights, cached shadows and a label atlas. */
 class BarRenderer {
+ static maxContactPeople=13;
  constructor(canvas,boxes,{labels=[]}={}){
   this.canvas=canvas;
   this.sceneLabels=labels;
@@ -23,7 +24,7 @@ class BarRenderer {
   const fragment=`${derivatives?'#extension GL_OES_standard_derivatives : enable':''}
    precision highp float;
    varying vec3 tint;varying vec3 world;varying vec3 faceNormal;varying float surface;varying vec2 labelUV;varying float viewDepth;
-   uniform mediump vec3 camera;uniform float brightness;uniform float daylight;uniform sampler2D labels;uniform sampler2D shadowMap;uniform vec2 shadowInfo;uniform vec4 people[10];
+   uniform mediump vec3 camera;uniform float brightness;uniform float daylight;uniform sampler2D labels;uniform sampler2D shadowMap;uniform vec2 shadowInfo;uniform vec4 people[${BarRenderer.maxContactPeople}];
    ${shadowPosition}
    float hash(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
    float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -95,7 +96,7 @@ class BarRenderer {
     if(surface>10.5&&surface<11.5&&dot(n,v)<0.0)n=-n;
     float visibility=shadow();
     float contact=1.0;
-    if(world.y<.04){for(int i=0;i<10;i++){vec2 d=(world.xz-people[i].xy)/max(people[i].z,.01);contact*=1.0-people[i].w*.48*exp(-dot(d,d)*1.8);}}
+    if(world.y<.04){for(int i=0;i<${BarRenderer.maxContactPeople};i++){vec2 d=(world.xz-people[i].xy)/max(people[i].z,.01);contact*=1.0-people[i].w*.48*exp(-dot(d,d)*1.8);}}
     // Cool daylight through the frontage, balanced with warm local pendant lights.
     float inside=1.0-smoothstep(9.9,10.4,world.z);
     vec3 ambient=mix(vec3(.23,.215,.19),vec3(.35,.38,.42),daylight);
@@ -137,7 +138,7 @@ class BarRenderer {
   this.shadowAttribute=gl.getAttribLocation(this.shadowProgram,'position');
   this.staticBuffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.shadowBuffer=gl.createBuffer();this.glassBuffer=gl.createBuffer();this.glassCapacity=0;
   this.labelTexture=gl.createTexture();this.shadowTexture=gl.createTexture();this.shadowFramebuffer=gl.createFramebuffer();this.shadowDepth=gl.createRenderbuffer();
-  this.people=new Float32Array(40);this.shadowSize=0;this.shadowDirty=true;
+  this.people=new Float32Array(BarRenderer.maxContactPeople*4);this.shadowSize=0;this.shadowDirty=true;
   this.setScene(boxes);
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.lost=true;const error=document.getElementById('graphicsError');if(error)error.hidden=false;});
   canvas.addEventListener('webglcontextrestored',()=>location.reload());
@@ -336,7 +337,7 @@ class BarRenderer {
  }
  contactShadows(dynamic){
   this.people.fill(0);let person=0;
-  for(const b of dynamic){if(b.contactShadow&&person<10){this.people[person*4]=b.x;this.people[person*4+1]=b.z;this.people[person*4+2]=.43;this.people[person*4+3]=1;person++}}
+  for(const b of dynamic){if(b.contactShadow&&person<BarRenderer.maxContactPeople){this.people[person*4]=b.x;this.people[person*4+1]=b.z;this.people[person*4+2]=.43;this.people[person*4+3]=1;person++}}
  }
  render(camera,dynamic,settings,serviceTime=1020){
   if(this.lost)return;this.resize(settings);const gl=this.gl;
