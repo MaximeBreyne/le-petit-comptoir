@@ -17,6 +17,9 @@ app.whenReady().then(async()=>{
    const click=selector=>{const node=document.querySelector(selector);check(node&&!node.disabled&&!node.closest('[hidden]'),'Usable visible control '+selector);node.click()};
    const key=(code,type='keydown')=>window.dispatchEvent(new KeyboardEvent(type,{code,key:code,bubbles:true,cancelable:true}));
    const advance=seconds=>{for(let i=0;i<Math.ceil(seconds*10);i++)game.tick(.1);ui();};
+   const approach=point=>({x:point.x,z:Math.min(2.15,Math.max(1.35,point.z))});
+   const faceStation=()=>{const point=game.preparationStation(),position=approach(point);camera={...position,y:1.68,a:0,pitch:Math.atan2(point.y+.18-1.68,point.z-position.z)};ui();};
+   const gatherSelected=()=>{const layout=BarEngine.preparationLayout,position=approach(game.preparationStation());game.takeVessel(approach(layout.vessels));game.placeHeld(position);for(const ingredient of Object.keys(recipes[state.prep.recipe].ingredients).filter(k=>k!=='beer')){game.takeIngredient(ingredient,approach(layout.ingredients[ingredient]));check(state.prep.held?.key===ingredient,'Ingredient is held: '+ingredient);game.placeHeld(position);}faceStation();};
    let locked=null;Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>locked});
    canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
    document.exitPointerLock=()=>queueMicrotask(()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))});
@@ -43,20 +46,22 @@ app.whenReady().then(async()=>{
    for(const key of ['whisky','gin','tonic','cola']){check(state.stock[key]===0&&state.reserve[key]===0,'New stock starts empty');click('[data-tablet-buy="'+key+'"]');}
    advance(10.1);BarTablet.refresh(true);
    for(const key of ['whisky','gin','tonic','cola']){check(state.reserve[key]===ingredients[key].pack,'Delivery reaches reserve: '+key);click('[data-tablet-restock="'+key+'"]');check(state.stock[key]===ingredients[key].pack&&state.reserve[key]===0,'Stock transfers through the tablet: '+key);}
+   camera={...BarScene.playCamera,x:1.65,z:6.4};BarTablet.open('drinks');
+   check(document.querySelector('[data-tablet-recipe="lemonade"]').disabled,'Tablet cannot start preparation at a table');
+   document.querySelector('[data-tablet-recipe="lemonade"]').click();check(state.prep===null,'Remote recipe click has no effect');
    const served=[];
    for(const id of added){
     BarTablet.close();await flush();camera={...BarScene.playCamera};
     const order={id:state.nextId++,name:'Test',recipe:id,patience:100,tableId:null,slot:1,phase:'preparing',arrivalRemaining:0,paymentMethod:'card'};
     state.orders=[order];const before={...state.stock};
     BarTablet.open('drinks');click('[data-tablet-recipe="'+id+'"]');await flush();
-    check(state.prep?.recipe===id&&!BarTablet.isOpen(),'Recipe opens its preparation controls: '+id);
-    for(let step=0;step<10&&!state.prep.ready;step++){
-     if(game.isPour()){key(preferences.bindings.pour.code);advance(recipes[id].target/recipes[id].speed);key(preferences.bindings.pour.code,'keyup');click('[data-action="finish"]');}
-     else click('[data-action="step"]');
-    }
+    check(state.prep?.recipe===id&&!BarTablet.isOpen()&&BarInput.isLooking(),'Recipe returns to physical preparation: '+id);
+    check(JSON.stringify(state.stock)===JSON.stringify(before),'Choosing a recipe consumes no ingredients');gatherSelected();
+    key(preferences.bindings.pour.code);advance(recipes[id].target/recipes[id].speed);key(preferences.bindings.pour.code,'keyup');key('KeyE');
+    if(!state.prep.ready)key('KeyE');
     check(state.prep.ready&&state.prep.quality>=90,'All preparation steps finish with a good dose: '+id);
     for(const [key,amount]of Object.entries(recipes[id].ingredients))check(Math.abs(state.stock[key]-(before[key]-amount))<1e-8,'Ingredients consumed once: '+id+'/'+key);
-    click('[data-action="plate"]');BarTablet.open('service');click('[data-order-id="'+order.id+'"][data-tablet-order-action="serve"]');
+    key('KeyE');BarTablet.open('service');click('[data-order-id="'+order.id+'"][data-tablet-order-action="serve"]');
     check(order.phase==='drinking','New drink can be served through the tablet: '+id);
     advance(4.1);game.pickupTerminal(BarEngine.registerPosition);const cash=state.cash;game.payCard(order.id,camera);advance(3.1);
     check(state.cash===cash+recipes[id].price+1,'Payment matches the new recipe and tip: '+id);
@@ -74,7 +79,7 @@ app.whenReady().then(async()=>{
    check(state.cash===173&&state.stock.rum===37&&state.totalSold===18&&state.prep.step===5,'Legacy funds, progression, stock and current preparation are retained');
    for(const key of ['whisky','gin','tonic','cola'])check(state.stock[key]===0&&state.reserve[key]===0,'Migration grants no extra ingredients');
    for(const id of ['softDrinks','spirits','signature'])check(state.management[id]===false,'Migration grants no new license');
-   BarInput.enterCursor();click('[data-action="step"]');check(state.prep.ready&&state.prep.quality===100,'Legacy mojito finishes with the generic recipe flow');
+   faceStation();key('KeyE');check(state.prep.ready&&state.prep.quality===100,'Legacy mojito finishes with the generic recipe flow');
    BarTablet.open('reserve');check(document.querySelector('[data-tablet-buy="gin"]').disabled,'Locked supplier products are disabled after loading');
    return {licenses:3,recipes:served,stock:'paid, delivered and transferred',legacy:'progression and preparation retained',gl:0};
   })()`,true);

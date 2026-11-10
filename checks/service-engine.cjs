@@ -2,6 +2,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {Game,recipes,tables,registerPosition}=require('../dist/engine.js');
+const {staff,gather,stationPosition}=require('./preparation-fixtures.cjs');
 
 const advance=(game,seconds)=>{for(let i=0;i<Math.ceil(seconds*10);i++)game.tick(.1)};
 function session(){const game=new Game();game.open();game.s.spawn=999;return game}
@@ -110,7 +111,7 @@ test('legacy saves preserve funds and stock while old counter orders gain explic
 test('bartender reserves capacity and consumes ingredients only once across a saved job',()=>{
  let game=session();game.s.management.bartender=true;const customer=order(game,{phase:'preparing'}),stock=game.s.stock.beer;
  game.tick(.1);assert.equal(game.s.staff.bartender.orderId,customer.id);assert.equal(game.s.stock.beer,stock-50);
- game.start('coffee');assert.equal(game.s.prep.recipe,'coffee');
+ game.start('coffee',staff);assert.equal(game.s.prep.recipe,'coffee');
  advance(game,3.9);game=reload(game);const afterLoad=game.s.stock.beer;advance(game,4.2);
  assert.equal(game.s.stock.beer,afterLoad);assert.equal(game.s.staff.bartender,null);assert.equal(game.s.tray.length,1);assert.equal(game.s.tray[0].orderId,customer.id);assert.equal(game.s.tray[0].quality,92);
  advance(game,10);assert.equal(game.s.tray.length,1);assert.equal(game.s.stock.beer,afterLoad);
@@ -120,7 +121,7 @@ test('bartender respects licenses, physical stock, player preparations and full 
  const game=session();game.s.management.bartender=true;
  const customer=order(game,{phase:'preparing',recipe:'mojito'}),before={...game.s.stock};game.tick(.1);assert.equal(game.s.staff.bartender,null);assert.deepEqual(game.s.stock,before);
  customer.recipe='beer';game.s.stock.beer=0;game.tick(.1);assert.equal(game.s.staff.bartender,null);
- game.s.stock.beer=100;game.start('beer');game.tick(.1);assert.equal(game.s.staff.bartender,null);assert.equal(game.s.stock.beer,50);
+ game.s.stock.beer=100;gather(game,'beer');game.setPour(true,stationPosition(game));game.tick(.1);assert.equal(game.s.staff.bartender,null);assert.equal(game.s.stock.beer,50);
  game.discard();game.s.tray=[{recipe:'wine',quality:90},{recipe:'wine',quality:90}];game.tick(.1);assert.equal(game.s.staff.bartender,null);assert.equal(game.s.stock.beer,50);
 });
 

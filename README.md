@@ -23,7 +23,7 @@ La souris commande la caméra dès l’entrée ou la reprise de la partie.
 Maintenir Maj en se déplaçant permet de courir. Cette touche est configurable
 dans Réglages, comme les autres commandes de déplacement.
 Tab ouvre ou range la tablette de gestion. Choisir une boisson sur la tablette
-libère le curseur pour la préparer ; cliquer sur le décor reprend la caméra.
+reprend la caméra pour la préparer directement dans le décor derrière le bar.
 La tablette regroupe le service, les boissons, la caisse, les stocks, le bâtiment,
 les licences et l’équipe. Le service continue pendant son utilisation.
 Pour ouvrir le bar, approchez le panneau suspendu à la porte d’entrée et appuyez
@@ -35,30 +35,40 @@ En haut à gauche, seuls le statut et le temps de jeu restant jusqu’à minuit
 sont affichés, avec une barre d’avancement de 17 h à minuit.
 Les stocks, améliorations et l’action Nouveau bar se consultent uniquement
 dans la tablette ; Nouveau bar se trouve dans Bâtiment et demande confirmation.
-Les commandes de préparation apparaissent seulement lorsqu’une boisson est
-en préparation ou sur le plateau. Aucun panneau de mode caméra n’est affiché.
-Choisir une recette sur la tablette, suivre les étapes, maintenir pour doser,
-valider, poser sur le plateau puis rejoindre le client pour servir et encaisser.
+Les indications de préparation apparaissent uniquement derrière le comptoir.
+Choisissez une recette sur la tablette, prenez le récipient au rangement avec E,
+puis posez-le au poste indiqué. Prenez les ingrédients dans les bouteilles et
+bacs étiquetés avec E ou un clic, et apportez-les un par un au poste.
+Restez près du poste pour maintenir la touche de dosage. Regardez le verre et
+appuyez sur E pour valider, mélanger si nécessaire, puis prendre la boisson
+sur le plateau. S’éloigner arrête le versement. Une préparation ne peut pas
+être commencée ou poursuivie depuis une table. Pour l’abandonner, utilisez
+Abandonner la préparation dans Tab > Boissons.
 Les touches 1 à 4 ne sélectionnent plus les boissons.
-Les ingrédients sont prélevés au début de la préparation.
+Les ingrédients sont prélevés à la prise ; la bière au premier tirage.
+Un ingrédient tenu et une préparation en cours sont conservés dans la sauvegarde.
+Les anciennes préparations déjà payées restent utilisables sans nouveau débit.
 35 euros de charges par soir, auxquels s’ajoutent les salaires des employés recrutés.
 Une trésorerie négative termine la partie.
 Le bouton Aide détaille les commandes et le fonctionnement.
 
 SERVICE À TABLE ET ENCAISSEMENTS
 Les clients occupent les quatre tables numérotées ou les trois places au comptoir.
-Rejoignez une table et appuyez sur E : la rubrique Service permet de prendre la
-commande sur la tablette. Revenez avec la boisson sur le plateau pour la servir.
+Rejoignez un client, regardez-le et appuyez sur E ou cliquez pour prendre sa
+commande. Revenez avec la boisson sur le plateau et interagissez de la même
+façon pour servir automatiquement la bonne boisson. La tablette conserve
+la liste des commandes, mais n’est pas nécessaire pour servir ou encaisser.
 Après la dégustation, le client demande à payer en espèces ou par carte.
 
 Espèces : prenez l’argent auprès du client, revenez à la caisse derrière le bar
-et appuyez sur E. Choisissez les pièces et billets à rendre, validez le montant,
+et regardez son écran avec E. La caisse s’ouvre directement, sans tablette.
+Choisissez les pièces et billets à rendre, validez le montant,
 puis rapportez la monnaie et le ticket au client. Un montant incorrect est refusé.
 La caisse commence avec 80 euros, inclus dans les 260 euros de trésorerie initiale.
 Vous pouvez alimenter son tiroir depuis la trésorerie disponible hors caisse.
 
 Carte : prenez le terminal sans fil sur son socle près de la caisse, rejoignez
-le client et présentez-le depuis la tablette. La validation prend trois secondes.
+le client et présentez-le avec E ou un clic. La validation prend trois secondes.
 Vous gardez le terminal jusqu’à son retour sur le socle. Les recettes et la
 progression sont comptées à la confirmation du règlement, sans double paiement.
 Les commandes, encaissements en cours et tâches des employés sont sauvegardés.
@@ -153,7 +163,11 @@ la géométrie mise en cache, en plus du moteur, des sauvegardes et du build.
 electron checks/hud.cjs vérifie l’interface, la progression de la journée
 et les interactions avec le panneau d’entrée dans une fenêtre masquée.
 electron checks/licenses-ui.cjs contrôle les achats de licences, les six nouvelles
-préparations dans la tablette et le chargement d’une sauvegarde antérieure.
+recettes et le chargement d’une sauvegarde antérieure.
+electron checks/preparation-ui.cjs vérifie les dix recettes par interactions
+E/clic, les déplacements réels dans l’allée, les stocks et le refus à distance.
+electron checks/direct-service.cjs vérifie le service et les paiements directs,
+le comptage à la caisse et le terminal, sans ouvrir la tablette.
 electron checks/graphics.cjs vérifie la transparence des vitrages, leur profondeur,
 la lumière du jour et de nuit, et mesure le rendu avec dix personnages.
 electron checks/visual-preview.cjs produit les aperçus du bar, du panneau

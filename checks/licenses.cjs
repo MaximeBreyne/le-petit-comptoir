@@ -3,6 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {Game,recipes,ingredients,managementUpgrades,isValidStock,registerPosition}=require('../dist/engine.js');
 
+const {staff,gather,stationPosition}=require('./preparation-fixtures.cjs');
 const newIngredients=['whisky','gin','tonic','cola'];
 const newRecipes=['virginMojito','lemonade','whisky','ginTonic','ginFizz','cubaLibre'];
 const licenses=['cocktails','softDrinks','spirits','signature'];
@@ -76,16 +77,16 @@ test('each new recipe can be stocked, dosed, finished, served and paid exactly o
   let game=licensedGame();const recipe=recipes[id];
   for(const key of Object.keys(recipe.ingredients).filter(key=>newIngredients.includes(key)))game.buy(key);
   advance(game,10.1);for(const key of newIngredients)game.restock(key);
-  const stock=clone(game.s.stock),cash=game.s.cash;game.start(id);assert.equal(game.s.prep.recipe,id);
+  const stock=clone(game.s.stock),cash=game.s.cash;const station=gather(game,id);assert.equal(game.s.prep.recipe,id);
   for(const [key,amount]of Object.entries(recipe.ingredients))assert.equal(game.s.stock[key],stock[key]-amount);
-  game.finishMix();assert.equal(game.s.prep.ready,false);game.plate();assert.equal(game.s.tray.length,0);
-  for(let step=0;step<recipe.pourStep;step++){assert.equal(game.isPour(),false);game.step()}
+  game.finishMix(station);assert.equal(game.s.prep.ready,false);game.plate(station);assert.equal(game.s.tray.length,0);
+  assert.equal(game.preparationStatus(station).stage,'pour');
   assert.equal(game.isPour(),true);game.step();assert.equal(game.s.prep.step,recipe.pourStep,'The dose cannot be skipped');
-  game.setPour(true);advance(game,recipe.target/recipe.speed/2);const half=game.s.prep.amount;
+  game.setPour(true,station);advance(game,recipe.target/recipe.speed/2);const half=game.s.prep.amount;
   game=new Game(clone(game.s));assert.equal(game.s.prep.pouring,false);assert.equal(game.s.prep.amount,half);
-  game.setPour(true);advance(game,recipe.target/recipe.speed/2);game.finishPour();assert.equal(game.s.prep.quality,100);
-  if(Number.isInteger(recipe.finishStep)){assert.equal(game.s.prep.step,recipe.finishStep);assert.equal(game.s.prep.ready,false);game.plate();assert.equal(game.s.tray.length,0);game.finishMix()}
-  assert.equal(game.s.prep.ready,true);game.plate();assert.equal(game.s.tray.length,1);assert.equal(game.s.tray[0].recipe,id);
+  game.setPour(true,station);advance(game,recipe.target/recipe.speed/2);game.finishPour(station);assert.equal(game.s.prep.quality,100);
+  if(Number.isInteger(recipe.finishStep)){assert.equal(game.s.prep.step,recipe.finishStep);assert.equal(game.s.prep.ready,false);game.plate(station);assert.equal(game.s.tray.length,0);game.finishMix(station)}
+  assert.equal(game.s.prep.ready,true);game.plate(station);assert.equal(game.s.tray.length,1);assert.equal(game.s.tray[0].recipe,id);
   const order=addOrder(game,id),position=game.orderPosition(order);order.paymentMethod=index%2?'cash':'card';
   game.serve(order.id,position);assert.equal(game.s.cash,cash);assert.equal(game.s.sold,0);advance(game,4.1);
   if(order.paymentMethod==='cash'){
@@ -117,7 +118,7 @@ test('bartender cannot prepare any locked new recipe and paid licenses enable sa
   let game=new Game();game.s.cash=2000;game.s.totalSold=100;game.s.management.bartender=true;game.open();game.s.spawn=999;
   for(const [key,amount]of Object.entries(recipes[id].ingredients))game.s.stock[key]=amount*3;
   const order=addOrder(game,id),stock=clone(game.s.stock);game.tick(.1);
-  assert.equal(game.s.staff.bartender,null);assert.deepEqual(game.s.stock,stock);game.start(id);assert.equal(game.s.prep,null);assert.deepEqual(game.s.stock,stock);
+  assert.equal(game.s.staff.bartender,null);assert.deepEqual(game.s.stock,stock);game.start(id,staff);assert.equal(game.s.prep,null);assert.deepEqual(game.s.stock,stock);
   for(const license of licenses)game.purchaseUpgrade(license);game.tick(.1);assert.equal(game.s.staff.bartender.orderId,order.id);
   for(const [key,amount]of Object.entries(recipes[id].ingredients))assert.equal(game.s.stock[key],stock[key]-amount);
   const consumed=clone(game.s.stock);advance(game,2);game=new Game(clone(game.s));advance(game,12);
@@ -128,8 +129,8 @@ test('bartender cannot prepare any locked new recipe and paid licenses enable sa
 test('old saves retain funds, ingredients, active preparation and staff jobs without new unlocks or supplies',()=>{
  const original=new Game();original.s.cash=173;original.s.management.bartender=true;original.s.management.waiter=true;original.s.management.cocktails=true;original.open();original.s.spawn=999;
  addOrder(original,'beer');const table=addOrder(original,'coffee');table.tableId=1;table.slot=null;table.phase='awaiting-order';
- original.tick(.1);original.start('wine');original.step();original.setPour(true);original.tick(.1);
- const legacy=clone(original.s);for(const key of newIngredients){delete legacy.stock[key];delete legacy.reserve[key]}
+ original.tick(.1);gather(original,'wine');original.setPour(true,stationPosition(original));original.tick(.1);
+ const legacy=clone(original.s);for(const key of ['physical','vesselPlaced','held','added'])delete legacy.prep[key];for(const key of newIngredients){delete legacy.stock[key];delete legacy.reserve[key]}
  for(const key of ['softDrinks','spirits','signature'])delete legacy.management[key];
  const before=clone(legacy);let restored=new Game(legacy);
  assert.deepEqual(legacy,before);assert.equal(restored.s.cash,173);assert.equal(restored.s.prep.recipe,'wine');assert.equal(restored.s.prep.amount,legacy.prep.amount);assert.equal(restored.s.prep.pouring,false);

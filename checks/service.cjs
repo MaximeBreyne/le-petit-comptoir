@@ -1,5 +1,5 @@
 'use strict';
-// End-to-end tablet service and payment controls, using an isolated Electron profile.
+// Direct service, optional tablet controls and payment persistence in an isolated profile.
 const {app,BrowserWindow}=require('electron');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'comptoir-service-')));
@@ -18,8 +18,12 @@ app.whenReady().then(async()=>{
    const action=(kind,id)=>'#tabletModal [data-tablet-order-action="'+kind+'"][data-order-id="'+id+'"]';
    const key=(code,type='keydown')=>window.dispatchEvent(new KeyboardEvent(type,{code,key:code,bubbles:true,cancelable:true}));
    const tick=seconds=>{for(let i=0;i<Math.ceil(seconds*10);i++)game.tick(.1);state=game.s;ui();BarTablet.refresh(true)};
-   const atTable=id=>{const table=BarEngine.tables.find(table=>table.id===id);camera={...camera,x:table.x+(table.x<6?1.25:-1.25),z:table.z};};
-   const atRegister=()=>{camera={...camera,...BarEngine.registerPosition};};
+   const aimAt=point=>{const dx=point.x-camera.x,dy=point.y-camera.y,dz=point.z-camera.z;camera.a=Math.atan2(dx,dz);camera.pitch=Math.atan2(dy,Math.hypot(dx,dz));};
+   const atTable=id=>{const table=BarEngine.tables.find(table=>table.id===id);camera={...camera,x:table.x+(table.x<6?1.25:-1.25),y:1.68,z:table.z};aimAt({...BarScene.tableSeat(id),y:1.25});customerVisuals.clear();};
+   const atRegister=()=>{camera={...camera,x:2.65,y:1.68,z:1.85};aimAt({x:2.65,y:1.59,z:2.94});};
+   const atTerminal=()=>{camera={...camera,x:3.25,y:1.68,z:1.85};aimAt({x:3.25,y:1.2,z:2.65});};
+   const atPreparationPoint=(point,height=.18)=>{camera={...camera,x:point.x,y:1.68,z:point.z<1?1.65:point.z-.65};aimAt({...point,y:point.y+height});};
+   const closeRegister=async()=>{click('#close');for(let attempt=0;attempt<30&&!BarInput.isLooking();attempt++)await flush();check(BarInput.isLooking(),'Closing register resumes the camera');};
    const fixture=(id,tableId,recipe,paymentMethod,phase='awaiting-order')=>({id,name:'Client '+id,tableId,slot:null,recipe,paymentMethod,phase,patience:100,arrivalRemaining:0,drinkRemaining:0,due:0,tender:0,cardRemaining:0});
    let locked=null;Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>locked});
    canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
@@ -32,22 +36,25 @@ app.whenReady().then(async()=>{
    check(document.querySelector(action('take',1)).disabled,'Taking a table order remotely is disabled');
    check(!document.querySelector('#tabletModal [data-service-order="1"]').textContent.includes(recipes.beer.name),'Unknown table recipe stays hidden');
    BarTablet.close();await flush();atTable(1);key('KeyE');await flush();
-   check(BarTablet.isOpen()&&BarTablet.getTab()==='service','E at a customer opens Service');
-   click(action('take',1));check(state.orders[0].phase==='preparing','Tablet takes the order');
+   check(!BarTablet.isOpen()&&state.orders[0].phase==='preparing','E takes a customer order without opening the tablet');
+   BarTablet.open('service',1);
    check(document.querySelector('#tabletModal [data-service-order="1"]').textContent.includes(recipes.beer.name),'Taken order reveals its drink');
-   click(action('prepare',1));check(!BarTablet.isOpen()&&state.prep?.recipe==='beer','Order can start preparation');
-   click('#prep [data-action="step"]');key('Space');tick(3.5);key('Space','keyup');ui();
-   click('#prep [data-action="finish"]');click('#prep [data-action="plate"]');check(state.tray.length===1,'Prepared drink reaches the tray');
+   check(document.querySelector(action('prepare',1)).disabled,'Preparation cannot start at a table');
+   camera={...BarScene.playCamera};BarTablet.refresh(true);click(action('prepare',1));await flush();check(!BarTablet.isOpen()&&state.prep?.recipe==='beer','Order preparation starts behind the bar');
+   atPreparationPoint(BarEngine.preparationLayout.vessels,.12);key('KeyE');check(state.prep.held?.kind==='vessel','Pinte is physically picked up');
+   atPreparationPoint(BarEngine.preparationLayout.stations.beer);key('KeyE');check(state.prep.vesselPlaced,'Pinte is placed beneath the tap');
+   key('Space');tick(3.5);key('Space','keyup');ui();key('KeyE');key('KeyE');check(state.tray.length===1,'Prepared drink reaches the tray through station interactions');
    camera={...camera,x:6,z:1.55};BarTablet.open('service',1);
    check(document.querySelector(action('serve',1)).disabled,'Remote table delivery is disabled');
    const initialCash=state.cash;game.serve(1,camera);check(state.orders[0].phase==='preparing'&&state.tray.length===1,'Engine also rejects remote delivery');
-   atTable(1);BarTablet.refresh(true);click(action('serve',1));
+   BarTablet.close();await flush();atTable(1);canvas.click();
    check(state.orders[0].phase==='drinking'&&state.cash===initialCash&&state.sold===0,'Serving does not collect payment');
    tick(8);check(state.orders[0].phase==='payment','Customer requests payment after drinking');
-   click(action('collect',1));check(state.orders[0].phase==='cash-collected','Cash collected at the table');
-   click(action('register',1));check(BarTablet.getTab()==='register'&&document.querySelector('[data-change-input="1"]').disabled,'Register consult is read-only away from it');
+   key('KeyE');check(state.orders[0].phase==='cash-collected'&&!BarTablet.isOpen(),'Cash collected directly at the table');
+   BarTablet.open('register',1);check(BarTablet.getTab()==='register'&&document.querySelector('[data-change-input="1"]').disabled,'Optional register consult is read-only away from it');
    BarTablet.close();await flush();atRegister();key('KeyE');await flush();
-   check(BarTablet.getTab()==='register','E at the register opens Caisse');
+   check(BarService.isRegisterOpen()&&!BarTablet.isOpen(),'E at the register opens the physical cash drawer');
+   await closeRegister();BarTablet.open('register',1);
    const input=document.querySelector('[data-change-input="1"]'),tillBefore=state.payments.till;
    const due=state.orders[0].due,change=Math.round((state.orders[0].tender-due)*100)/100;
    check(change===4,'Fixture needs four euros of change');
@@ -59,7 +66,7 @@ app.whenReady().then(async()=>{
    click('[data-change-confirm="1"]');check(state.orders[0].phase==='change-ready'&&state.cash===initialCash,'Preparing change awaits handover before booking revenue');
    const preparedTill=state.payments.till;save(true);GameMenu.returnHome();GameMenu.continueGame();await flush();
    check(state.orders[0].phase==='change-ready'&&state.payments.till===preparedTill&&state.cash===initialCash,'Continue preserves pending cash and drawer money');
-   atTable(1);key('KeyE');await flush();click(action('change',1));
+   atTable(1);key('KeyE');await flush();check(!BarTablet.isOpen(),'Change is handed over directly');
    check(state.orders.length===0&&state.sold===1&&state.cash===initialCash+due,'Cash handover records exactly one sale');
    game.completeCash(1,camera);check(state.cash===initialCash+due&&state.payments.receipts.length===1,'Cash receipt cannot be paid twice');
 
@@ -67,21 +74,21 @@ app.whenReady().then(async()=>{
    atTable(3);BarTablet.open('service',2);click(action('serve',2));tick(8);
    check(document.querySelector(action('card',2)).disabled,'A card payment requires the wireless terminal');
    const beforeCard=state.cash;game.payCard(2,camera);check(state.orders[0].phase==='payment'&&state.cash===beforeCard,'Missing terminal blocks payment in engine too');
-   BarTablet.close();await flush();atRegister();key('KeyE');await flush();click('[data-tablet-action="terminal-pickup"]');
+   BarTablet.close();await flush();atTerminal();key('KeyE');
    check(state.payments.terminalCarried,'Terminal picked up at register');
    BarTablet.open('service',2);check(document.querySelector(action('card',2)).disabled,'Terminal cannot charge a distant table');
    game.payCard(2,camera);check(state.orders[0].phase==='payment','Card engine rejects remote use');
-   BarTablet.close();await flush();atTable(3);key('KeyE');await flush();click(action('card',2));
+   BarTablet.close();await flush();atTable(3);key('KeyE');check(!BarTablet.isOpen(),'Terminal is presented directly');
    check(state.orders[0].phase==='card-processing'&&state.cash===beforeCard,'Card starts asynchronous authorization');
    game.payCard(2,camera);tick(3);check(state.orders.length===0&&state.cash===beforeCard+7&&state.sold===2,'Card authorization records exactly one sale');
    tick(3);check(state.cash===beforeCard+7&&state.payments.receipts.length===2,'Repeated ticks do not duplicate a payment');
-   BarTablet.close();await flush();atRegister();key('KeyE');await flush();click('[data-tablet-action="terminal-return"]');
+   atTerminal();key('KeyE');
    check(!state.payments.terminalCarried,'Terminal returned to its counter dock');
-   const treasury=state.cash,till=state.payments.till;document.querySelector('#tabletFundAmount').value='3';document.querySelector('#tabletFundAmount').dispatchEvent(new Event('input',{bubbles:true}));click('[data-tablet-action="fund-till"]');
+   atRegister();key('KeyE');const treasury=state.cash,till=state.payments.till;document.querySelector('#directFundAmount').value='3';document.querySelector('#directFundAmount').dispatchEvent(new Event('input',{bubbles:true}));click('[data-direct-fund]');
    check(state.cash===treasury&&state.payments.till===till+3,'Register funding moves existing treasury only');
    const cashRevenue=state.payments.cashRevenue,cardRevenue=state.payments.cardRevenue;
 
-   state.totalSold=0;state.cash=2000;BarTablet.open('team');
+   await closeRegister();state.totalSold=0;state.cash=2000;BarTablet.open('team');
    check(document.querySelector('[data-tablet-upgrade="bartender"]').disabled&&document.querySelector('[data-tablet-upgrade="waiter"]').disabled,'Both employees start locked by progression');
    state.totalSold=32;BarTablet.refresh(true);click('[data-tablet-upgrade="bartender"]');click('[data-tablet-upgrade="waiter"]');
    check(state.management.bartender&&state.management.waiter&&state.cash===1320,'Employees are recruited and paid through the tablet');

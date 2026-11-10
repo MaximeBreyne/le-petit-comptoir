@@ -33,9 +33,10 @@ const BarScene=(()=>{
  }
  const inStockroom=position=>!!position&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
  function prepStation(recipe){
-  if(recipe==='coffee')return {x:8.43,y:1.152,z:2.47,stream:{x:8.43,y:1.316,z:2.47,h:.072}};
-  if(recipe==='beer')return {x:4.15,y:1.133,z:2.72,stream:{x:4.15,y:1.53,z:2.72,h:.18}};
-  return {x:6.5,y:1.133,z:3.05,stream:{x:6.5,y:1.51,z:3.05,h:.24}};
+  const key=recipe==='beer'?'beer':recipe==='coffee'?'coffee':'cocktails';
+  const point=globalThis.BarEngine?.preparationLayout?.stations[key]||({beer:{x:4.15,y:1.133,z:2.72},coffee:{x:8.43,y:1.152,z:2.47},cocktails:{x:6.5,y:1.133,z:3.05}})[key];
+  const stream=key==='beer'?{y:1.53,h:.18}:key==='coffee'?{y:1.316,h:.072}:{y:1.51,h:.24};
+  return {...point,stream:{x:point.x,z:point.z,...stream}};
  }
  function geometry(target){
   const box=(x,y,z,w,h,d,c,mat=0,extra={})=>{const p={x,y,z,w,h,d,c,mat,solid:false,...extra};target.push(p);return p};
@@ -128,6 +129,91 @@ const BarScene=(()=>{
    }
   }
  }
+ const preparationLabels={wine:'VIN ROUGE',rum:'RHUM',whisky:'WHISKY',gin:'GIN',sugar:'SIROP',soda:'EAU PÉTILLANTE',tonic:'TONIC',cola:'COLA',lime:'CITRONS',mint:'MENTHE',ice:'GLAÇONS',coffee:'CAFÉ'};
+ const preparationColors={wine:'#593c40',rum:'#8b6d3b',whisky:'#916037',gin:'#538476',sugar:'#b2a169',soda:'#739ca0',tonic:'#a1b692',cola:'#624132'};
+ function preparationFixtures(items){
+  const layout=globalThis.BarEngine?.preparationLayout;if(!layout)return;
+  const g=geometry(items),{box:b,cylinder:c}=g;
+  for(const [key,point]of Object.entries(layout.ingredients)){
+   if(point.fixed)continue;
+   const {x,y,z}=point,front=z>2;
+   if(front){
+    b(x,y+.008,z,.36,.016,.29,'#73847b',M.metal);
+    for(const dx of [-.172,.172])b(x+dx,y+.064,z,.016,.112,.29,'#9ba89d',M.metal);
+    for(const dz of [-.137,.137])b(x,y+.064,z+dz,.36,.112,.016,'#9ba89d',M.metal);
+    b(x,y+.065,z-.148,.30,.09,.006,'#eee8d5',M.paint,{label:preparationLabels[key],labelFace:'front',labelColor:'#203c2c',labelPixels:256,castShadow:false});
+   }else{
+    b(x,y-.007,z,.39,.014,.25,'#5c6c61',M.metal);
+    b(x,y-.047,1.022,.40,.09,.014,'#eee8d5',M.paint,{label:preparationLabels[key],labelFace:'back',labelColor:'#203c2c',labelPixels:256,castShadow:false});
+   }
+  }
+  const v=layout.vessels;
+  for(const dx of [-.50,.28])b(v.x+dx,1.055,v.z,.045,.09,.27,'#53665b',M.metal);
+  b(v.x,v.y-.025,v.z,1.22,.05,.35,'#64766a',M.metal);
+  for(const dz of [-.165,.165])b(v.x,v.y+.018,v.z+dz,1.22,.035,.016,'#acb8aa',M.metal);
+  b(v.x,v.y-.018,1.04,.85,.095,.012,'#eee8d5',M.paint,{label:'VERRERIE',labelFace:'back',labelColor:'#203c2c',labelPixels:256,castShadow:false});
+  for(const [index,recipe]of ['beer','wine','coffee','mojito','whisky','ginFizz'].entries())glass(g,recipe,v.x+(index-2.5)*.19,v.y,v.z,0);
+ }
+ function preparationItem(g,key,x,y,z,scale=1){
+  if(Object.hasOwn(preparationColors,key)){
+   bottle(g,x,y,z,preparationColors[key],scale,'');
+   g.box(x,y+.16*scale,z+.054*scale,.082*scale,.11*scale,.004,'#ded8bd',M.paint,{castShadow:false});
+   return;
+  }
+  if(key==='lime'){
+   g.sphere(x,y+.04*scale,z,.10*scale,.08*scale,.085*scale,'#79923d',M.paint);
+   g.cylinder(x,y+.079*scale,z,.012*scale,.006*scale,.012*scale,'#445e2a',M.paint);
+  }else if(key==='mint'){
+   for(let i=0;i<4;i++){
+    const a=i*1.8,dx=Math.sin(a)*.035*scale,dz=Math.cos(a)*.035*scale;
+    g.cylinder(x+dx*.4,y+.062*scale,z+dz*.4,.004*scale,.12*scale,.004*scale,'#647d35',M.paint,{rz:.2*Math.sin(a)});
+    g.sphere(x+dx,y+(.06+i*.018)*scale,z+dz,.075*scale,.012*scale,.037*scale,i%2?'#49764b':'#739548',M.paint,{ry:a,rz:.3});
+   }
+  }else if(key==='ice'){
+   for(const [i,dx,dz]of [[0,-.035,.014],[1,.035,-.014],[2,.004,.040]]){
+    g.box(x+dx*scale,y+(.025+i*.008)*scale,z+dz*scale,.045*scale,.044*scale,.046*scale,'#cfdfd8',M.clearGlass,{ry:i*.8,castShadow:false});
+    g.box(x+dx*scale,y+(.025+i*.008)*scale,z+dz*scale,.021*scale,.025*scale,.023*scale,'#e1e7df',M.paint,{ry:i*.8,castShadow:false});
+   }
+  }else if(key==='coffee'){
+   g.cylinder(x,y+.026*scale,z,.09*scale,.04*scale,.09*scale,'#aab5a9',M.metal);
+   g.cylinder(x,y+.048*scale,z,.077*scale,.005*scale,.077*scale,'#4b3426',M.paint);
+   g.box(x,y+.023*scale,z+.10*scale,.025*scale,.022*scale,.15*scale,'#38433c',M.paint);
+  }
+ }
+ function preparationVisuals(items,state,camera){
+  const layout=globalThis.BarEngine?.preparationLayout;if(!layout)return;
+  const g=geometry(items),p=state?.prep,stock=state?.stock||{};
+  for(const [key,point]of Object.entries(layout.ingredients)){
+   if(point.fixed||!(stock[key]>0))continue;
+   const {x,y,z}=point;
+   if(Object.hasOwn(preparationColors,key)){
+    if(p?.held?.key!==key)preparationItem(g,key,x,y,z);
+   }else if(key==='coffee'){
+    g.box(x,y+.15,z,.24,.30,.18,'#806647',M.fabric);
+    g.box(x,y+.15,z+.094,.16,.15,.006,'#d9d1b2',M.paint,{castShadow:false});
+    g.box(x,y+.305,z,.22,.025,.15,'#a89770',M.fabric);
+   }else{
+    const count=Math.min(3,Math.ceil(stock[key]/3));
+    for(let i=0;i<count;i++)preparationItem(g,key,x+(i-1)*.10,y+.018,z+(i%2?-.04:.025),key==='mint'?.75:.9);
+   }
+  }
+  // Prepared fruit and herbs remain beside the vessel until the drink is mixed.
+  if(p?.physical&&p.vesselPlaced&&!p.ready&&p.amount===0){
+   const point=prepStation(p.recipe);
+   for(const [index,key]of ['lime','mint','ice'].filter(key=>p.added?.[key]).entries())preparationItem(g,key,point.x-.18,point.y,point.z+(index-1)*.10,.65);
+  }
+  if(!camera||!p?.held)return;
+  const cp=Math.cos(camera.pitch||0),sp=Math.sin(camera.pitch||0),forward=.58*cp+.40*sp,side=state.payments?.terminalCarried?-.28:.28;
+  const origin={x:camera.x+Math.sin(camera.a)*forward+Math.cos(camera.a)*side,y:camera.y+.58*sp-.40*cp,z:camera.z+Math.cos(camera.a)*forward-Math.sin(camera.a)*side};
+  const local=[],hand=geometry(local);
+  if(p.held.kind==='vessel')glass(hand,p.recipe,0,0,0,0);
+  else preparationItem(hand,p.held.key,0,0,0,.73);
+  hand.sphere(.045,.03,-.005,.055,.085,.085,'#c4916d',M.skin);
+  hand.sphere(.005,-.02,.025,.09,.05,.10,'#c4916d',M.skin);
+  hand.cylinder(.025,-.10,.045,.095,.18,.105,'#344e43',M.fabric,{rx:-.25});
+  const angle=camera.a+Math.PI,cs=Math.cos(angle),sn=Math.sin(angle);
+  for(const item of local)items.push({...item,x:origin.x+item.x*cs+item.z*sn,y:origin.y+item.y,z:origin.z-item.x*sn+item.z*cs,ry:(item.ry||0)+angle,castShadow:false});
+ }
  function create(){
   const items=[],g=geometry(items),{box:b,cylinder:c,sphere:s}=g;
   const solid={solid:true},noShadow={castShadow:false};
@@ -192,10 +278,16 @@ const BarScene=(()=>{
    b(x,2.77,9.94,4.02,.07,.12,'#283c3b',M.metal,noShadow);
    b(x,1.75,9.94,.05,2.0,.12,'#283c3b',M.metal,noShadow);
    b(x,2.28,9.94,4,.045,.12,'#283c3b',M.metal,noShadow);
-   b(x,1.50,9.99,3.92,1.48,.009,'#c0d1cf',M.clearGlass,noShadow);
-   b(x,2.52,9.99,3.92,.42,.009,'#c0d1cf',M.clearGlass,noShadow);
+   // Glazing overlaps its rebates so daylight cannot leak through frame seams.
+   b(x,1.515,9.99,4.02,1.53,.009,'#c0d1cf',M.clearGlass,noShadow);
+   b(x,2.525,9.99,4.02,.46,.009,'#c0d1cf',M.clearGlass,noShadow);
   }
+  // The 2.9 m double door sits inside the 3.32 m opening between the shopfront
+  // posts. Full-depth jambs and a lintel close that gap, outside the door path.
+  for(const x of [4.44,7.56])b(x,1.41,9.96,.23,2.82,.20,'#273a38',M.metal,{...solid,...noShadow});
+  b(6,2.825,9.96,3.5,.10,.20,'#273a38',M.metal,noShadow);
   b(6,1.41,10.02,2.9,2.82,.018,'#b7cfca',M.clearGlass,{...solid,...noShadow});
+  for(const x of [4.56,7.44])b(x,1.41,9.95,.055,2.82,.10,'#263a36',M.metal,noShadow);
   b(6,1.41,9.95,.07,2.82,.1,'#263a36',M.metal,noShadow);
   b(6,.15,9.91,2.9,.3,.1,'#293b34',M.wood);
   for(const x of [5.84,6.16])c(x,1.18,9.82,.026,.38,.026,'#b79d62',M.metal);
@@ -224,14 +316,16 @@ const BarScene=(()=>{
    b(x,2.0,.23,2.74,1.95,.12,'#25342f',M.wood);
    for(const dx of [-1.4,1.4])b(x+dx,1.99,.43,.075,2.0,.5,'#65563e',M.wood);
    for(const y of [1.12,1.78,2.43]){
-    b(x,y,.52,2.83,.055,.67,'#74604a',M.wood);
+    // The low shelf is recessed: usable bottles sit in front on the worktop.
+    b(x,y,y===1.12?.42:.52,2.83,.055,y===1.12?.45:.67,'#74604a',M.wood);
     b(x,y-.037,.72,2.65,.014,.035,'#ddc38c',M.light,noShadow);
-    for(let j=0;j<8;j++){
+    for(let j=0;y>1.12&&j<8;j++){
      const col=['#3f5640','#614b2c','#3b4f46','#653e36'][j%4];
      bottle(g,x-1.16+j*.33,y+.03,.56,col,.84+(j%3)*.08,['MAISON','RESERVE','VIGNE','AMBRE'][j%4]);
     }
    }
   }
+  preparationFixtures(items);
   b(6,3.02,.82,5.15,.34,.06,'#293a33',M.wood,{label:'LE PETIT COMPTOIR',labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f0dfb9',castShadow:false});
   // A narrow service counter with timber slats and brass foot rail.
   b(6,.5,3.02,8.8,1,.9,'#3f3329',M.wood,solid);
@@ -282,17 +376,12 @@ const BarScene=(()=>{
   c(9.76,1.65,2.93,.28,.3,.28,'#58412e',M.glass,{topRadius:.85});
   c(9.76,1.8175,2.93,.3,.035,.3,'#252e29');
   // Preparation utensils, cutting board, produce and register.
-  b(6.5,1.115,2.79,.69,.035,.4,'#ac9261',M.wood);
-  for(let j=0;j<2;j++)s(6.64+j*.10,1.176,2.81+j*.07,.09,.075,.09,'#71813c',M.paint,{ry:j*.8});
-  c(6.44,1.143,2.83,.075,.016,.075,'#638036',M.paint);
-  c(6.44,1.152,2.83,.061,.003,.061,'#d4d48a',M.paint);
-  for(let j=0;j<6;j++){const a=j*Math.PI/3;b(6.44+Math.sin(a)*.012,1.155,2.83+Math.cos(a)*.012,.001,.002,.027,'#ece4b0',M.paint,{ry:a,castShadow:false});}
-  b(6.32,1.14,2.68,.19,.008,.034,'#bec4b9',M.metal,{ry:.15});
-  b(6.16,1.143,2.704,.12,.018,.035,'#4c4536',M.wood,{ry:.15});
+  b(6.52,1.115,2.94,.54,.035,.70,'#ac9261',M.wood);
+  b(6.52,1.14,2.68,.19,.008,.034,'#bec4b9',M.metal,{ry:.15});
+  b(6.36,1.143,2.704,.12,.018,.035,'#4c4536',M.wood,{ry:.15});
   b(7.96,1.115,2.61,.20,.018,.30,'#b6b69c',M.fabric,{ry:-.12});
   c(7.2,1.22,3.02,.18,.25,.18,'#aeb7aa',M.metal,{topRadius:.8});
   c(7.47,1.19,3.02,.14,.18,.14,'#abb3a8',M.metal);
-  bottle(g,7.75,1.11,3.02,'#65724c',.75,'SIROP');
   // Cash drawer and till face the staff aisle (-Z), with the display tilted
   // upward toward the barman. The room sees the monitor's closed back.
   b(2.65,1.17,2.94,.68,.15,.53,'#26332f',M.metal);
@@ -528,5 +617,5 @@ const BarScene=(()=>{
    b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
   }
  }
- return {create,geometry,bottle,glass,customer,storageVisuals,registerVisuals,terminal,tableSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,tableSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

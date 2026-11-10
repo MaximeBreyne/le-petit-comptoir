@@ -58,7 +58,8 @@ app.whenReady().then(async()=>{
    game.s=new Game().s;state=game.s;ui();render();
    BarTablet.open('service');click('#tabletServiceToggle');check(state.open&&status().code==='open','Service can also be opened from the tablet Service page');
    check($('tabletServiceToggle').textContent===$('tabletDrinksServiceToggle').textContent,'Service and Drinks controls agree after opening');
-   click('[data-tablet-tab="drinks"]');click('[data-tablet-recipe="beer"]');await flush();
+   click('[data-tablet-tab="drinks"]');check(document.querySelector('[data-tablet-recipe="beer"]').disabled,'Preparation is disabled near the entrance');
+   camera={...BarScene.playCamera};BarTablet.refresh(true);click('[data-tablet-recipe="beer"]');await flush();
    check(state.prep?.recipe==='beer'&&!$('workbench').hidden,'Preparation controls appear only when needed');
    BarTablet.open('service');click('#tabletServiceToggle');
    check(state.closing&&state.prep?.recipe==='beer'&&$('tabletServiceToggle').disabled&&$('tabletDrinksServiceToggle').disabled,'Last round remains available during preparation and disables both service toggles');

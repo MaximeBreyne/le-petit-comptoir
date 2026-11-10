@@ -60,7 +60,7 @@ app.whenReady().then(async()=>{
    check(!document.querySelector('[data-menu-action="continue"]').disabled,'Closing service save remains loadable after midnight');
    click('continue');check(state.closing&&state.time===closingTime&&state.orders[0].name==='Lucie','Continue restores the closing service');
    game.s=new Game().s;state=game.s;ui();
-   state.cash=173;game.open();game.start('beer');game.step();game.setPour(true);keys.KeyW=true;
+   state.cash=173;game.open();camera={...BarScene.playCamera};game.start('beer',camera);game.takeVessel({x:7,z:1.35});camera={...BarScene.playCamera,x:4.15,z:2.15};game.placeHeld(camera);game.setPour(true,camera);check(state.prep.pouring&&state.stock.beer===950,'The physical tap is pouring before pause');keys.KeyW=true;
    esc();check(GameMenu.getMode()==='pause'&&paused,'Escape opens pause');
    check(!state.prep.pouring&&Object.keys(keys).length===0,'Pause stops pouring and held movement');
    const clock=state.time;frame(performance.now()+100);check(state.time===clock,'Pause stops simulation clock');

@@ -34,10 +34,10 @@ onkeydown=e=>{
  if(editing)return;
  if(e.code==='KeyE'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
   e.preventDefault();if(e.repeat)return;
-  if(!useInteraction())toast('Approchez le panneau d’entrée, une table, la caisse ou la réserve, puis appuyez sur E.');
+  if(!useInteraction())toast('Approchez-vous et regardez le client, l’ingrédient ou le poste à utiliser.');
   return;
  }
- if(e.code===b.pour.code&&game.isPour()){e.preventDefault();if(!paused)game.setPour(true);return}
+ if(e.code===b.pour.code&&game.isPour()){e.preventDefault();if(!paused){const message=game.setPour(true,camera);if(message&&!e.repeat)toast(message)}return}
  if(BarInput.isCursorMode())return;
  if(Object.values(b).some(v=>v.code===e.code)||(b.sprint.code==='ShiftLeft'&&e.code==='ShiftRight')){e.preventDefault();keys[e.code]=true}
 };
@@ -45,10 +45,10 @@ onkeyup=e=>{keys[e.code]=false;if(e.code===preferences.bindings.pour.code)game.s
 onblur=()=>{keys={};game.setPour(false);audio.setState(false,false);if(GameMenu.getMode()==='play'){save(true);GameMenu.pause()}};
 canvas.onclick=()=>{
  if(paused||menusOpen()||BarTablet.isOpen())return;
- if(BarInput.isLooking()&&BarVenue.aimedAtSign(camera))useInteraction({action:'service'});
+ if(BarInput.isLooking())useInteraction();
  else if(!BarInput.isLooking())BarInput.enterLook();
 };
-$('modal').addEventListener('close',()=>{if(GameMenu.getMode()==='play'&&!paused&&!BarInput.isLooking())BarInput.enterCursor();else BarInput.refresh()});
+$('modal').addEventListener('close',()=>{if(GameMenu.getMode()==='play'&&!paused&&!BarInput.isLooking())BarInput.enterLook();else BarInput.refresh()});
 document.addEventListener('mousemove',e=>{if(document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused&&!menusOpen()&&!BarTablet.isOpen()){camera.a+=e.movementX*.0025*preferences.sensitivity;camera.pitch=Math.max(-1.15,Math.min(1.15,camera.pitch-e.movementY*.0025*preferences.sensitivity*(preferences.invertY?-1:1)))}});
 function movement(dt){if(paused||menusOpen()||BarTablet.isOpen()||BarInput.isCursorMode())return;const b=preferences.bindings;if(keys[b.turnLeft.code])camera.a-=dt*1.8;if(keys[b.turnRight.code])camera.a+=dt*1.8;let forward=(keys[b.forward.code]?1:0)-(keys[b.back.code]?1:0),side=(keys[b.right.code]?1:0)-(keys[b.left.code]?1:0);const length=Math.hypot(forward,side)||1;forward/=length;side/=length;
  const running=keys[b.sprint.code]||(b.sprint.code==='ShiftLeft'&&keys.ShiftRight),speed=running?4.6:2.5;
