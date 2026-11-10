@@ -28,6 +28,8 @@ app.whenReady().then(async()=>{
    const flush=()=>new Promise(resolve=>setTimeout(resolve,30));
    const key=(code,value=code,type='keydown',repeat=false)=>window.dispatchEvent(new KeyboardEvent(type,{code,key:value,bubbles:true,cancelable:true,repeat}));
    const click=selector=>{const node=document.querySelector(selector);check(node&&!node.disabled,'Usable button: '+selector);node.click()};
+   const aimAt=point=>{const dx=point.x-camera.x,dy=point.y-camera.y,dz=point.z-camera.z;camera.a=Math.atan2(dx,dz);camera.pitch=Math.atan2(dy,Math.hypot(dx,dz))};
+   const atVessels=()=>{camera={x:7,y:1.68,z:1.35,a:Math.PI,pitch:0};aimAt({...BarEngine.preparationLayout.vessels,y:1.27})};
    check(window.BarInput,'Interaction controller is loaded');
    // Control the OS callback timing, including a grant arriving after TAB.
    let locked=null,requests=0,exits=0,autoGrant=true,rejectNext=false,delayRelease=false,pending=[],releases=[];
@@ -48,7 +50,7 @@ app.whenReady().then(async()=>{
 
    key('Tab','Tab');await flush();
    check(!locked&&BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play','TAB opens the tablet without entering pause');
-   click('[data-tablet-tab="drinks"]');click('[data-tablet-page="drinks"] [data-tablet-action="service"]');check(state.open,'Open bar is usable in the tablet');
+   click('[data-tablet-tab="service"]');click('[data-tablet-page="service"] [data-tablet-action="service"]');check(state.open,'Open bar is usable in the tablet');
    state.spawn=999;const clock=state.time;last=performance.now()-30;frame(performance.now());check(state.time>clock,'Service time continues in cursor mode');
    const stillAngle=camera.a;document.dispatchEvent(new MouseEvent('mousemove',{movementX:40,movementY:20}));check(camera.a===stillAngle,'Cursor motion does not rotate the camera');
    const position={x:camera.x,z:camera.z};key(preferences.bindings.forward.code,'z');movement(.1);key(preferences.bindings.forward.code,'z','keyup');check(camera.x===position.x&&camera.z===position.z,'Cursor typing does not move the player');
@@ -63,22 +65,22 @@ app.whenReady().then(async()=>{
    const choices=['beer','wine','coffee','mojito'];
    for(const recipe of choices){
     game.s=new Game().s;state=game.s;state.management.cocktails=true;game.open();state.spawn=999;ui();
-    BarInput.enterLook();await flush();key('Tab','Tab');await flush();click('[data-tablet-recipe="'+recipe+'"]');await flush();
-    check(state.prep?.recipe===recipe,'Tablet selects recipe '+recipe);
+    atVessels();BarInput.enterLook();await flush();key('KeyE','e');await flush();click('[data-vessel-recipe="'+recipe+'"]');await flush();
+    check(state.prep?.recipe===recipe&&state.prep.held?.kind==='vessel','Physical rack selects and takes the glass for '+recipe);
     check(BarInput.isLooking()&&locked===canvas&&!paused&&GameMenu.getMode()==='play','Recipe selection returns directly to the camera');
-    check(game.preparationStatus(camera).stage==='vessel'&&!document.querySelector('[data-action="step"]'),'Preparation asks for a physical vessel without an Add button');
+    check(game.preparationStatus(camera).stage==='place-vessel'&&!document.querySelector('[data-action="step"]'),'Chosen glass is held and must be placed physically');
    }
    game.s=new Game().s;state=game.s;game.open();ui();
    for(let index=1;index<=4;index++){key('Digit'+index,String(index));key('Numpad'+index,String(index));check(state.prep===null,'Number shortcuts no longer select a recipe')}
 
    game.s=new Game().s;state=game.s;game.open();state.spawn=999;
    camera={...BarScene.playCamera};state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:90,tableId:null,slot:1,phase:'preparing',arrivalRemaining:0,paymentMethod:'card'}];state.nextId=2;ui();
-   key('Tab','Tab');await flush();click('[data-tablet-recipe="beer"]');await flush();game.takeVessel({x:7,z:1.35});camera={x:4.15,y:1.68,z:2.15,a:0,pitch:Math.atan2(1.313-1.68,.57)};game.placeHeld(camera);ui();
+   atVessels();key('KeyE','e');await flush();click('[data-vessel-recipe="beer"]');await flush();camera={x:4.15,y:1.68,z:2.15,a:0,pitch:Math.atan2(1.313-1.68,.57)};key('KeyE','e');check(state.prep.vesselPlaced,'E places the selected glass beneath its tap');ui();
    key(preferences.bindings.pour.code,' ');check(state.prep.pouring,'Pour key works at the physical tap');
    key('Tab','Tab');await flush();check(!state.prep.pouring&&BarTablet.isOpen(),'Opening the tablet releases held pouring');
-   key(preferences.bindings.pour.code,' ','keyup');click('[data-tablet-action="prep"]');await flush();
+   key(preferences.bindings.pour.code,' ','keyup');key('Tab','Tab');await flush();
    key(preferences.bindings.pour.code,' ');for(let i=0;i<36;i++)game.tick(.1);key(preferences.bindings.pour.code,' ','keyup');ui();
-   key('KeyE','e');key('KeyE','e');camera={...BarScene.playCamera};BarTablet.open('service',1);click('[data-tablet-order-action="serve"][data-order-id="1"]');BarTablet.close();await flush();
+   key('KeyE','e');key('KeyE','e');camera={x:6,y:1.68,z:2.1,a:0,pitch:0};aimAt({x:6,y:1.5,z:4.3});customerVisuals.clear();render();key('KeyE','e');await flush();
    check(state.sold===0&&state.cash===260&&state.orders[0].phase==='drinking'&&state.tray.length===0,'A drink can be selected, prepared and served without ESC before payment');
    for(let i=0;i<41;i++)game.tick(.1);check(state.orders[0].phase==='payment','The served client requests payment');game.pickupTerminal(BarEngine.registerPosition);game.payCard(1,camera);check(state.sold===0&&state.cash===260,'Pending card approval does not credit money');for(let i=0;i<31;i++)game.tick(.1);ui();check(state.sold===1&&state.cash===266&&state.orders.length===0,'Payment completes service without ESC');
    check(GameMenu.getMode()==='play'&&!paused&&BarInput.isLooking(),'Service returns to the camera without entering pause');
@@ -105,7 +107,7 @@ app.whenReady().then(async()=>{
    rejectNext=new DOMException('Pointer lock cannot be acquired immediately after the user has exited the lock.','SecurityError');
    BarInput.enterLook();await flush();BarInput.enterCursor();const requestsBeforeCancel=requests;
    await new Promise(resolve=>setTimeout(resolve,1600));
-   check(requests===requestsBeforeCancel&&!locked&&BarInput.isCursorMode()&&!paused,'Switching to the counter cancels pending Escape cooldown recovery');
+   check(requests===requestsBeforeCancel&&!locked&&BarInput.isCursorMode()&&!paused,'Switching to the counter cancels pending Escape cooldown recovery: '+JSON.stringify({requests,requestsBeforeCancel,locked:!!locked,cursor:BarInput.isCursorMode(),paused,mode:GameMenu.getMode()}));
 
    GameMenu.pause();GameMenu.openSettings();
    for(const code of ['Tab','KeyE','F11']){
@@ -118,7 +120,7 @@ app.whenReady().then(async()=>{
    preferences=defaultPreferences();savePreferences();GameMenu.closeSettings();GameMenu.returnHome();await flush();
    check(!locked&&GameMenu.isHome(),'Returning home releases camera');
    const homePrep=state.prep;key('Digit4',"'");check(state.prep===homePrep,'Welcome rejects preparation shortcuts');
-   return {automaticCamera:true,tablet:'without pause',recipes:'tablet catalogue',fullService:'without ESC',lateCapture:'safe',bindingMigration:true,requests,exits};
+   return {automaticCamera:true,tablet:'orders without pause',recipes:'physical glass rack',fullService:'without ESC',lateCapture:'safe',bindingMigration:true,requests,exits};
   })()`,true);
 
   // Reload restores the actual Chromium capture methods. In a hidden window,
@@ -162,7 +164,10 @@ app.whenReady().then(async()=>{
    await waitFor("document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused",'Focused Continue must capture the camera without a scene click');
    nativeKey('Tab');
    await waitFor("!document.pointerLockElement&&BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play'",'Native TAB must open the tablet without pause');
-   await nativeClick('[data-tablet-tab="drinks"]');await nativeClick('[data-tablet-recipe="beer"]');
+   nativeKey('Tab');await waitFor("document.pointerLockElement===canvas&&BarInput.isLooking()&&!paused",'Native TAB returns from orders to the camera');
+   await win.webContents.executeJavaScript("camera={x:7,y:1.68,z:1.35,a:Math.PI,pitch:Math.atan2(1.27-1.68,.5)};ui();");
+   nativeKey('E');await waitFor("!!document.querySelector('[data-vessel-recipe=beer]')&&$('modal').open",'Native E opens the physical glass rack');
+   await nativeClick('[data-vessel-recipe="beer"]');
    await waitFor("state.prep?.recipe==='beer'&&!paused",'Native cursor click must choose a drink without ESC');
    await win.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
    await sleep(250);

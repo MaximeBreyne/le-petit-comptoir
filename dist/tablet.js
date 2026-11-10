@@ -1,14 +1,13 @@
 'use strict';
 // A single catalogue and management screen; adding recipes never needs a new key.
 window.BarTablet=(()=>{
- const sections={service:['Service','La salle et les commandes'],drinks:['Boissons','La carte du comptoir'],register:['Caisse','Encaissements & terminal'],reserve:['Réserve','Stocks & fournisseur'],building:['Bâtiment','Votre établissement'],licenses:['Licences','Développer la carte'],team:['Équipe','Les personnes derrière le bar']};
- let current='drinks',catalogueSignature='',upgradesSignature='',traySignature='',lastRefresh=0;
- const recipeCards=new Map(),stockRows=new Map(),upgradeCards=new Map();
+ const sections={service:['Service','La salle et les commandes'],orders:['À préparer','Les boissons commandées'],register:['Caisse','Encaissements & terminal'],reserve:['Réserve','Stocks & fournisseur'],building:['Bâtiment','Votre établissement'],licenses:['Licences','Développer la carte'],team:['Équipe','Les personnes derrière le bar']};
+ let current='orders',upgradesSignature='',lastRefresh=0;
+ const stockRows=new Map(),upgradeCards=new Map();
  const make=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node};
  const number=value=>Number(value||0).toLocaleString('fr-BE',{maximumFractionDigits:1});
- const normalize=value=>String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- const iconPaths={service:'M3 11h18M5 11v10m14-10v10M8 3h8v5H8zM2 5v4m20-4v4',register:'M4 13h16v8H4zM6 13l2-6h9l2 6M9 2h9v5H9zM7 17h10M10 10h1m3 0h1',drinks:'M6 2h12l-1 10a5 5 0 0 1-10 0L6 2zm6 15v5m-4 0h8',reserve:'M3 7l9-5 9 5v12l-9 4-9-4V7zm0 0 9 5 9-5m-9 5v11',building:'M3 22V7l9-5 9 5v15M8 22v-7h8v7M7 8h2m6 0h2M7 11h2m6 0h2',licenses:'M6 2h12v15l-6-3-6 3V2zm3 5h6M9 10h6M7 17v5l5-3 5 3v-5',team:'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8-7a3 3 0 0 1 0 6M1 22v-3a6 6 0 0 1 12 0v3m3-7a5 5 0 0 1 6 5v2'};
- function icon(name){const node=document.createElementNS('http://www.w3.org/2000/svg','svg');node.setAttribute('viewBox','0 0 24 24');node.setAttribute('aria-hidden','true');node.innerHTML=`<path d="${iconPaths[name]||iconPaths.drinks}"/>`;return node}
+ const iconPaths={service:'M3 11h18M5 11v10m14-10v10M8 3h8v5H8zM2 5v4m20-4v4',register:'M4 13h16v8H4zM6 13l2-6h9l2 6M9 2h9v5H9zM7 17h10M10 10h1m3 0h1',orders:'M6 2h12l-1 10a5 5 0 0 1-10 0L6 2zm6 15v5m-4 0h8',reserve:'M3 7l9-5 9 5v12l-9 4-9-4V7zm0 0 9 5 9-5m-9 5v11',building:'M3 22V7l9-5 9 5v15M8 22v-7h8v7M7 8h2m6 0h2M7 11h2m6 0h2',licenses:'M6 2h12v15l-6-3-6 3V2zm3 5h6M9 10h6M7 17v5l5-3 5 3v-5',team:'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8-7a3 3 0 0 1 0 6M1 22v-3a6 6 0 0 1 12 0v3m3-7a5 5 0 0 1 6 5v2'};
+ function icon(name){const node=document.createElementNS('http://www.w3.org/2000/svg','svg');node.setAttribute('viewBox','0 0 24 24');node.setAttribute('aria-hidden','true');node.innerHTML=`<path d="${iconPaths[name]||iconPaths.orders}"/>`;return node}
  function button(text,action,className=''){const node=make('button',className,text);node.type='button';if(action)node.dataset.tabletAction=action;return node}
  const dialog=make('dialog','tablet-device');dialog.id='tabletModal';dialog.setAttribute('aria-labelledby','tabletTitle');
  const screen=make('div','tablet-screen');dialog.append(screen);
@@ -45,7 +44,7 @@ window.BarTablet=(()=>{
   const customer=make('strong','tablet-order-customer'),detail=make('p','tablet-order-detail'),bill=make('p','tablet-order-bill'),proximity=make('p','tablet-order-proximity');
   const patience=make('progress','tablet-order-patience');patience.max=100;patience.setAttribute('aria-label','Patience du client');
   const actions=make('div','tablet-order-actions'),buttons={};
-  for(const [action,label]of [['take','Prendre la commande'],['prepare','Préparer cette boisson'],['serve','Servir le plateau'],['collect','Prendre les espèces'],['change','Remettre la monnaie'],['card','Présenter le terminal'],['register','Aller à la caisse']]){
+  for(const [action,label]of [['take','Prendre la commande']]){
    const item=button(label,null,'tablet-button');item.dataset.tabletOrderAction=action;actions.append(item);buttons[action]=item;
   }
   card.append(head,customer,detail,bill,patience,proximity,actions);grid.append(card);seats.set(key,{card,badge,customer,detail,bill,proximity,patience,buttons});
@@ -56,7 +55,7 @@ window.BarTablet=(()=>{
  function reachOrder(order){return !!game.canReachOrder?.(order.id,camera)}
  function refreshService(s){
   const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo();
-  serviceNote.textContent='Regardez un client et appuyez sur E ou cliquez pour prendre sa commande, servir sa boisson ou encaisser. La préparation se fait uniquement derrière le bar. Le panneau près de l’entrée ouvre et ferme le service.';
+  serviceNote.textContent='Approchez-vous d’un client pour noter sa commande ici. Choisissez ensuite sa boisson au rangement des verres derrière le bar. Le service et les paiements se font directement auprès du client avec E.';
   roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
   roomSummary.textContent=`${count} / ${crowd.capacity} clients · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalWithWaiter?'avec le serveur':payments.terminalCarried?'avec vous':'au comptoir'}`;
@@ -96,17 +95,11 @@ window.BarTablet=(()=>{
    const enable=(name,allowed,label)=>{const item=entry.buttons[name];item.hidden=false;item.disabled=!allowed||arriving||s.gameOver;if(label)item.textContent=label;};
    if(phase==='awaiting-order')enable('take',near);
    if(phase==='preparing'&&!beingServed){
-    const ready=s.tray.some(drink=>drink.recipe===order.recipe&&(!drink.orderId||drink.orderId===order.id));
-    if(ready)enable('serve',near);else {enable('prepare',s.open&&game.canWork(camera)&&!s.prep&&game.canMake(order.recipe)&&s.tray.length<s.capacity&&job?.orderId!==order.id);if(!game.canWork(camera))entry.proximity.textContent='Rejoignez l’espace derrière le bar pour préparer cette commande.';}
+    const ticket=game.preparationQueue().find(ticket=>ticket.orderId===order.id);
+    entry.detail.textContent=recipe.name+' · '+({todo:'À préparer',preparing:'En préparation',ready:ticket?.prepId?'Prête au poste':'Prête sur le plateau',serving:'En service'}[ticket?.status]||'À préparer');
+    entry.proximity.textContent=ticket?.status==='ready'?'Prenez la boisson et regardez le client avec E pour servir.':'Choisissez la boisson au rangement des verres, derrière le bar.';
    }
-   if(phase==='payment'&&order.paymentMethod==='cash')enable('collect',near,`Prendre ${money(order.tender||0)}`);
-   if(phase==='payment'&&order.paymentMethod==='card'){
-    enable('card',near&&payments.terminalCarried&&!payments.terminalOrderId);
-    if(!payments.terminalCarried)entry.proximity.textContent='Prenez le terminal sans fil à la caisse, puis revenez vers ce client.';
-    else if(payments.terminalOrderId)entry.proximity.textContent='Le terminal termine un autre paiement.';
-   }
-   if(phase==='cash-collected')enable('register',true,'Préparer la monnaie en caisse');
-   if(phase==='change-ready')enable('change',near,(order.tender||0)>(order.due||0)?'Remettre la monnaie':'Remettre le ticket');
+   if(phase==='payment'||phase==='cash-collected'||phase==='change-ready')entry.proximity.textContent='Regardez le client avec E pour le règlement ; la monnaie se prépare à la caisse derrière le bar.';
    const paymentStatus=game.waiterPaymentStatus?.(order.id);
    if(game.paymentHandledByWaiter?.(order.id)){
     entry.badge.textContent=paymentStatus?.blocked?'Serveur en attente':'Encaissement par le serveur';
@@ -160,33 +153,10 @@ window.BarTablet=(()=>{
   const history=payments.receipts||[],signature=JSON.stringify(history);if(signature!==receiptsSignature){receiptsSignature=signature;receipts.replaceChildren();if(!history.length)receipts.append(make('p','tablet-empty','Aucun règlement encaissé pour le moment.'));for(const receipt of history.slice(0,10)){const row=make('div','tablet-receipt');row.append(make('span',null,`${receipt.customerName||'Client'} · ${receipt.tableId?'Table '+receipt.tableId:'Comptoir'}`),make('span',null,receipt.method==='card'?'Carte bancaire':'Espèces'),make('strong',null,money(receipt.amount||0)));receipts.append(row);}}
  }
 
- // Drinks: keep controls and cards mounted so typing, focus and scrolling survive ticks.
- const drinks=pages.get('drinks'),notice=make('div','tablet-service-notice'),noticeText=make('p'),serviceAction=button('Ouvrir le bar','service','tablet-button');serviceAction.id='tabletDrinksServiceToggle';
- const returnPrep=button('Revenir à la préparation','prep','tablet-button tablet-button-subtle'),cancelPrep=button('Abandonner la préparation','discard-prep','tablet-button tablet-button-subtle');notice.append(noticeText,serviceAction,returnPrep,cancelPrep);drinks.append(notice);
- const carriedTray=make('section','tablet-carried-tray'),carriedDrinks=make('div','tablet-carried-drinks');carriedTray.append(make('h3',null,'Sur votre plateau'),carriedDrinks);drinks.append(carriedTray);
- const filters=make('div','tablet-filters'),searchLabel=make('label','tablet-search-label');searchLabel.append(make('span',null,'Rechercher une boisson'));
- const search=make('input');search.id='tabletSearch';search.type='search';search.placeholder='Nom, ingrédient…';search.autocomplete='off';searchLabel.append(search);
- const stationLabel=make('label','tablet-station-label');stationLabel.append(make('span',null,'Poste de préparation'));
- const station=make('select');station.id='tabletStation';stationLabel.append(station);filters.append(searchLabel,stationLabel);drinks.append(filters);
- const catalogue=make('div','tablet-catalogue');catalogue.id='tabletCatalogue';const noResults=make('p','tablet-empty','Aucune boisson ne correspond à cette recherche.');noResults.hidden=true;drinks.append(catalogue,noResults);
- function syncCatalogue(){
-  const signature=JSON.stringify(Object.entries(recipes));if(signature===catalogueSignature)return;catalogueSignature=signature;
-  const selected=station.value;station.replaceChildren();const all=make('option',null,'Tous les postes');all.value='';station.append(all);
-  for(const name of new Set(Object.values(recipes).map(recipe=>recipe.station))){const option=make('option',null,name);option.value=name;station.append(option)}station.value=[...station.options].some(option=>option.value===selected)?selected:'';
-  catalogue.replaceChildren();recipeCards.clear();
-  for(const [id,recipe]of Object.entries(recipes)){
-   const card=make('article','tablet-recipe-card');card.dataset.catalogueRecipe=id;
-   const head=make('div','tablet-recipe-head'),symbol=make('div','tablet-drink-symbol');symbol.dataset.drink=id;symbol.style.setProperty('--drink-color',recipe.color||'#b29a60');symbol.append(icon('drinks'));
-   const description=make('div');description.append(make('span','tablet-recipe-station',recipe.station),make('h3',null,recipe.name));head.append(symbol,description,make('strong','tablet-recipe-price',money(recipe.price)));card.append(head);
-   const list=make('ul','tablet-ingredients'),ingredientNodes=new Map();
-   for(const [key,amount]of Object.entries(recipe.ingredients)){const row=make('li');row.append(make('span',null,ingredients[key]?.name||key),make('b',null,`${number(amount)} ${ingredients[key]?.unit||''}`));list.append(row);ingredientNodes.set(key,row)}card.append(list);
-   const foot=make('div','tablet-recipe-foot'),availability=make('span','tablet-availability'),prepare=button('Préparer',null,'tablet-button'),licenseLink=button('Voir la licence',null,'tablet-button tablet-button-subtle');prepare.dataset.tabletRecipe=id;prepare.setAttribute('aria-label',`Préparer ${recipe.name}`);licenseLink.dataset.tabletLicense=recipe.license||'';licenseLink.hidden=true;foot.append(availability,licenseLink,prepare);card.append(foot);catalogue.append(card);
-   recipeCards.set(id,{card,availability,prepare,licenseLink,ingredientNodes,search:normalize(recipe.name+' '+recipe.station+' '+Object.keys(recipe.ingredients).map(key=>ingredients[key]?.name||key).join(' '))});
-  }
-  filterCatalogue();
- }
- function filterCatalogue(){const query=normalize(search.value.trim());let visible=0;for(const [id,entry]of recipeCards){entry.card.hidden=!!((query&&!entry.search.includes(query))||(station.value&&recipes[id].station!==station.value));if(!entry.card.hidden)visible++}noResults.hidden=visible!==0}
- search.addEventListener('input',filterCatalogue);station.addEventListener('change',filterCatalogue);
+ // Order tickets replace the old recipe-launch catalogue.
+ const orders=pages.get('orders');
+ orders.append(make('p','tablet-order-note','Les commandes prises apparaissent ici et dans votre vue du bar. Au rangement des verres, appuyez sur E pour choisir la boisson et son récipient. Posez-le au poste indiqué ; vous pouvez laisser plusieurs préparations en cours.'));
+ const orderList=make('div');orderList.id='tabletOrderQueue';orders.append(orderList);BarOrders.mount(orderList);
 
  // Deliveries go to the physical storeroom. Only a player in that room can refill the bar.
  const reserve=pages.get('reserve'),reserveNote=make('div','tablet-reserve-note');reserve.append(reserveNote);
@@ -225,18 +195,14 @@ window.BarTablet=(()=>{
   }
  }
 
- function setTab(key){current=Object.hasOwn(sections,key)?key:'drinks';for(const [id,page]of pages)page.hidden=id!==current;for(const [id,item]of navButtons){item.classList.toggle('active',id===current);if(id===current)item.setAttribute('aria-current','page');else item.removeAttribute('aria-current')}eyebrow.textContent=sections[current][0];title.textContent=sections[current][1];feedback.textContent='';main.scrollTop=0;refresh(true)}
+ function setTab(key){current=Object.hasOwn(sections,key)?key:'orders';for(const [id,page]of pages)page.hidden=id!==current;for(const [id,item]of navButtons){item.classList.toggle('active',id===current);if(id===current)item.setAttribute('aria-current','page');else item.removeAttribute('aria-current')}eyebrow.textContent=sections[current][0];title.textContent=sections[current][1];feedback.textContent='';main.scrollTop=0;refresh(true)}
  function refresh(force=false){
   if(!dialog.open&&!force)return;const now=performance.now();if(!force&&now-lastRefresh<200)return;lastRefresh=now;
-  const s=game.s,inReserve=!!BarScene.inStockroom?.(camera);syncCatalogue();syncUpgrades();cash.textContent=money(s.cash);serviceStatus.textContent=s.gameOver?'Partie terminée':s.closing?'Dernière tournée':s.open?'Service ouvert':'Service fermé';serviceStatus.dataset.open=String(s.open&&!s.closing);
+  const s=game.s,inReserve=!!BarScene.inStockroom?.(camera);syncUpgrades();BarOrders.refresh();cash.textContent=money(s.cash);serviceStatus.textContent=s.gameOver?'Partie terminée':s.closing?'Dernière tournée':s.open?'Service ouvert':'Service fermé';serviceStatus.dataset.open=String(s.open&&!s.closing);
   refreshService(s);refreshRegister(s);
   location.textContent=inReserve?'Dans la réserve':game.canWork(camera)?'Derrière le bar':'Dans la salle';location.dataset.reserve=String(inReserve);
-  noticeText.textContent=s.gameOver?'Votre trésorerie est épuisée. Ouvrez Bâtiment pour commencer un nouveau bar.':s.prep?`${recipes[s.prep.recipe].name} est en préparation. Terminez cette boisson au comptoir.`:!s.open?'Ouvrez le bar, puis choisissez une boisson à préparer.':s.closing?'Le bar termine son service. Préparez les dernières commandes.':'Choisissez une recette, puis préparez-la au comptoir.';
-  for(const item of [serviceAction,roomServiceAction]){item.hidden=false;item.disabled=s.closing||s.gameOver;item.textContent=s.open?'Dernière tournée':'Ouvrir le bar';}
-  newBarAction.disabled=!GameMenu.hasSession()||GameMenu.getMode()!=='play'||paused;returnPrep.hidden=cancelPrep.hidden=!s.prep;
-  carriedTray.hidden=!s.tray.length;
-  const carriedSignature=JSON.stringify(s.tray);if(carriedSignature!==traySignature){traySignature=carriedSignature;carriedDrinks.replaceChildren();s.tray.forEach((drink,index)=>{const row=make('div','tablet-carried-drink'),discard=button('Jeter',null,'tablet-button tablet-button-subtle');discard.dataset.tabletDiscard=String(index);row.append(make('span',null,`${recipes[drink.recipe].name} · ${drink.quality} %`),discard);carriedDrinks.append(row);});}
-  for(const [id,entry]of recipeCards){const recipe=recipes[id],licensed=game.canPrepare(id),available=game.canMake(id),license=BarEngine.managementUpgrades[recipe.license];entry.prepare.disabled=!game.canWork(camera)||!s.open||s.gameOver||!!s.prep||!available||s.tray.length+(s.staff.bartender?1:0)>=s.capacity;entry.availability.textContent=!licensed?`${license?.name||'Licence'} requise`:!available?'Stock au comptoir insuffisant':!game.canWork(camera)?'Rejoignez le bar pour préparer':s.prep?.recipe===id?'En préparation':s.tray.length>=s.capacity?'Plateau plein':'Ingrédients disponibles';entry.licenseLink.hidden=licensed||!recipe.license;entry.card.dataset.locked=String(!licensed);entry.availability.dataset.available=String(available);for(const [key,row]of entry.ingredientNodes)row.classList.toggle('missing',(s.stock[key]||0)<recipe.ingredients[key])}
+  roomServiceAction.hidden=false;roomServiceAction.disabled=s.closing||s.gameOver;roomServiceAction.textContent=s.open?'Dernière tournée':'Ouvrir le bar';
+  newBarAction.disabled=!GameMenu.hasSession()||GameMenu.getMode()!=='play'||paused;
   reserveNote.textContent=inReserve?'Vous êtes dans la réserve. Réapprovisionnez le comptoir avec les ingrédients disponibles.':'Pour réapprovisionner le comptoir, rejoignez la réserve derrière le bar puis appuyez sur E.';reserveNote.classList.toggle('tablet-reserve-present',inReserve);
   for(const [key,row]of stockRows){const ingredient=ingredients[key],stored=s.reserve?.[key]||0,limit=game.serviceCapacity(key);row.serviceAmount.textContent=`${number(s.stock[key])} ${ingredient.unit}`;row.capacity.textContent=`Capacité : ${number(limit)} ${ingredient.unit}`;row.reserveAmount.textContent=`${number(stored)} ${ingredient.unit}`;const deliveries=s.deliveries.filter(d=>d.key===key);row.delivery.textContent=deliveries.length?`${deliveries.length} lot${deliveries.length>1?'s':''} en route · ${Math.ceil(Math.min(...deliveries.map(d=>d.remaining)))} s`:'Aucune livraison en cours';row.refill.disabled=!inReserve||s.gameOver||stored<=0||s.stock[key]>=limit;row.refill.title=!inReserve?'Rejoignez la réserve pour transférer les ingrédients.':'';const licensed=game.canBuy(key);row.buy.disabled=s.gameOver||s.cash<ingredient.cost||!licensed;row.licenseNote.hidden=licensed;row.licenseNote.textContent=licensed?'':`${BarEngine.managementUpgrades[ingredient.license]?.name||'Licence'} requise`;row.buy.title=licensed?'':row.licenseNote.textContent;}
   for(const [id,entry]of upgradeCards){
@@ -248,7 +214,7 @@ window.BarTablet=(()=>{
   if(s.management.waiter&&!s.staff.waiter){const waiting=game.waiterPaymentStatus?.();if(waiting)upgradeCards.get('waiter').statusText.textContent=waiterPaymentMessage(waiting);}
  }
  function focusOrder(id){selectedOrderId=Number.isSafeInteger(id)?id:null;refresh(true);const entry=[...seats.values()].find(entry=>Number(entry.card.dataset.serviceOrder)===selectedOrderId);const card=current==='register'?cashCards.get(selectedOrderId)?.card:entry?.card;if(card){card.focus({preventScroll:true});card.scrollIntoView({block:'nearest'});}}
- function open(tab='drinks',orderId){
+ function open(tab='orders',orderId){
   if(!window.GameMenu?.hasSession()||GameMenu.getMode()!=='play'||paused||$('modal').open||$('settingsModal').open)return false;
   keys={};game.setPour(false);window.BarInput?.suspend();selectedOrderId=Number.isSafeInteger(orderId)?orderId:null;setTab(tab);
   if(!dialog.open)dialog.showModal();document.body.dataset.tabletOpen='true';refresh(true);
@@ -260,7 +226,7 @@ window.BarTablet=(()=>{
  }
  function toggle(){return dialog.open?close():open()}
  function handleEscape(){if(!dialog.open)return false;close();return true}
- function reset(){close({suspend:true});search.value='';station.value='';selectedOrderId=null;for(const entry of cashCards.values())entry.card.remove();cashCards.clear();receiptsSignature='';setTab('drinks')}
+ function reset(){close({suspend:true});selectedOrderId=null;for(const entry of cashCards.values())entry.card.remove();cashCards.clear();receiptsSignature='';setTab('orders')}
  dialog.addEventListener('cancel',event=>{event.preventDefault();handleEscape()});
  dialog.addEventListener('close',()=>{document.body.dataset.tabletOpen=String(dialog.open)});
  dialog.addEventListener('click',event=>{
@@ -272,27 +238,16 @@ window.BarTablet=(()=>{
   if(target.dataset.tabletOrderAction){
    const id=Number(target.dataset.orderId),order=game.s.orders.find(order=>order.id===id);if(!order){feedback.textContent='Ce client a quitté sa place.';refresh(true);return;}
    selectedOrderId=id;
-   switch(target.dataset.tabletOrderAction){
-    case'take':actAndRefresh(()=>game.takeOrder(id,camera));break;
-    case'prepare':actAndRefresh(()=>game.start(order.recipe,camera));if(game.s.prep?.recipe===order.recipe)close();break;
-    case'serve':actAndRefresh(()=>game.serve(id,camera));break;
-    case'collect':actAndRefresh(()=>game.collectCash(id,camera));break;
-    case'change':actAndRefresh(()=>game.completeCash(id,camera));break;
-    case'card':actAndRefresh(()=>game.payCard(id,camera));break;
-    case'register':setTab('register');focusOrder(id);break;
-   }
+   if(target.dataset.tabletOrderAction==='take')actAndRefresh(()=>game.takeOrder(id,camera));
    return;
   }
   if(target.dataset.changeCoin!==undefined){const entry=cashCards.get(Number(target.dataset.orderId));if(entry&&!entry.input.disabled){const currentAmount=Number(entry.input.value)||0;entry.input.value=(Math.round((currentAmount+Number(target.dataset.changeCoin))*100)/100).toFixed(2);}return;}
   if(target.dataset.changeReset){const entry=cashCards.get(Number(target.dataset.changeReset));if(entry)entry.input.value='0';return;}
   if(target.dataset.changeConfirm){const id=Number(target.dataset.changeConfirm),entry=cashCards.get(id);if(entry)actAndRefresh(()=>game.prepareChange(id,Number(entry.input.value),camera));return;}
-  if(target.dataset.tabletAction==='discard-prep'){actAndRefresh(()=>game.discard());return;}
-  if(target.dataset.tabletDiscard!==undefined){actAndRefresh(()=>game.discard(Number(target.dataset.tabletDiscard)));return;}
-  if(target.dataset.tabletRecipe){const id=target.dataset.tabletRecipe;act(()=>game.start(id,camera));if(game.s.prep?.recipe===id)close();else refresh(true);return}
   if(target.dataset.tabletBuy){let message;act(()=>{message=game.buy(target.dataset.tabletBuy);return message});feedback.textContent=message||'Commande enregistrée.';refresh(true);return}
   if(target.dataset.tabletRestock){if(!BarScene.inStockroom?.(camera)){feedback.textContent='Rejoignez la réserve pour réapprovisionner le comptoir.';refresh(true);return}const key=target.dataset.tabletRestock;let message;act(()=>{message=game.restock(key);return message});feedback.textContent=message||'Comptoir réapprovisionné.';refresh(true);return}
   if(target.dataset.tabletUpgrade){let message;act(()=>{message=game.purchaseUpgrade(target.dataset.tabletUpgrade);return message});feedback.textContent=message||'Amélioration acquise.';refresh(true);return}
-  switch(target.dataset.tabletAction){case'close':close();break;case'prep':close();break;case'service':actAndRefresh(()=>game.s.open?game.close():game.open());break;case'new-bar':GameMenu.newGame();break;case'terminal-pickup':actAndRefresh(()=>game.pickupTerminal(camera));break;case'terminal-return':actAndRefresh(()=>game.returnTerminal(camera));break;case'fund-till':actAndRefresh(()=>game.fundTill(Number(fundAmount.value),camera));break}
+  switch(target.dataset.tabletAction){case'close':close();break;case'service':actAndRefresh(()=>game.s.open?game.close():game.open());break;case'new-bar':GameMenu.newGame();break;case'terminal-pickup':actAndRefresh(()=>game.pickupTerminal(camera));break;case'terminal-return':actAndRefresh(()=>game.returnTerminal(camera));break;case'fund-till':actAndRefresh(()=>game.fundTill(Number(fundAmount.value),camera));break}
  });
  return {open,close,toggle,isOpen:()=>dialog.open,refresh,handleEscape,reset,getTab:()=>current,focusOrder};
 })();

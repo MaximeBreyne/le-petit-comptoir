@@ -31,7 +31,8 @@ app.whenReady().then(async()=>{
    atTable(1);let target=BarService.target(camera);check(target?.kind==='customer'&&target.orderId===1,'Looking at seated client targets their order');
    camera.a+=Math.PI;check(!BarService.target(camera),'Looking away does not target the closest client');check(!BarService.use(target)&&state.orders[0].phase==='awaiting-order','Stale target cannot act while looking away');
    atTable(1);paused=true;check(!BarService.use(BarService.target(camera)),'Pause blocks direct actions');paused=false;
-   key('KeyE');check(state.orders[0].phase==='preparing'&&!BarTablet.isOpen(),'E takes the order without a tablet');
+   key('KeyE');check(state.orders[0].phase==='awaiting-order'&&BarTablet.isOpen(),'E opens the tablet for taking the table order');
+   click('[data-tablet-order-action="take"][data-order-id="1"]');check(state.orders[0].phase==='preparing','The nearby order is recorded through the tablet');BarTablet.close();await flush();
    state.tray=[{recipe:'wine',quality:100},{recipe:'beer',quality:100}];canvas.click();
    check(state.orders[0].phase==='drinking'&&state.tray.length===1&&state.tray[0].recipe==='wine','Click serves matching drink and keeps unrelated tray drink');
    const cashBefore=state.cash;tick(8);key('KeyE');check(state.orders[0].phase==='cash-collected'&&state.cash===cashBefore,'E collects cash without prematurely booking the sale');

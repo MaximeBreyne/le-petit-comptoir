@@ -36,16 +36,16 @@ app.whenReady().then(async()=>{
    check(document.querySelector(action('take',1)).disabled,'Taking a table order remotely is disabled');
    check(!document.querySelector('#tabletModal [data-service-order="1"]').textContent.includes(recipes.beer.name),'Unknown table recipe stays hidden');
    BarTablet.close();await flush();atTable(1);key('KeyE');await flush();
-   check(!BarTablet.isOpen()&&state.orders[0].phase==='preparing','E takes a customer order without opening the tablet');
-   BarTablet.open('service',1);
+   check(BarTablet.isOpen()&&state.orders[0].phase==='awaiting-order','E opens the tablet before taking a table order');
+   click(action('take',1));check(state.orders[0].phase==='preparing','Taking the order through the tablet sends it to the bar');
    check(document.querySelector('#tabletModal [data-service-order="1"]').textContent.includes(recipes.beer.name),'Taken order reveals its drink');
-   check(document.querySelector(action('prepare',1)).disabled,'Preparation cannot start at a table');
-   camera={...BarScene.playCamera};BarTablet.refresh(true);click(action('prepare',1));await flush();check(!BarTablet.isOpen()&&state.prep?.recipe==='beer','Order preparation starts behind the bar');
-   atPreparationPoint(BarEngine.preparationLayout.vessels,.12);key('KeyE');check(state.prep.held?.kind==='vessel','Pinte is physically picked up');
+   check(!document.querySelector(action('prepare',1))&&!document.querySelector('[data-tablet-recipe]'),'The tablet contains no preparation controls');
+   BarTablet.close();await flush();atPreparationPoint(BarEngine.preparationLayout.vessels,.12);key('KeyE');await flush();
+   click('#modal [data-vessel-recipe="beer"]');await flush();check(state.prep?.recipe==='beer'&&state.prep.held?.kind==='vessel'&&!BarTablet.isOpen(),'Choosing beer at the glass shelf physically takes its pint');
    atPreparationPoint(BarEngine.preparationLayout.stations.beer);key('KeyE');check(state.prep.vesselPlaced,'Pinte is placed beneath the tap');
    key('Space');tick(3.5);key('Space','keyup');ui();key('KeyE');key('KeyE');check(state.tray.length===1,'Prepared drink reaches the tray through station interactions');
    camera={...camera,x:6,z:1.55};BarTablet.open('service',1);
-   check(document.querySelector(action('serve',1)).disabled,'Remote table delivery is disabled');
+   check(!document.querySelector(action('serve',1)),'The tablet does not offer remote table delivery');
    const initialCash=state.cash;game.serve(1,camera);check(state.orders[0].phase==='preparing'&&state.tray.length===1,'Engine also rejects remote delivery');
    BarTablet.close();await flush();atTable(1);canvas.click();
    check(state.orders[0].phase==='drinking'&&state.cash===initialCash&&state.sold===0,'Serving does not collect payment');
@@ -71,12 +71,12 @@ app.whenReady().then(async()=>{
    game.completeCash(1,camera);check(state.cash===initialCash+due&&state.payments.receipts.length===1,'Cash receipt cannot be paid twice');
 
    state.orders=[fixture(2,3,'wine','card','preparing')];state.nextId=3;state.tray.push({recipe:'wine',quality:100});state.spawn=999;
-   atTable(3);BarTablet.open('service',2);click(action('serve',2));tick(8);
-   check(document.querySelector(action('card',2)).disabled,'A card payment requires the wireless terminal');
+   atTable(3);key('KeyE');tick(8);BarTablet.open('service',2);
+   check(!document.querySelector(action('card',2)),'The tablet does not offer remote card payments');
    const beforeCard=state.cash;game.payCard(2,camera);check(state.orders[0].phase==='payment'&&state.cash===beforeCard,'Missing terminal blocks payment in engine too');
    BarTablet.close();await flush();atTerminal();key('KeyE');
    check(state.payments.terminalCarried,'Terminal picked up at register');
-   BarTablet.open('service',2);check(document.querySelector(action('card',2)).disabled,'Terminal cannot charge a distant table');
+   BarTablet.open('service',2);check(!document.querySelector(action('card',2)),'Terminal cannot be operated through the tablet');
    game.payCard(2,camera);check(state.orders[0].phase==='payment','Card engine rejects remote use');
    BarTablet.close();await flush();atTable(3);key('KeyE');check(!BarTablet.isOpen(),'Terminal is presented directly');
    check(state.orders[0].phase==='card-processing'&&state.cash===beforeCard,'Card starts asynchronous authorization');
@@ -95,7 +95,7 @@ app.whenReady().then(async()=>{
    check(document.querySelector('[data-tablet-upgrade="bartender"]').disabled&&document.querySelector('[data-tablet-upgrade="waiter"]').disabled,'Owned employees cannot be purchased twice');
    state.orders=[fixture(3,2,'beer','cash','preparing')];state.tray=[{recipe:'beer',quality:100,orderId:3}];state.nextId=4;state.spawn=999;game.tick(.1);BarTablet.open('service',3);
    check(state.staff.waiter?.task==='serve'&&state.staff.waiter.orderId===3,'Waiter collects the available tray drink');
-   check(document.querySelector(action('prepare',3)).hidden&&document.querySelector(action('serve',3)).hidden&&document.querySelector('#tabletModal [data-service-order="3"]').textContent.includes('Serveur en route'),'Tablet does not suggest a duplicate drink while waiter delivers');
+   check(!document.querySelector(action('prepare',3))&&!document.querySelector(action('serve',3))&&document.querySelector('#tabletModal [data-service-order="3"]').textContent.includes('Serveur en route'),'Tablet does not suggest a duplicate drink while waiter delivers');
    const automaticCash=state.cash,automaticTill=state.payments.till;
    for(let i=0;i<700&&state.orders.some(order=>order.id===3);i++)tick(.1);
    check(!state.orders.some(order=>order.id===3)&&state.cash===automaticCash+6&&state.payments.till===automaticTill+6,'Recruited waiter serves, collects cash, counts and returns change automatically');

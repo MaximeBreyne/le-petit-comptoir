@@ -17,7 +17,7 @@ $('audioTest').onclick=()=>{audio.unlock();audio.chime('sale');$('settingsStatus
 addEventListener('pointerdown',()=>audio.unlock(),{once:true});addEventListener('keydown',()=>audio.unlock(),{once:true});
 function togglePause(){if(GameMenu.getMode()==='pause')GameMenu.resume();else if(GameMenu.getMode()==='play')GameMenu.pause()}
 $('pause').onclick=togglePause;
-function escapeAction(){if(capturing){capturing=null;settingsUI();return}if(window.BarTablet?.handleEscape())return;GameMenu.handleEscape()}
+function escapeAction(){if(capturing){capturing=null;settingsUI();return}if(window.BarPreparation?.handleEscape())return;if(window.BarTablet?.handleEscape())return;GameMenu.handleEscape()}
 window.desktopGame?.onEscape(escapeAction);
 onkeydown=e=>{
  if(capturing){e.preventDefault();e.stopPropagation();if(e.code==='Escape'){capturing=null;settingsUI();return}if(isReservedGameKey(e.code)||!/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Enter|Backspace|Home|End|PageUp|PageDown)$/.test(e.code)){ $('settingsStatus').textContent='Cette touche est réservée au jeu. Choisissez une lettre, une flèche ou Espace.';return}

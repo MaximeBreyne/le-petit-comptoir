@@ -57,12 +57,12 @@ app.whenReady().then(async()=>{
    render();check(renderer.gl.getError()===0,'The closing sign renders without WebGL errors');
    game.s=new Game().s;state=game.s;ui();render();
    BarTablet.open('service');click('#tabletServiceToggle');check(state.open&&status().code==='open','Service can also be opened from the tablet Service page');
-   check($('tabletServiceToggle').textContent===$('tabletDrinksServiceToggle').textContent,'Service and Drinks controls agree after opening');
-   click('[data-tablet-tab="drinks"]');check(document.querySelector('[data-tablet-recipe="beer"]').disabled,'Preparation is disabled near the entrance');
-   camera={...BarScene.playCamera};BarTablet.refresh(true);click('[data-tablet-recipe="beer"]');await flush();
+   click('[data-tablet-tab="orders"]');check(!document.querySelector('[data-tablet-recipe]'),'The tablet command list has no preparation buttons');
+   BarTablet.close();await flush();check(!BarPreparation.openVessels()&&state.prep===null,'A glass cannot be selected near the entrance');
+   camera={...BarScene.playCamera,x:7,z:1.4};check(BarPreparation.openVessels(),'Glass selection opens only near the shelf');click('#modal [data-vessel-recipe="beer"]');await flush();
    check(state.prep?.recipe==='beer'&&!$('workbench').hidden,'Preparation controls appear only when needed');
    BarTablet.open('service');click('#tabletServiceToggle');
-   check(state.closing&&state.prep?.recipe==='beer'&&$('tabletServiceToggle').disabled&&$('tabletDrinksServiceToggle').disabled,'Last round remains available during preparation and disables both service toggles');
+   check(state.closing&&state.prep?.recipe==='beer'&&$('tabletServiceToggle').disabled,'Last round remains available during preparation and disables reopening');
    render();
    // All sign states are prepared once. Repeated state changes must neither
    // overflow the shared atlas nor allocate fresh text textures per frame.
@@ -76,7 +76,7 @@ app.whenReady().then(async()=>{
    check(new Set(signRegions).size===3,'Closed, open and last-round signs have distinct text');
    check(renderer.labelMap.size===atlasSize,'Service changes reuse preallocated label regions');
    check(renderer.gl.getError()===0,'All service states render without WebGL errors');
-   return {removedHud:removed.length,stages,restoredProgress:true,sign:'E and aimed click; distance, direction, repeat, pause and tablet guards',tablet:'Service and Drinks synchronized during preparation',atlasLabels:atlasSize,gl:0};
+   return {removedHud:removed.length,stages,restoredProgress:true,sign:'E and aimed click; distance, direction, repeat, pause and tablet guards',tablet:'Service remains available during physical preparation',atlasLabels:atlasSize,gl:0};
   })()`,true);
   if(errors.length)throw Error(errors.join('\n'));console.log('HUD OK',JSON.stringify(result));clearTimeout(timeout);win.destroy();app.exit(0);
  }catch(error){clearTimeout(timeout);console.error(error);win?.destroy();app.exit(1)}

@@ -24,10 +24,12 @@ Maintenez **Maj** en vous déplaçant pour courir. La touche de course est
 configurable dans les réglages.
 
 **Tab** ouvre ou range la tablette. Ses rubriques regroupent les boissons,
-les stocks, le bâtiment, les licences et l’équipe. Choisissez la boisson sur
-la tablette : le curseur reste libre pour la préparation et le service.
-Cliquez sur le décor pour reprendre la caméra. Les raccourcis boissons
-**1 à 4** sont remplacés par ce catalogue ; le service continue pendant
+les stocks, le bâtiment, les licences et l’équipe. La rubrique **À préparer**
+affiche les boissons commandées, également visibles dans le jeu. Pour commencer
+une boisson, regardez le rangement des verres derrière le bar, appuyez sur **E**
+et choisissez la recette. Cinq emplacements permettent de laisser plusieurs
+préparations en cours. Reprenez un verre au poste avec **E** ; ingrédients et
+dosages sont conservés, y compris en sauvegarde. Le service continue pendant
 l’utilisation de la tablette.
 
 La réserve est une pièce accessible par la porte à gauche, derrière le bar.
@@ -47,11 +49,12 @@ servis et la trésorerie le permettent :
 | Préparateur de boissons | 24 clients encaissés | 300 € | Préparer les commandes avec le stock du comptoir ; salaire de 18 € par soir |
 | Serveur | 32 clients encaissés | 380 € | Prendre les commandes à table et apporter les boissons ; salaire de 22 € par soir |
 
-Les clients s’installent aux quatre tables numérotées ou aux trois places du
-comptoir. Approchez une table et appuyez sur **E** pour prendre sa commande
-dans **Service** sur la tablette. Apportez ensuite la boisson préparée.
+Les clients s’installent aux quatre tables ou au comptoir, dont les six places
+sont utilisées progressivement. Approchez une table et appuyez sur **E** pour
+ouvrir sa commande dans **Service** sur la tablette, puis validez la prise de
+commande. Apportez ensuite la boisson préparée et servez directement avec **E**.
 Le préparateur et le serveur peuvent effectuer ces tâches après recrutement ;
-les paiements restent à votre charge.
+le serveur peut aussi encaisser les espèces et les cartes.
 
 Après la dégustation, prenez les espèces du client, comptez la monnaie à la
 **Caisse**, puis rapportez-la avec le ticket. Le tiroir contient initialement

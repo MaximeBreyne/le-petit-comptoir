@@ -22,12 +22,12 @@ Continuer la partie ou Charger une sauvegarde. F11 permet de passer en fenêtre.
 La souris commande la caméra dès l’entrée ou la reprise de la partie.
 Maintenir Maj en se déplaçant permet de courir. Cette touche est configurable
 dans Réglages, comme les autres commandes de déplacement.
-Tab ouvre ou range la tablette de gestion. Choisir une boisson sur la tablette
-reprend la caméra pour la préparer directement dans le décor derrière le bar.
-La tablette regroupe le service, les boissons, la caisse, les stocks, le bâtiment,
+Tab ouvre ou range la tablette de gestion. La rubrique À préparer liste les
+boissons commandées ; la sélection des recettes se fait au rangement des verres.
+La tablette regroupe le service, les commandes à préparer, la caisse, les stocks, le bâtiment,
 les licences et l’équipe. Le service continue pendant son utilisation.
 Pour ouvrir le bar, approchez le panneau suspendu à la porte d’entrée et appuyez
-sur E, ou utilisez Ouvrir le bar dans Service ou Boissons sur la tablette.
+sur E, ou utilisez Ouvrir le bar dans Service sur la tablette.
 Un clic en regardant le panneau à proximité permet également de le tourner.
 Le même panneau ou bouton lance la dernière tournée : les clients présents
 doivent être servis et encaissés avant le bilan. Le panneau reflète cet état.
@@ -36,17 +36,27 @@ sont affichés, avec une barre d’avancement de 17 h à minuit.
 Les stocks, améliorations et l’action Nouveau bar se consultent uniquement
 dans la tablette ; Nouveau bar se trouve dans Bâtiment et demande confirmation.
 Les indications de préparation apparaissent uniquement derrière le comptoir.
-Choisissez une recette sur la tablette, prenez le récipient au rangement avec E,
-puis posez-le au poste indiqué. Prenez les ingrédients dans les bouteilles et
+Regardez le rangement des verres derrière le bar et appuyez sur E : choisissez
+la boisson et prenez son récipient, puis posez-le au poste indiqué. Prenez les ingrédients dans les bouteilles et
 bacs étiquetés avec E ou un clic, et apportez-les un par un au poste.
 Restez près du poste pour maintenir la touche de dosage. Regardez le verre et
 appuyez sur E pour valider, mélanger si nécessaire, puis prendre la boisson
 sur le plateau. S’éloigner arrête le versement. Une préparation ne peut pas
-être commencée ou poursuivie depuis une table. Pour l’abandonner, utilisez
-Abandonner la préparation dans Tab > Boissons.
+être commencée ou poursuivie depuis une table. Pour l’abandonner, regardez
+son verre, faites un clic droit et choisissez Jeter cette préparation.
+Pour jeter une boisson terminée, regardez-la sur le plateau, appuyez sur E
+et choisissez Jeter cette boisson.
+Cinq emplacements gardent des boissons en cours : deux bières, un café et
+deux autres boissons (vin ou cocktails). Posez votre récipient ou ingrédient
+avant de commencer une autre boisson. Regardez un verre laissé au poste et
+appuyez sur E pour le reprendre ; son dosage et ses ingrédients sont conservés.
+Le plateau plein empêche seulement de récupérer la boisson, qui reste au poste.
+La file des commandes apparaît sur la tablette et en jeu : à faire, en préparation,
+à récupérer, sur le plateau ou en service. Deux commandes identiques restent
+distinctes, et le préparateur ne relance pas une commande déjà en cours.
 Les touches 1 à 4 ne sélectionnent plus les boissons.
 Les ingrédients sont prélevés à la prise ; la bière au premier tirage.
-Un ingrédient tenu et une préparation en cours sont conservés dans la sauvegarde.
+Un ingrédient tenu et toutes les préparations en cours sont conservés dans la sauvegarde.
 Les anciennes préparations déjà payées restent utilisables sans nouveau débit.
 35 euros de charges par soir, auxquels s’ajoutent les salaires des employés recrutés.
 Une trésorerie négative termine la partie.
@@ -65,7 +75,8 @@ Tab > Service indique la fréquentation et la progression vers la prochaine plac
 Les clients s’assoient sur les tabourets, face au bar ; les places supplémentaires
 n’ajoutent aucun client au lancement d’une nouvelle partie.
 Rejoignez un client, regardez-le et appuyez sur E ou cliquez pour prendre sa
-commande. Revenez avec la boisson sur le plateau et interagissez de la même
+commande sur la tablette qui s’ouvre. Validez Prendre la commande à proximité.
+Revenez avec la boisson sur le plateau et interagissez de la même
 façon pour servir automatiquement la bonne boisson. La tablette conserve
 la liste des commandes, mais n’est pas nécessaire pour servir ou encaisser.
 Après la dégustation, le client demande à payer en espèces ou par carte.

@@ -6,7 +6,7 @@ window.GameMenu=(()=>{
  let sessionActive=false,view='home',returnView='home',settingsOrigin='home',confirmation=null,escapeSuppressedUntil=0;
  const panel=document.createElement('section');panel.id='gameMenu';panel.className='game-menu';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','menuTitle');
  document.body.append(panel);
- const gameUI=[...document.querySelectorAll('body > header, #serviceHud, #workbench, body > footer')];
+ const gameUI=[...document.querySelectorAll('body > header, #serviceHud, #orderQueueHud, #workbench, body > footer')];
 
  function read(key){try{return JSON.parse(localStorage.getItem(key))}catch{return null}}
  function validState(s){
@@ -20,7 +20,10 @@ window.GameMenu=(()=>{
   if(!Array.isArray(s.orders)||s.orders.length>BarEngine.MAX_CUSTOMERS||!s.orders.every(o=>o&&recipes[o.recipe]&&Number.isSafeInteger(o.id)&&o.id>0&&typeof o.name==='string'&&o.name.length<=80&&!/[<>]/.test(o.name)&&Number.isFinite(o.patience)&&o.patience>0&&o.patience<=100))return false;
   if(!Array.isArray(s.tray)||s.tray.length>s.capacity||!s.tray.every(t=>t&&recipes[t.recipe]&&Number.isFinite(t.quality)&&t.quality>=0&&t.quality<=100))return false;
   if(!Array.isArray(s.deliveries)||!s.deliveries.every(d=>d&&ingredients[d.key]&&Number.isFinite(d.remaining)&&d.remaining>=0&&d.remaining<=10))return false;
-  if(s.prep){const p=s.prep,r=recipes[p.recipe];if(!r||!Number.isInteger(p.step)||p.step<0||p.step>=r.steps.length||!Number.isFinite(p.amount)||p.amount<0||p.amount>r.target*1.60001||!Number.isFinite(p.quality)||p.quality<0||p.quality>100||typeof p.ready!=='boolean')return false}
+  if(s.parkedPreps!==undefined&&!Array.isArray(s.parkedPreps))return false;
+  const preparations=[s.prep,...(s.parkedPreps||[])].filter(Boolean);
+  if(preparations.length>BarEngine.preparationSlots.length)return false;
+  for(const p of preparations){const r=recipes[p.recipe];if(!r||!Number.isInteger(p.step)||p.step<0||p.step>=r.steps.length||!Number.isFinite(p.amount)||p.amount<0||p.amount>r.target*1.60001||!Number.isFinite(p.quality)||p.quality<0||p.quality>100||typeof p.ready!=='boolean')return false}
   return true;
  }
  function validCamera(value){return value&&['x','y','z','a','pitch'].every(k=>Number.isFinite(value[k]))&&BarScene.containsWalkablePosition(value.x,value.z)&&value.y>0&&value.y<3}

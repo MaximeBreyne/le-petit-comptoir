@@ -21,7 +21,7 @@ window.BarService=(()=>{
  function customerLabel(order){
   const phase=game.orderPhase(order),location=place(order);
   if(game.paymentHandledByWaiter?.(order.id))return waiterPaymentMessage(game.waiterPaymentStatus(order.id))+' · '+location;
-  if(phase==='awaiting-order')return `E : prendre la commande · ${location}`;
+  if(phase==='awaiting-order')return `E : noter la commande sur la tablette · ${location}`;
   if(phase==='preparing'){
    if(game.s.staff.waiter?.task==='serve'&&game.s.staff.waiter.orderId===order.id)return `Serveur en route · ${location}`;
    return game.trayDrinkIndex(order)>=0?`E : servir ${recipes[order.recipe].name} · ${location}`:`${location} : ${recipes[order.recipe].name} à préparer au bar`;
@@ -65,7 +65,7 @@ window.BarService=(()=>{
   const order=game.s.orders.find(order=>order.id===current.orderId);if(!order)return false;
   if(game.paymentHandledByWaiter?.(order.id)){toast(waiterPaymentMessage(game.waiterPaymentStatus(order.id)));return true;}
   const phase=game.orderPhase(order);
-  if(phase==='awaiting-order')act(()=>game.takeOrder(order.id,camera));
+  if(phase==='awaiting-order')BarTablet.open('service',order.id);
   else if(phase==='preparing')act(()=>game.serve(order.id,camera));
   else if(phase==='payment')act(()=>order.paymentMethod==='cash'?game.collectCash(order.id,camera):game.payCard(order.id,camera));
   else if(phase==='change-ready')act(()=>game.completeCash(order.id,camera));

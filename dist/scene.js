@@ -43,12 +43,15 @@ const BarScene=(()=>{
    (x>=.55&&x<=1.35&&z>=-.35&&z<=.35);
  }
  const inStockroom=position=>!!position&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
- function prepStation(recipe){
+ function prepStation(preparation){
+  const recipe=typeof preparation==='string'?preparation:preparation?.recipe;
   const key=recipe==='beer'?'beer':recipe==='coffee'?'coffee':'cocktails';
-  const point=globalThis.BarEngine?.preparationLayout?.stations[key]||({beer:{x:4.15,y:1.133,z:2.72},coffee:{x:8.43,y:1.152,z:2.47},cocktails:{x:6.5,y:1.133,z:3.05}})[key];
+  const slot=typeof preparation==='object'&&globalThis.BarEngine?.preparationSlots?.find(slot=>slot.id===preparation?.slotId);
+  const point=slot||globalThis.BarEngine?.preparationLayout?.stations[key]||({beer:{x:4.15,y:1.133,z:2.72},coffee:{x:8.43,y:1.152,z:2.47},cocktails:{x:6.5,y:1.133,z:3.05}})[key];
   const stream=key==='beer'?{y:1.53,h:.18}:key==='coffee'?{y:1.316,h:.072}:{y:1.51,h:.24};
-  return {...point,stream:{x:point.x,z:point.z,...stream}};
+  return {x:point.x,y:point.y,z:point.z,stream:{x:point.x,z:point.z,...stream}};
  }
+ function trayPosition(index){return {x:4.98+(index%2)*.26,y:1.133,z:2.85+Math.floor(index/2)*.32}}
  function geometry(target){
   const box=(x,y,z,w,h,d,c,mat=0,extra={})=>{const p={x,y,z,w,h,d,c,mat,solid:false,...extra};target.push(p);return p};
   const cylinder=(x,y,z,w,h,d,c,mat=0,extra={})=>box(x,y,z,w,h,d,c,mat,{round:true,...extra});
@@ -209,9 +212,9 @@ const BarScene=(()=>{
    }
   }
   // Prepared fruit and herbs remain beside the vessel until the drink is mixed.
-  if(p?.physical&&p.vesselPlaced&&!p.ready&&p.amount===0){
-   const point=prepStation(p.recipe);
-   for(const [index,key]of ['lime','mint','ice'].filter(key=>p.added?.[key]).entries())preparationItem(g,key,point.x-.18,point.y,point.z+(index-1)*.10,.65);
+  for(const preparation of [p,...(state?.parkedPreps||[])])if(preparation?.physical&&preparation.vesselPlaced&&!preparation.ready&&preparation.amount===0){
+   const point=prepStation(preparation);
+   for(const [index,key]of ['lime','mint','ice'].filter(key=>preparation.added?.[key]).entries())preparationItem(g,key,point.x-.18,point.y,point.z+(index-1)*.10,.65);
   }
   if(!camera||!p?.held)return;
   const cp=Math.cos(camera.pitch||0),sp=Math.sin(camera.pitch||0),forward=.58*cp+.40*sp,side=state.payments?.terminalCarried?-.28:.28;
@@ -357,7 +360,7 @@ const BarScene=(()=>{
   c(4.15,1.126,2.95,.15,.031,.15,'#9d824c',M.metal);
   c(4.15,1.157,2.95,.105,.023,.105,'#bba26b',M.metal);
   c(4.15,1.78,2.95,.075,.85,.075,'#b59b60',M.metal,{rz:Math.PI/2});
-  for(const dx of [-.3,0,.3]){
+  for(const dx of [-.35,0,.3]){
    c(4.15+dx,1.72,2.82,.045,.22,.045,'#b59b60',M.metal,{rx:Math.PI/2});
    c(4.15+dx,1.67,2.72,.035,.11,.035,'#aeb8af',M.metal);
    c(4.15+dx,1.707,2.72,.057,.025,.057,'#9aab9f',M.metal);
@@ -387,9 +390,16 @@ const BarScene=(()=>{
   c(9.76,1.65,2.93,.28,.3,.28,'#58412e',M.glass,{topRadius:.85});
   c(9.76,1.8175,2.93,.3,.035,.3,'#252e29');
   // Preparation utensils, cutting board, produce and register.
-  b(6.52,1.115,2.94,.54,.035,.70,'#ac9261',M.wood);
-  b(6.52,1.14,2.68,.19,.008,.034,'#bec4b9',M.metal,{ry:.15});
-  b(6.36,1.143,2.704,.12,.018,.035,'#4c4536',M.wood,{ry:.15});
+  for(const point of globalThis.BarEngine?.preparationSlots?.filter(slot=>slot.kind==='cocktails')||[{x:6.5,y:1.133,z:3.05},{x:5.85,y:1.133,z:3.05}]){
+   b(point.x,point.y-.017,point.z,.52,.034,.40,'#ac9261',M.wood);
+   for(const dx of [-.235,.235])b(point.x+dx,point.y+.001,point.z,.009,.002,.35,'#80683f',M.wood,{castShadow:false});
+   for(const dz of [-.175,.175])b(point.x,point.y+.001,point.z+dz,.47,.002,.009,'#80683f',M.wood,{castShadow:false});
+  }
+  // Four tray places stay clear of both working boards and the customer glasses.
+  b(5.11,1.115,3.01,.74,.036,.68,'#a18c5e',M.metal);
+  b(5.11,1.133,3.01,.70,.002,.64,'#344e43',M.fabric,{castShadow:false});
+  for(const x of [4.75,5.47])b(x,1.146,3.01,.02,.027,.68,'#b8a275',M.metal);
+  for(const z of [2.68,3.34])b(5.11,1.146,z,.74,.027,.02,'#b8a275',M.metal);
   b(7.96,1.115,2.61,.20,.018,.30,'#b6b69c',M.fabric,{ry:-.12});
   c(7.2,1.22,3.02,.18,.25,.18,'#aeb7aa',M.metal,{topRadius:.8});
   c(7.47,1.19,3.02,.14,.18,.14,'#abb3a8',M.metal);
@@ -711,5 +721,5 @@ const BarScene=(()=>{
    b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
   }
  }
- return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,counterSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,counterSeat,prepStation,trayPosition,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

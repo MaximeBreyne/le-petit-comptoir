@@ -57,18 +57,26 @@ const preparationLayout=Object.freeze({
   wine:{x:2.9,y:1.02,z:.85},rum:{x:3.35,y:1.02,z:.85},whisky:{x:3.8,y:1.02,z:.85},gin:{x:4.25,y:1.02,z:.85},sugar:{x:4.7,y:1.02,z:.85},soda:{x:5.15,y:1.02,z:.85},tonic:{x:5.6,y:1.02,z:.85},cola:{x:6.05,y:1.02,z:.85},lime:{x:6.05,y:1.12,z:2.6},mint:{x:7.1,y:1.12,z:2.6},ice:{x:7.55,y:1.12,z:2.6},coffee:{x:9.65,y:1.02,z:.85},beer:{x:4.15,y:1.67,z:2.72,fixed:true}
  }).map(([key,point])=>[key,Object.freeze(point)])))
 });
+const preparationKind=id=>id==='beer'?'beer':id==='coffee'?'coffee':'cocktails';
+const preparationSlots=Object.freeze([
+ {id:'beer',kind:'beer',label:'Tireuse 1',...preparationLayout.stations.beer},
+ {id:'beer2',kind:'beer',label:'Tireuse 2',...preparationLayout.stations.beer,x:3.8},
+ {id:'coffee',kind:'coffee',label:'Machine à café',...preparationLayout.stations.coffee},
+ {id:'cocktails',kind:'cocktails',label:'Plan de préparation 1',...preparationLayout.stations.cocktails},
+ {id:'cocktails2',kind:'cocktails',label:'Plan de préparation 2',...preparationLayout.stations.cocktails,x:5.85}
+].map(Object.freeze));
 const waiterPaymentTasks=new Set(['collect-cash','prepare-change','return-change','pickup-terminal','take-card','wait-card','return-terminal']);
 const freshPayments=()=>({till:80,terminalCarried:false,terminalWithWaiter:false,terminalOrderId:null,cashRevenue:0,cardRevenue:0,receipts:[]});
-const fresh=()=>({version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20,whisky:0,gin:0,tonic:0,cola:0},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{cocktails:false,softDrinks:false,spirits:false,signature:false,counter:false,assistant:false,bartender:false,waiter:false,restockTimer:0},payments:freshPayments(),staff:{bartender:null,waiter:null,waiterPosition:{x:1.05,z:4.5}},orders:[],deliveries:[],prep:null,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
+const fresh=()=>({version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20,whisky:0,gin:0,tonic:0,cola:0},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{cocktails:false,softDrinks:false,spirits:false,signature:false,counter:false,assistant:false,bartender:false,waiter:false,restockTimer:0},payments:freshPayments(),staff:{bartender:null,waiter:null,waiterPosition:{x:1.05,z:4.5}},orders:[],deliveries:[],prep:null,parkedPreps:[],nextPrepId:1,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
 class Game{
  constructor(saved){this.s=fresh();if(saved&&saved.version===2){const s=saved;const nums=['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','capacity','spawn','nextId'];if(nums.every(k=>Number.isFinite(s[k]))&&isValidStock(s.stock)&&Array.isArray(s.orders)&&s.orders.every(o=>o&&Object.hasOwn(recipes,o.recipe)&&Number.isFinite(o.patience))&&Array.isArray(s.tray)&&s.tray.every(t=>t&&Object.hasOwn(recipes,t.recipe))&&Array.isArray(s.deliveries)&&s.deliveries.every(d=>d&&Object.hasOwn(ingredients,d.key)&&Number.isFinite(d.remaining))&&(!s.prep||(Object.hasOwn(recipes,s.prep.recipe)&&Number.isFinite(s.prep.amount)))){this.s=JSON.parse(JSON.stringify(s));
   // Legacy saves already own their service stock. Migrating must not grant a
   // second starter supply, clamp existing quantities or mutate the saved object.
   this.s.stock=normalizeReserve(s.stock);this.s.reserve=normalizeReserve(s.reserve);this.s.management=normalizeManagement(s);if(this.s.prep)this.s.prep.pouring=false;
-  this.normalizeService(s);this.normalizePreparation(s.prep);
+  this.normalizeService(s);this.normalizePreparations(s);
  }}}
  normalizePreparation(saved){
-  if(!saved){this.s.prep=null;return}
+  if(!saved||!Object.hasOwn(recipes,saved.recipe)||!Number.isFinite(saved.amount))return null;
   const recipe=recipes[saved.recipe],physical=saved.physical===true;
   const added=Object.fromEntries(Object.keys(recipe.ingredients).filter(key=>!physical||saved.added?.[key]===true).map(key=>[key,true]));
   const vesselPlaced=physical?saved.vesselPlaced===true:saved.step>0||saved.ready===true;
@@ -76,9 +84,26 @@ class Game{
   if(physical&&saved.held?.kind==='vessel'&&!vesselPlaced)held={kind:'vessel'};
   const key=saved.held?.key;
   if(physical&&vesselPlaced&&saved.held?.kind==='ingredient'&&key!=='beer'&&Object.hasOwn(recipe.ingredients,key)&&!added[key]&&saved.held.amount===recipe.ingredients[key])held={kind:'ingredient',key,amount:recipe.ingredients[key]};
-  this.s.prep={recipe:saved.recipe,physical:true,vesselPlaced,held,added,step:0,amount:bounded(saved.amount,0,recipe.target*1.6,0),pouring:false,ready:false,quality:bounded(saved.quality,0,100,0)};
-  const p=this.s.prep,complete=vesselPlaced&&Object.keys(recipe.ingredients).filter(key=>key!=='beer').every(key=>added[key]);
+  const p={recipe:saved.recipe,physical:true,vesselPlaced,held,added,step:0,amount:bounded(saved.amount,0,recipe.target*1.6,0),pouring:false,ready:false,quality:bounded(saved.quality,0,100,0)};
+  const complete=vesselPlaced&&Object.keys(recipe.ingredients).filter(key=>key!=='beer').every(key=>added[key]);
   if(complete){p.step=recipe.pourStep;if(Number.isInteger(recipe.finishStep)&&saved.step===recipe.finishStep)p.step=recipe.finishStep;p.ready=saved.ready===true&&Object.keys(recipe.ingredients).every(key=>added[key]);}
+  return p;
+ }
+ normalizePreparations(saved){
+  const s=this.s,slots=new Set(),ids=new Set(),orders=new Set();s.prep=null;s.parkedPreps=[];
+  let next=Number.isSafeInteger(saved.nextPrepId)&&saved.nextPrepId>0?saved.nextPrepId:1;
+  const list=[{value:saved.prep,active:true},...(Array.isArray(saved.parkedPreps)?saved.parkedPreps:[]).map(value=>({value,active:false}))];
+  for(const {value,active}of list){
+   const p=this.normalizePreparation(value);if(!p)continue;
+   const compatible=preparationSlots.filter(slot=>slot.kind===preparationKind(p.recipe)&&!slots.has(slot.id)),slot=compatible.find(slot=>slot.id===value.slotId)||compatible[0];if(!slot)continue;
+   p.id=Number.isSafeInteger(value.id)&&value.id>0&&!ids.has(value.id)?value.id:next++;
+   while(ids.has(p.id))p.id=next++;next=Math.max(next,p.id+1);ids.add(p.id);p.slotId=slot.id;slots.add(slot.id);
+   const order=s.orders.find(order=>order.id===value.orderId&&order.recipe===p.recipe&&this.orderPhase(order)==='preparing'&&!orders.has(order.id));
+   p.orderId=order?.id??null;if(order)orders.add(order.id);
+   if(!active)p.held=null;
+   if(active)s.prep=p;else s.parkedPreps.push(p);
+  }
+  s.nextPrepId=next;
  }
  normalizeService(saved){
   const s=this.s,occupiedTables=new Set(),occupiedSlots=new Set();
@@ -93,6 +118,7 @@ class Game{
    return {...order,id:Number.isSafeInteger(order.id)&&order.id>0?order.id:s.nextId+index,name:String(order.name||'Client').replace(/[<>]/g,'').slice(0,80),tableId:table?.id??null,slot,phase,patience:bounded(order.patience,0,100,100),arrivalRemaining:bounded(order.arrivalRemaining,0,3,0),drinkRemaining:bounded(order.drinkRemaining,0,10,phase==='drinking'?8:0),paymentMethod:order.paymentMethod==='cash'?'cash':'card',due,tender:money(bounded(order.tender,due,100,Math.ceil(due/5)*5)),cardRemaining:bounded(order.cardRemaining,0,3,phase==='card-processing'?3:0),tip:money(bounded(order.tip,0,1,Math.max(0,due-recipe.price)))};
   }).filter(Boolean);
   s.nextId=Math.max(s.nextId,...s.orders.map(order=>order.id+1));
+  for(const drink of s.tray)if(drink.orderId&&!s.orders.some(order=>order.id===drink.orderId&&order.recipe===drink.recipe&&this.orderPhase(order)==='preparing'))delete drink.orderId;
   const p=saved.payments,uncredited=s.orders.filter(order=>order.phase==='change-ready').reduce((sum,order)=>sum+order.due,0);
   s.payments={till:money(bounded(p?.till,0,Math.max(0,s.cash)+uncredited,Math.min(80,Math.max(0,s.cash)))),terminalCarried:p?.terminalCarried===true,terminalOrderId:null,cashRevenue:money(bounded(p?.cashRevenue,0,1e9,0)),cardRevenue:money(bounded(p?.cardRevenue,0,1e9,0)),receipts:Array.isArray(p?.receipts)?p.receipts.filter(r=>r&&Number.isSafeInteger(r.id)&&Number.isFinite(r.amount)&&r.amount>=0&&['cash','card'].includes(r.method)).slice(0,40):[]};
   s.payments.terminalWithWaiter=!!(s.management.waiter&&p?.terminalWithWaiter===true&&!s.payments.terminalCarried);
@@ -212,25 +238,78 @@ class Game{
   return `${ingredients[key].name} : ${quantity.toLocaleString('fr-BE',{maximumFractionDigits:2})} ${ingredients[key].unit} transférés au comptoir.`;
  }
  canWork(position){return !!position&&Number.isFinite(position.x)&&Number.isFinite(position.z)&&position.x>=2.25&&position.x<=10.35&&position.z>=1.15&&position.z<=2.30}
- preparationStation(id=this.s.prep?.recipe){return preparationLayout.stations[id==='beer'?'beer':id==='coffee'?'coffee':'cocktails']}
- nearPrepStation(position,id=this.s.prep?.recipe){return this.canWork(position)&&positionNear(position,this.preparationStation(id),preparationLayout.stationReach)}
+ preparations(){return [this.s.prep,...(this.s.parkedPreps||[])].filter(Boolean)}
+ preparationStation(value=this.s.prep){
+  const p=typeof value==='object'&&value?value:typeof value==='number'?this.preparations().find(prep=>prep.id===value):this.s.prep?.recipe===value?this.s.prep:null;
+  return preparationSlots.find(slot=>slot.id===p?.slotId)||preparationLayout.stations[preparationKind(p?.recipe||value)];
+ }
+ nearPrepStation(position,value=this.s.prep){return this.canWork(position)&&positionNear(position,this.preparationStation(value),preparationLayout.stationReach)}
  nearPreparationSource(key,position){const point=key==='vessels'?preparationLayout.vessels:preparationLayout.ingredients[key];return !!point&&this.canWork(position)&&positionNear(position,point,preparationLayout.reach)}
- preparationStatus(position){
-  const p=this.s.prep;if(!p)return null;
+ preparationStatus(position,prepId){
+  const p=prepId===undefined?this.s.prep:this.preparations().find(prep=>prep.id===prepId);if(!p)return null;
   const remaining=Object.keys(recipes[p.recipe].ingredients).filter(key=>key!=='beer'&&!p.added?.[key]);
   const stage=p.ready?'ready':p.held?.kind==='vessel'?'place-vessel':!p.vesselPlaced?'vessel':p.held?'place-ingredient':remaining.length?'ingredient':p.step===recipes[p.recipe].finishStep?'mix':'pour';
-  return {stage,remaining,held:p.held,station:this.preparationStation(),canWork:this.canWork(position),nearStation:this.nearPrepStation(position)};
+  return {stage,remaining,held:p.held,station:this.preparationStation(p),canWork:this.canWork(position),nearStation:this.nearPrepStation(position,p)};
  }
- start(id,position){let s=this.s;if(!Object.hasOwn(recipes,id))return 'Boisson inconnue.';if(!this.canWork(position))return 'Rejoignez l’espace de travail derrière le comptoir pour préparer une boisson.';if(!s.open)return 'Ouvrez le bar avant de préparer.';if(s.prep)return 'Terminez ou jetez la préparation en cours.';if(s.tray.length+(s.staff.bartender?1:0)>=s.capacity)return 'Le plateau est plein ou réservé par le préparateur : servez une boisson.';if(!this.canPrepare(id))return `Achetez la ${managementUpgrades[recipes[id].license].name.toLocaleLowerCase('fr-BE')} dans la tablette pour préparer cette boisson.`;if(!this.canMake(id))return 'Il manque des ingrédients. Réapprovisionnez le comptoir depuis la réserve.';s.prep={recipe:id,physical:true,vesselPlaced:false,held:null,added:{},step:0,amount:0,pouring:false,ready:false,quality:0};return 'Prenez '+recipes[id].glass.toLocaleLowerCase('fr-BE')+' au rangement derrière le bar.'}
+ preparationQueue(){
+  const s=this.s,used=new Set(),preps=this.preparations(),drinks=s.tray.map((drink,index)=>({...drink,index}));
+  const rows=s.orders.filter(order=>this.orderPhase(order)==='preparing'&&(order.arrivalRemaining||0)<=0).map(order=>({orderId:order.id,recipe:order.recipe,place:order.tableId?'Table '+order.tableId:'Comptoir '+((order.slot??0)+1),name:order.name,status:'todo',prepId:null}));
+  const claim=(orderId,recipe,status,prepId)=>{const row=rows.find(row=>row.orderId===orderId&&row.recipe===recipe&&row.status==='todo');if(row){row.status=status;row.prepId=prepId??null;}return !!row;};
+  const waiter=s.staff.waiter,bartender=s.staff.bartender;
+  if(waiter?.task==='serve')claim(waiter.orderId,waiter.recipe||waiter.drink?.recipe,'serving');
+  for(const drink of drinks)if(drink.orderId&&claim(drink.orderId,drink.recipe,'ready'))used.add(drink.index);
+  if(bartender&&claim(bartender.orderId,bartender.recipe,'preparing'))rows.find(row=>row.orderId===bartender.orderId).worker='bartender';
+  for(const p of preps)if(p.orderId)claim(p.orderId,p.recipe,p.ready?'ready':'preparing',p.id);
+  for(const drink of drinks)if(!drink.orderId&&!used.has(drink.index)){const row=rows.find(row=>row.recipe===drink.recipe&&row.status==='todo');if(row){claim(row.orderId,row.recipe,'ready');used.add(drink.index)}}
+  for(const p of preps)if(!p.orderId){const row=rows.find(row=>row.recipe===p.recipe&&row.status==='todo');if(row)claim(row.orderId,row.recipe,p.ready?'ready':'preparing',p.id)}
+  return rows;
+ }
+ freePreparationSlot(recipe){const occupied=new Set(this.preparations().map(p=>p.slotId));return preparationSlots.find(slot=>slot.kind===preparationKind(recipe)&&!occupied.has(slot.id))||null}
+ preparationStartError(id,position,orderId){
+  const s=this.s;if(!Object.hasOwn(recipes,id))return 'Boisson inconnue.';
+  if(!this.canWork(position))return 'Rejoignez l’espace de travail derrière le comptoir pour préparer une boisson.';
+  if(!s.open||s.gameOver)return 'Ouvrez le bar avant de préparer.';
+  if(this.preparations().some(p=>p.held))return 'Posez d’abord le récipient ou l’ingrédient que vous tenez.';
+  if(s.prep&&!s.prep.vesselPlaced)return 'Prenez et posez d’abord le récipient de la préparation active.';
+  if(!this.canPrepare(id))return `Achetez la ${managementUpgrades[recipes[id].license].name.toLocaleLowerCase('fr-BE')} dans la tablette pour préparer cette boisson.`;
+  if(!this.canMake(id))return 'Il manque des ingrédients. Réapprovisionnez le comptoir depuis la réserve.';
+  if(!this.freePreparationSlot(id))return 'Tous les emplacements de ce poste sont occupés. Terminez une boisson pour libérer une place.';
+  if(orderId!=null&&!this.preparationQueue().some(row=>row.orderId===orderId&&row.recipe===id&&row.status==='todo'))return 'Cette commande est déjà en préparation ou n’est plus à réaliser.';
+  return null;
+ }
+ preparationAvailability(id,position,orderId){
+  if(!this.nearPreparationSource('vessels',position))return 'Approchez-vous du rangement des verres derrière le bar.';
+  return this.preparationStartError(id,position,orderId);
+ }
+ start(id,position,orderId){
+  const error=this.preparationStartError(id,position,orderId);if(error)return error;
+  const s=this.s,slot=this.freePreparationSlot(id),order=this.preparationQueue().find(row=>row.recipe===id&&row.status==='todo'&&(orderId==null||row.orderId===orderId));
+  this.setPour(false);s.parkedPreps??=[];if(s.prep)s.parkedPreps.push(s.prep);
+  s.nextPrepId=Number.isSafeInteger(s.nextPrepId)&&s.nextPrepId>0?s.nextPrepId:1;
+  s.prep={id:s.nextPrepId++,slotId:slot.id,orderId:order?.orderId??null,recipe:id,physical:true,vesselPlaced:false,held:null,added:{},step:0,amount:0,pouring:false,ready:false,quality:0};
+  return 'Prenez '+recipes[id].glass.toLocaleLowerCase('fr-BE')+' au rangement derrière le bar.';
+ }
+ beginAtVessels(id,position,orderId){
+  const error=this.preparationAvailability(id,position,orderId);if(error)return error;
+  this.start(id,position,orderId);return this.takeVessel(position);
+ }
+ selectPreparation(id,position){
+  const s=this.s,p=this.preparations().find(prep=>prep.id===id);if(!p)return 'Cette préparation n’est plus disponible.';
+  if(!this.nearPrepStation(position,p))return 'Approchez-vous de cette préparation derrière le comptoir.';
+  if(s.prep===p)return null;
+  if(this.preparations().some(prep=>prep.held))return 'Posez d’abord le récipient ou l’ingrédient que vous tenez.';
+  this.setPour(false);s.parkedPreps=s.parkedPreps.filter(prep=>prep!==p);if(s.prep)s.parkedPreps.push(s.prep);s.prep=p;
+  return recipes[p.recipe].name+' sélectionné.';
+ }
  takeVessel(position){
-  const p=this.s.prep;if(!p)return 'Choisissez une recette sur la tablette.';
+  const p=this.s.prep;if(!p)return 'Choisissez une boisson au rangement des verres.';
   if(!this.nearPreparationSource('vessels',position))return 'Approchez-vous du rangement des verres derrière le bar.';
   if(p.held)return 'Posez d’abord ce que vous tenez au poste de préparation.';
   if(p.vesselPlaced)return 'Le récipient est déjà sur le poste.';
   p.held={kind:'vessel'};return recipes[p.recipe].glass+' pris. Posez-le au poste de préparation.';
  }
  takeIngredient(key,position){
-  const p=this.s.prep;if(!p)return 'Choisissez une recette sur la tablette.';
+  const p=this.s.prep;if(!p)return 'Choisissez une boisson au rangement des verres.';
   if(!Object.hasOwn(recipes[p.recipe].ingredients,key)||key==='beer')return key==='beer'?'La bière se tire directement au robinet.':'Cet ingrédient ne fait pas partie de la recette.';
   if(!this.nearPreparationSource(key,position))return 'Approchez-vous de cet ingrédient derrière le bar.';
   if(!p.vesselPlaced)return 'Prenez et posez d’abord le récipient au poste.';
@@ -250,7 +329,7 @@ class Game{
  step(){return 'Prenez le récipient et les ingrédients dans le bar, puis apportez-les au poste.'}
  isPour(){const p=this.s.prep;return !!p&&!p.ready&&p.vesselPlaced&&!p.held&&p.step===recipes[p.recipe].pourStep&&Object.keys(recipes[p.recipe].ingredients).filter(key=>key!=='beer').every(key=>p.added?.[key])}
  setPour(v,position){
-  const p=this.s.prep;if(!p)return;if(!v){p.pouring=false;return}
+  if(!v){for(const prep of this.preparations())prep.pouring=false;return}const p=this.s.prep;if(!p)return;
   if(!this.nearPrepStation(position)){p.pouring=false;return 'Rejoignez le poste pour doser la boisson.'}
   if(!this.isPour()){p.pouring=false;return 'Apportez d’abord le récipient et tous les ingrédients au poste.'}
   if(p.recipe==='beer'&&!p.added.beer){const amount=recipes.beer.ingredients.beer;if(this.s.stock.beer<amount){p.pouring=false;return 'Le fût est vide : réapprovisionnez la bière.'}this.s.stock.beer-=amount;p.added.beer=true}
@@ -258,12 +337,12 @@ class Game{
  }
  finishPour(position){const p=this.s.prep;if(!this.nearPrepStation(position))return 'Rejoignez le poste pour terminer le dosage.';if(!this.isPour())return;if(p.recipe==='beer'&&!p.added.beer)return 'Tirez d’abord la bière au robinet.';p.pouring=false;const r=recipes[p.recipe];p.quality=Math.max(0,Math.round(100-Math.abs(p.amount-r.target)/r.target*180));if(Number.isInteger(r.finishStep))p.step=r.finishStep;else p.ready=true}
  finishMix(position){const p=this.s.prep;if(!this.nearPrepStation(position))return 'Rejoignez le poste pour mélanger la boisson.';if(p&&!p.ready&&!p.held&&Number.isInteger(recipes[p.recipe].finishStep)&&p.step===recipes[p.recipe].finishStep)p.ready=true}
- plate(position){const s=this.s,p=s.prep;if(!this.nearPrepStation(position))return 'Rejoignez le poste pour prendre la boisson préparée.';if(!p?.ready)return 'Terminez la préparation.';if(s.tray.length+(s.staff.bartender?1:0)>=s.capacity)return 'Le plateau est plein.';s.tray.push({recipe:p.recipe,quality:p.quality});s.prep=null;return 'Boisson déposée sur le plateau.'}
+ plate(position){const s=this.s,p=s.prep;if(!this.nearPrepStation(position))return 'Rejoignez le poste pour prendre la boisson préparée.';if(!p?.ready)return 'Terminez la préparation.';if(s.tray.length+(s.staff.bartender?1:0)>=s.capacity)return 'Le plateau est plein.';const drink={recipe:p.recipe,quality:p.quality};if(p.orderId&&s.orders.some(order=>order.id===p.orderId&&order.recipe===p.recipe&&this.orderPhase(order)==='preparing'))drink.orderId=p.orderId;s.tray.push(drink);s.prep=null;return 'Boisson déposée sur le plateau.'}
  discard(index){let s=this.s;if(index===undefined){if(!s.prep)return;s.prep=null;}else{if(!s.tray[index])return;s.tray.splice(index,1)}s.waste++;return 'Boisson jetée. Les ingrédients sont perdus.'}
  takeOrder(id,position){const order=this.s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous de la table pour prendre la commande.';if(this.orderPhase(order)!=='awaiting-order')return 'La commande a déjà été prise.';order.phase='preparing';order.patience=100;return `Table ${order.tableId} : ${recipes[order.recipe].name}. Commande envoyée au bar.`}
  trayDrinkIndex(order){return this.s.tray.findIndex(drink=>drink.recipe===order.recipe&&(!drink.orderId||drink.orderId===order.id))}
  serve(id,position){const s=this.s,order=s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous du client pour apporter sa boisson.';if(this.orderPhase(order)!=='preparing')return this.orderPhase(order)==='awaiting-order'?'Prenez d’abord sa commande.':'Ce client a déjà été servi.';if(s.staff.waiter?.task==='serve'&&s.staff.waiter.orderId===id)return 'Le serveur apporte déjà cette commande.';const index=this.trayDrinkIndex(order);if(index<0)return 'Préparez '+recipes[order.recipe].name+' et posez-le sur le plateau.';return this.deliverDrink(order,s.tray.splice(index,1)[0])}
- deliverDrink(order,drink){const s=this.s;if(drink.quality<40){this.removeOrder(order);s.lost++;return 'Boisson refusée : dosage trop éloigné de la recette.'}order.tip=drink.quality>=85&&order.patience>25?1:0;order.due=money(recipes[order.recipe].price+order.tip);order.paymentMethod=order.paymentMethod==='cash'?'cash':'card';order.tender=[5,10,20,50,100].find(note=>note>=order.due)||order.due;if(order.paymentMethod==='cash'&&order.tender===order.due&&order.id%2===1)order.tender=Math.min(100,order.tender*2);order.phase='drinking';order.drinkRemaining=order.tableId?8:4;order.patience=Math.max(25,order.patience);return 'Boisson servie. Le client vous demandera ensuite l’addition.'}
+ deliverDrink(order,drink){const s=this.s;if(drink.quality<40){this.removeOrder(order);s.lost++;return 'Boisson refusée : dosage trop éloigné de la recette.'}order.tip=drink.quality>=85&&order.patience>25?1:0;order.due=money(recipes[order.recipe].price+order.tip);order.paymentMethod=order.paymentMethod==='cash'?'cash':'card';order.tender=[5,10,20,50,100].find(note=>note>=order.due)||order.due;if(order.paymentMethod==='cash'&&order.tender===order.due&&order.id%2===1)order.tender=Math.min(100,order.tender*2);order.phase='drinking';order.drinkRemaining=order.tableId?8:4;order.patience=Math.max(25,order.patience);this.releaseOrderDrinks(order.id);return 'Boisson servie. Le client vous demandera ensuite l’addition.'}
  collectCash(id,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const order=this.s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous du client pour prendre les espèces.';if(this.orderPhase(order)!=='payment'||order.paymentMethod!=='cash')return 'Ce client ne vous remet pas d’espèces maintenant.';order.phase='cash-collected';return `${order.tender.toFixed(2)} € reçus. Rejoignez la caisse pour préparer la monnaie.`}
  prepareChange(id,amount,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const s=this.s,order=s.orders.find(o=>o.id===id);if(!this.nearRegister(position))return 'Rejoignez la caisse au comptoir.';if(!order||this.orderPhase(order)!=='cash-collected')return 'Aucun encaissement en espèces à traiter pour ce client.';const expected=money(order.tender-order.due);if(!Number.isFinite(amount)||amount<0||Math.abs(amount-expected)>.000001)return 'Le montant de monnaie est incorrect. Vérifiez le total et les espèces reçues.';if(s.payments.till+1e-9<expected)return 'Le fond de caisse est insuffisant pour rendre la monnaie. Ajoutez des espèces depuis la trésorerie.';s.payments.till=money(s.payments.till+order.due);order.change=expected;order.phase='change-ready';return expected?`${expected.toFixed(2)} € de monnaie préparés. Rapportez-les au client.`:'Paiement exact. Rapportez le ticket au client.'}
  completeCash(id,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const order=this.s.orders.find(o=>o.id===id);if(!order||this.orderPhase(order)!=='change-ready')return 'Préparez la monnaie à la caisse avant de revenir.';if(!this.canReachOrder(id,position))return 'Retournez auprès du client pour terminer l’encaissement.';this.finishPayment(order,'cash');return 'Monnaie et ticket remis. Paiement enregistré.'}
@@ -271,20 +350,21 @@ class Game{
  returnTerminal(position,actor='player'){const p=this.s.payments;if(!this.nearRegister(position))return 'Reposez le terminal sur son socle au comptoir.';if(p.terminalOrderId!==null)return 'Attendez la confirmation du paiement en cours.';if(actor==='waiter'){p.terminalWithWaiter=false;return 'Terminal rapporté par le serveur.'}if(p.terminalWithWaiter)return 'Le serveur rapporte le terminal.';if(!p.terminalCarried)return 'Le terminal est déjà sur son socle.';p.terminalCarried=false;return 'Terminal reposé sur son socle.'}
  payCard(id,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const s=this.s,order=s.orders.find(o=>o.id===id);if(!order||this.orderPhase(order)!=='payment'||order.paymentMethod!=='card')return 'Aucun paiement par carte disponible pour ce client.';if(!(actor==='waiter'?s.payments.terminalWithWaiter:s.payments.terminalCarried))return 'Prenez le terminal sans fil au comptoir.';if(s.payments.terminalOrderId!==null)return 'Le terminal traite déjà un paiement.';if(!this.canReachOrder(id,position))return 'Apportez le terminal auprès du client.';order.phase='card-processing';order.cardRemaining=3;s.payments.terminalOrderId=id;return 'Carte présentée. Autorisation en cours…'}
  finishPayment(order,method){const s=this.s;if(!s.orders.includes(order))return;const amount=money(order.due);s.cash=money(s.cash+amount);s.revenue=money(s.revenue+amount);s.payments[method==='cash'?'cashRevenue':'cardRevenue']=money(s.payments[method==='cash'?'cashRevenue':'cardRevenue']+amount);s.sold++;s.totalSold++;s.payments.receipts.unshift({id:order.id,day:s.day,customerName:order.name||'Client',tableId:order.tableId??null,recipe:order.recipe,method,amount,tip:order.tip||0,time:s.time});s.payments.receipts.length=Math.min(40,s.payments.receipts.length);this.removeOrder(order)}
- removeOrder(order){const s=this.s;s.orders=s.orders.filter(o=>o!==order);for(const drink of s.tray)if(drink.orderId===order.id)delete drink.orderId;if(s.payments.terminalOrderId===order.id)s.payments.terminalOrderId=null}
+ releaseOrderDrinks(id){for(const drink of this.s.tray)if(drink.orderId===id)delete drink.orderId;for(const p of this.preparations())if(p.orderId===id)p.orderId=null}
+ removeOrder(order){const s=this.s;s.orders=s.orders.filter(o=>o!==order);this.releaseOrderDrinks(order.id);if(s.payments.terminalOrderId===order.id)s.payments.terminalOrderId=null}
  upgrade(){return this.purchaseUpgrade('tray')}
  close(){if(!this.s.open)return;this.s.closing=true;return 'Dernières commandes : servez et encaissez les clients restants.'}
- end(){let s=this.s;if(s.orders.length||s.payments.terminalWithWaiter||s.staff.waiter?.task==='return-terminal')return null;const salaries=['assistant','bartender','waiter'].reduce((sum,id)=>sum+(s.management[id]?managementUpgrades[id].salary:0),0),charges=35+salaries;this.spend(charges);s.waste+=s.tray.length+(s.prep?1:0)+(s.staff.bartender?1:0)+(s.staff.waiter?.drink?1:0);s.lastReport={day:s.day,revenue:s.revenue,cashRevenue:s.payments.cashRevenue,cardRevenue:s.payments.cardRevenue,expenses:s.expenses,charges,salaries,profit:s.revenue-s.expenses-charges,sold:s.sold,lost:s.lost,waste:s.waste};s.open=false;s.closing=false;s.orders=[];s.tray=[];s.prep=null;s.staff={bartender:null,waiter:null,waiterPosition:{x:1.05,z:4.5}};s.payments.terminalWithWaiter=false;s.payments.cashRevenue=0;s.payments.cardRevenue=0;s.payments.terminalOrderId=null;s.management.restockTimer=0;s.gameOver=s.cash<0;s.day++;s.time=1020;s.sold=0;s.lost=0;s.revenue=0;s.expenses=0;s.waste=0;return s.lastReport}
+ end(){let s=this.s;if(s.orders.length||s.payments.terminalWithWaiter||s.staff.waiter?.task==='return-terminal')return null;const salaries=['assistant','bartender','waiter'].reduce((sum,id)=>sum+(s.management[id]?managementUpgrades[id].salary:0),0),charges=35+salaries;this.spend(charges);s.waste+=s.tray.length+this.preparations().length+(s.staff.bartender?1:0)+(s.staff.waiter?.drink?1:0);s.lastReport={day:s.day,revenue:s.revenue,cashRevenue:s.payments.cashRevenue,cardRevenue:s.payments.cardRevenue,expenses:s.expenses,charges,salaries,profit:s.revenue-s.expenses-charges,sold:s.sold,lost:s.lost,waste:s.waste};s.open=false;s.closing=false;s.orders=[];s.tray=[];s.prep=null;s.parkedPreps=[];s.staff={bartender:null,waiter:null,waiterPosition:{x:1.05,z:4.5}};s.payments.terminalWithWaiter=false;s.payments.cashRevenue=0;s.payments.cardRevenue=0;s.payments.terminalOrderId=null;s.management.restockTimer=0;s.gameOver=s.cash<0;s.day++;s.time=1020;s.sold=0;s.lost=0;s.revenue=0;s.expenses=0;s.waste=0;return s.lastReport}
  staffTick(dt){
   const s=this.s;
   let job=s.staff.bartender;
   if(job){
    const order=s.orders.find(order=>order.id===job.orderId);
    if(!s.management.bartender||!order||this.orderPhase(order)!=='preparing'||!this.canPrepare(job.recipe)){s.waste++;s.staff.bartender=null}
-   else {job.remaining=Math.max(0,job.remaining-dt);if(job.remaining<=1e-9&&s.tray.length+(s.prep?1:0)<s.capacity){s.tray.push({recipe:job.recipe,quality:92,orderId:job.orderId});s.staff.bartender=null}}
+   else {job.remaining=Math.max(0,job.remaining-dt);if(job.remaining<=1e-9&&s.tray.length<s.capacity){s.tray.push({recipe:job.recipe,quality:92,orderId:job.orderId});s.staff.bartender=null}}
   }
-  if(s.management.bartender&&!s.staff.bartender&&s.tray.length+(s.prep?1:0)<s.capacity){
-   const order=s.orders.find(order=>this.orderPhase(order)==='preparing'&&(order.arrivalRemaining||0)<=0&&this.canMake(order.recipe)&&s.prep?.recipe!==order.recipe&&this.trayDrinkIndex(order)<0&&!(s.staff.waiter?.task==='serve'&&s.staff.waiter.orderId===order.id));
+  if(s.management.bartender&&!s.staff.bartender&&s.tray.length<s.capacity){
+   const pending=this.preparationQueue().find(row=>row.status==='todo'&&this.canMake(row.recipe));const order=s.orders.find(order=>order.id===pending?.orderId);
    if(order){for(const [key,amount]of Object.entries(recipes[order.recipe].ingredients))s.stock[key]-=amount;const total=Math.max(8,recipes[order.recipe].steps.length*2);s.staff.bartender={orderId:order.id,recipe:order.recipe,remaining:total,total}}
   }
   this.waiterTick(dt);
@@ -295,7 +375,7 @@ class Game{
    const order=s.orders.find(order=>order.id===job.orderId);
    if(job.task==='wait-card'&&!order&&p.terminalWithWaiter){this.assignWaiterJob('return-terminal',null);job=s.staff.waiter;}
    else if(!s.management.waiter||!this.validWaiterJob(job,order)){
-    if(job.drink){delete job.drink.orderId;if(s.tray.length+(s.prep?1:0)+(s.staff.bartender?1:0)<s.capacity)s.tray.push(job.drink);else s.waste++}
+    if(job.drink){delete job.drink.orderId;if(s.tray.length+(s.staff.bartender?1:0)<s.capacity)s.tray.push(job.drink);else s.waste++}
     if(order?.phase==='payment')delete order.paymentBy;
     s.staff.waiter=null;
     if(p.terminalWithWaiter){if(s.management.waiter)this.assignWaiterJob('return-terminal',null);else p.terminalWithWaiter=false;}
@@ -366,5 +446,5 @@ class Game{
   // Do not accumulate missed arrivals while all available seats are occupied.
   s.spawn=Math.max(0,s.spawn-dt);if(!s.closing&&s.spawn<=1e-9)this.spawnCustomer();if(s.closing&&s.orders.length===0)return this.end()}
 }
-const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
+const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout,preparationSlots};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
