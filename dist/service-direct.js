@@ -20,6 +20,7 @@ window.BarService=(()=>{
  }
  function customerLabel(order){
   const phase=game.orderPhase(order),location=place(order);
+  if(game.paymentHandledByWaiter?.(order.id))return waiterPaymentMessage(game.waiterPaymentStatus(order.id))+' · '+location;
   if(phase==='awaiting-order')return `E : prendre la commande · ${location}`;
   if(phase==='preparing'){
    if(game.s.staff.waiter?.task==='serve'&&game.s.staff.waiter.orderId===order.id)return `Serveur en route · ${location}`;
@@ -39,7 +40,7 @@ window.BarService=(()=>{
   if(atRegister(position)){
    for(const [kind,point,radius,label]of [
     ['register',{x:2.65,y:1.59,z:2.94},.30,'E : ouvrir la caisse'],
-    ['terminal',{x:3.25,y:1.2,z:2.65},.16,game.s.payments.terminalCarried?'E : reposer le terminal sur son socle':'E : prendre le terminal sans fil'],
+    ['terminal',{x:3.25,y:1.2,z:2.65},.16,game.s.payments.terminalWithWaiter?'Terminal utilisé par le serveur':game.s.staff.waiter?.task==='pickup-terminal'?'Le serveur vient chercher le terminal':game.s.payments.terminalCarried?'E : reposer le terminal sur son socle':'E : prendre le terminal sans fil'],
    ]){const hit=aim(position,point,radius,1.8);if(hit)candidates.push({action:'direct-service',kind,label,...hit});}
   }
   for(const order of game.s.orders){
@@ -57,9 +58,11 @@ window.BarService=(()=>{
   if(!current||current.kind!==request?.kind||current.orderId!==request?.orderId)return false;
   if(current.kind==='register')return openRegister();
   if(current.kind==='terminal'){
+   if(game.s.payments.terminalWithWaiter||game.s.staff.waiter?.task==='pickup-terminal'){toast('Le serveur rapporte le terminal après son encaissement.');return true;}
    act(()=>game.s.payments.terminalCarried?game.returnTerminal(camera):game.pickupTerminal(camera));return true;
   }
   const order=game.s.orders.find(order=>order.id===current.orderId);if(!order)return false;
+  if(game.paymentHandledByWaiter?.(order.id)){toast(waiterPaymentMessage(game.waiterPaymentStatus(order.id)));return true;}
   const phase=game.orderPhase(order);
   if(phase==='awaiting-order')act(()=>game.takeOrder(order.id,camera));
   else if(phase==='preparing')act(()=>game.serve(order.id,camera));
@@ -117,13 +120,14 @@ window.BarService=(()=>{
   const ready=s.orders.filter(order=>game.orderPhase(order)==='change-ready');
   cashEmpty.hidden=pending.length>0;cashEmpty.textContent=ready.length?'Monnaie prête : retournez auprès des clients pour leur remettre la monnaie et le ticket.':'Aucune somme à compter. Prenez les espèces auprès du client qui souhaite régler.';
   for(const order of pending){
-   const entry=cashCards.get(order.id)||cashCard(order),expected=cents(order.tender)-cents(order.due),selected=entry.selected.reduce((a,b)=>a+b,0),left=expected-selected;
+   const entry=cashCards.get(order.id)||cashCard(order),expected=cents(order.tender)-cents(order.due),selected=entry.selected.reduce((a,b)=>a+b,0),left=expected-selected,handled=game.paymentHandledByWaiter?.(order.id);
    entry.title.textContent=`${place(order)} · ${order.name||'Client'}`;entry.details.textContent=`Addition : ${money(order.due)} · Reçu : ${money(order.tender)}`;entry.due.textContent=`À rendre : ${money(expected/100)}`;
    entry.selectedValue.textContent=`Sélection : ${money(selected/100)}`;
    entry.remaining.textContent=!near?'Rejoignez la caisse.':expected>cents(s.payments.till)?'Ajoutez des espèces au tiroir pour rendre la monnaie.':left>0?`Il reste ${money(left/100)} à sélectionner.`:left<0?`Retirez ${money(-left/100)}.`:'Le montant est exact.';
    entry.remaining.dataset.exact=String(left===0);
-   for(const coin of entry.coins.children)coin.disabled=!near||s.gameOver;
-   entry.undo.disabled=entry.reset.disabled=!near||!entry.selected.length;entry.confirm.disabled=!near||s.gameOver||selected!==expected||expected>cents(s.payments.till);
+   if(handled)entry.remaining.textContent=waiterPaymentMessage(game.waiterPaymentStatus(order.id));
+   for(const coin of entry.coins.children)coin.disabled=!near||s.gameOver||handled;
+   entry.undo.disabled=entry.reset.disabled=!near||handled||!entry.selected.length;entry.confirm.disabled=!near||handled||s.gameOver||selected!==expected||expected>cents(s.payments.till);
    entry.confirm.textContent=expected===0?'Préparer le ticket':'Préparer la monnaie';
   }
   const funding=Number(fundInput.value);fundInput.disabled=!near||s.gameOver;fundButton.disabled=!near||s.gameOver||!Number.isFinite(funding)||funding<=0||Math.abs(cents(funding)-funding*100)>1e-7||funding>bank;

@@ -8,7 +8,7 @@ const {Renderer,Scene,Venue}=vm.runInContext('({Renderer:BarRenderer,Scene:BarSc
 function renderer(limit){
  const result=Object.create(Renderer.prototype);
  result.gl={MAX_TEXTURE_SIZE:0x0d33,getParameter:()=>limit,bindBuffer(){},bufferData(){}};
- result.colors=new Map();result.scratch=new Float32Array(16384);result.sceneLabels=Venue.labelTemplates;result.uploadAtlas=()=>{};
+ result.colors=new Map();result.scratch=new Float32Array(16384);result.sceneLabels=[...Venue.labelTemplates,...Scene.terminalLabelTemplates];result.uploadAtlas=()=>{};
  return result;
 }
 function inspectAtlas(r){
@@ -22,7 +22,7 @@ for(const limit of [4096,2048])test(`the real venue labels fit the ${limit}px at
  const r=renderer(limit),boxes=Scene.create();Venue.addFrame(boxes);r.setScene(boxes);
  assert.equal(r.atlas.width,limit);assert.equal(r.atlas.height,2048);assert.ok(r.labelMap.size>=30);inspectAtlas(r);
  const existing=[...r.labelMap].map(([key,rect])=>[key,{...rect}]);
- for(const box of [...boxes,...Venue.labelTemplates].filter(b=>b.label||b.labelLines)){
+ for(const box of [...boxes,...Venue.labelTemplates,...Scene.terminalLabelTemplates].filter(b=>b.label||b.labelLines)){
   const rect=r.label(box),size=r.labelDimensions(box);assert.ok(Math.abs((rect.u1-rect.u0)*r.atlas.width-size.w)<1e-6);assert.ok(Math.abs((rect.v1-rect.v0)*r.atlas.height-size.h)<1e-6);
   assert.ok(Math.abs(size.w/size.h/r.labelAspect(box)-1)<.025,'Glyph aspect ratio follows the physical sign');
  }

@@ -71,6 +71,8 @@ Carte : prenez le terminal sans fil sur son socle près de la caisse, rejoignez
 le client et présentez-le avec E ou un clic. La validation prend trois secondes.
 Vous gardez le terminal jusqu’à son retour sur le socle. Les recettes et la
 progression sont comptées à la confirmation du règlement, sans double paiement.
+Le terminal affiche le montant et l’état du paiement. Son écran, son clavier
+numérique, ses touches de validation et son socle de recharge sont modélisés.
 Les commandes, encaissements en cours et tâches des employés sont sauvegardés.
 Le bilan du soir attend la fin des commandes et des paiements.
 
@@ -108,7 +110,15 @@ Préparateur de boissons : 24 clients encaissés et 300 euros, puis 18 euros par
 Il prépare les commandes prises en consommant les ingrédients du comptoir et
 dépose les boissons sur le plateau, dans la limite de sa capacité.
 Serveur : 32 clients encaissés et 380 euros, puis 22 euros par soir. Il prend les
-commandes à table et apporte les boissons. Les encaissements restent à votre charge.
+commandes à table, apporte les boissons et encaisse les espèces et les cartes.
+Pour les espèces, il passe à la caisse, compte la monnaie et la rapporte au client.
+Si nécessaire, il alimente le tiroir depuis la trésorerie disponible ; si elle
+ne suffit pas, il attend de la monnaie et continue les autres tâches possibles.
+Pour les cartes, il prend le terminal partagé, attend l’autorisation puis le
+rapporte sur son socle. Reposez le terminal si vous le portez pour le lui laisser.
+Un paiement pris en charge par le serveur ne peut pas être encaissé deux fois.
+Les serveurs déjà recrutés bénéficient de ces fonctions et les tâches en cours
+sont conservées en sauvegarde, y compris le transport du terminal et de la monnaie.
 Les anciennes sauvegardes gardent l’accès aux cocktails.
 Elles conservent aussi leur argent, stocks, employés, commandes et préparations.
 Les trois nouvelles licences restent à acheter et les quatre nouveaux stocks
@@ -168,6 +178,8 @@ electron checks/preparation-ui.cjs vérifie les dix recettes par interactions
 E/clic, les déplacements réels dans l’allée, les stocks et le refus à distance.
 electron checks/direct-service.cjs vérifie le service et les paiements directs,
 le comptage à la caisse et le terminal, sans ouvrir la tablette.
+electron checks/waiter-payments-ui.cjs vérifie les encaissements du serveur,
+le partage du terminal, les sauvegardes et les commandes disponibles au joueur.
 electron checks/graphics.cjs vérifie la transparence des vitrages, leur profondeur,
 la lumière du jour et de nuit, et mesure le rendu avec dix personnages.
 electron checks/visual-preview.cjs produit les aperçus du bar, du panneau

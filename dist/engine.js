@@ -15,7 +15,7 @@ const managementUpgrades=Object.freeze({
  counter:{name:'Comptoir équipé',category:'building',requiredSales:12,cost:180,requires:[],description:'Augmentez de 50 % la capacité de chaque ingrédient au comptoir.'},
  assistant:{name:'Aide de réserve',category:'team',requiredSales:18,cost:220,salary:10,requires:[],description:'Réapprovisionne le comptoir depuis la réserve toutes les 12 secondes de service. Salaire : 10 € par soir.'},
  bartender:{name:'Préparateur de boissons',category:'team',requiredSales:24,cost:300,salary:18,requires:[],description:'Prépare les commandes prises, avec les ingrédients du comptoir, puis les pose sur le plateau. Salaire : 18 € par soir.'},
- waiter:{name:'Serveur',category:'team',requiredSales:32,cost:380,salary:22,requires:[],description:'Prend les commandes à table et apporte les boissons disponibles. Vous gérez les encaissements. Salaire : 22 € par soir.'}
+ waiter:{name:'Serveur',category:'team',requiredSales:32,cost:380,salary:22,requires:[],description:'Prend les commandes, apporte les boissons et encaisse les espèces ou les cartes avec le terminal partagé. Salaire : 22 € par soir.'}
 });
 function normalizeManagement(saved){
  const value=saved.management;
@@ -48,8 +48,9 @@ const preparationLayout=Object.freeze({
   wine:{x:2.9,y:1.02,z:.85},rum:{x:3.35,y:1.02,z:.85},whisky:{x:3.8,y:1.02,z:.85},gin:{x:4.25,y:1.02,z:.85},sugar:{x:4.7,y:1.02,z:.85},soda:{x:5.15,y:1.02,z:.85},tonic:{x:5.6,y:1.02,z:.85},cola:{x:6.05,y:1.02,z:.85},lime:{x:6.05,y:1.12,z:2.6},mint:{x:7.1,y:1.12,z:2.6},ice:{x:7.55,y:1.12,z:2.6},coffee:{x:9.65,y:1.02,z:.85},beer:{x:4.15,y:1.67,z:2.72,fixed:true}
  }).map(([key,point])=>[key,Object.freeze(point)])))
 });
-const freshPayments=()=>({till:80,terminalCarried:false,terminalOrderId:null,cashRevenue:0,cardRevenue:0,receipts:[]});
-const fresh=()=>({version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20,whisky:0,gin:0,tonic:0,cola:0},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{cocktails:false,softDrinks:false,spirits:false,signature:false,counter:false,assistant:false,bartender:false,waiter:false,restockTimer:0},payments:freshPayments(),staff:{bartender:null,waiter:null},orders:[],deliveries:[],prep:null,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
+const waiterPaymentTasks=new Set(['collect-cash','prepare-change','return-change','pickup-terminal','take-card','wait-card','return-terminal']);
+const freshPayments=()=>({till:80,terminalCarried:false,terminalWithWaiter:false,terminalOrderId:null,cashRevenue:0,cardRevenue:0,receipts:[]});
+const fresh=()=>({version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20,whisky:0,gin:0,tonic:0,cola:0},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{cocktails:false,softDrinks:false,spirits:false,signature:false,counter:false,assistant:false,bartender:false,waiter:false,restockTimer:0},payments:freshPayments(),staff:{bartender:null,waiter:null,waiterPosition:{x:1.05,z:4.5}},orders:[],deliveries:[],prep:null,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
 class Game{
  constructor(saved){this.s=fresh();if(saved&&saved.version===2){const s=saved;const nums=['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','capacity','spawn','nextId'];if(nums.every(k=>Number.isFinite(s[k]))&&isValidStock(s.stock)&&Array.isArray(s.orders)&&s.orders.every(o=>o&&Object.hasOwn(recipes,o.recipe)&&Number.isFinite(o.patience))&&Array.isArray(s.tray)&&s.tray.every(t=>t&&Object.hasOwn(recipes,t.recipe))&&Array.isArray(s.deliveries)&&s.deliveries.every(d=>d&&Object.hasOwn(ingredients,d.key)&&Number.isFinite(d.remaining))&&(!s.prep||(Object.hasOwn(recipes,s.prep.recipe)&&Number.isFinite(s.prep.amount)))){this.s=JSON.parse(JSON.stringify(s));
   // Legacy saves already own their service stock. Migrating must not grant a
@@ -83,18 +84,82 @@ class Game{
   s.nextId=Math.max(s.nextId,...s.orders.map(order=>order.id+1));
   const p=saved.payments,uncredited=s.orders.filter(order=>order.phase==='change-ready').reduce((sum,order)=>sum+order.due,0);
   s.payments={till:money(bounded(p?.till,0,Math.max(0,s.cash)+uncredited,Math.min(80,Math.max(0,s.cash)))),terminalCarried:p?.terminalCarried===true,terminalOrderId:null,cashRevenue:money(bounded(p?.cashRevenue,0,1e9,0)),cardRevenue:money(bounded(p?.cardRevenue,0,1e9,0)),receipts:Array.isArray(p?.receipts)?p.receipts.filter(r=>r&&Number.isSafeInteger(r.id)&&Number.isFinite(r.amount)&&r.amount>=0&&['cash','card'].includes(r.method)).slice(0,40):[]};
-  const activeCard=s.orders.find(order=>order.phase==='card-processing'&&s.payments.terminalCarried&&order.id===p?.terminalOrderId);
+  s.payments.terminalWithWaiter=!!(s.management.waiter&&p?.terminalWithWaiter===true&&!s.payments.terminalCarried);
+  for(const order of s.orders){
+   if(order.paymentBy!=='waiter'||!s.management.waiter||!['payment','cash-collected','change-ready','card-processing'].includes(order.phase))delete order.paymentBy;
+   if(order.paymentMethod==='card'&&s.payments.terminalCarried)delete order.paymentBy;
+  }
+  const activeCard=s.orders.find(order=>order.phase==='card-processing'&&order.id===p?.terminalOrderId&&(s.payments.terminalCarried||s.payments.terminalWithWaiter&&order.paymentBy==='waiter'));
   for(const order of s.orders)if(order.phase==='card-processing'&&order!==activeCard){order.phase='payment';order.cardRemaining=0}
   if(activeCard)s.payments.terminalOrderId=activeCard.id;
-  s.staff={bartender:null,waiter:null};
+  const point=saved.staff?.waiterPosition;
+  s.staff={bartender:null,waiter:null,waiterPosition:point&&Number.isFinite(point.x)&&Number.isFinite(point.z)&&point.x>=.3&&point.x<=11.7&&point.z>=1.15&&point.z<=9.6?{x:point.x,z:point.z}:{x:1.05,z:4.5}};
   for(const role of ['bartender','waiter']){
    const job=saved.staff?.[role],order=s.orders.find(order=>order.id===job?.orderId);
-   if(!s.management[role]||!job||!order||!Number.isFinite(job.remaining)||!Number.isFinite(job.total)||job.total<=0||job.total>30)continue;
+   if(!s.management[role]||!job||(!order&&!(role==='waiter'&&job.task==='return-terminal'))||!Number.isFinite(job.remaining)||!Number.isFinite(job.total)||job.total<=0||job.total>60)continue;
    if(role==='bartender'&&(job.recipe!==order.recipe||order.phase!=='preparing'))continue;
-   if(role==='waiter'&&!['take-order','serve'].includes(job.task))continue;
+   if(role==='waiter'&&!['take-order','serve',...waiterPaymentTasks].includes(job.task))continue;
    if(role==='waiter'&&job.task==='serve'&&(!job.drink||job.drink.recipe!==order.recipe||!Number.isFinite(job.drink.quality)))continue;
+   if(role==='waiter'&&!this.validWaiterJob(job,order))continue;
    s.staff[role]={...job,remaining:bounded(job.remaining,0,job.total,job.total)};
+   if(role==='waiter'){
+    const validRoute=Array.isArray(job.route)&&job.route.length>=2&&job.route.length<=16&&job.route.every(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z)&&p.x>=.3&&p.x<=11.7&&p.z>=1.15&&p.z<=9.6)&&Number.isFinite(job.travel)&&job.travel>=0&&job.travel<=job.total;
+    if(!validRoute){const position=s.staff.waiterPosition;s.staff.waiter.route=this.waiterRoute(position,this.waiterDestination(job.task,order));s.staff.waiter.travel=Math.min(job.total,this.waiterRouteLength(s.staff.waiter.route)/1.8);}
+   }
   }
+  if(s.payments.terminalWithWaiter&&!s.staff.waiter){
+   this.assignWaiterJob(activeCard?'wait-card':'return-terminal',activeCard||null,activeCard?activeCard.cardRemaining:undefined);
+  }
+ }
+ paymentHandledByWaiter(id){return this.s.management.waiter&&this.s.orders.some(order=>order.id===id&&order.paymentBy==='waiter')}
+ waiterPaymentStatus(id){
+  const s=this.s,job=s.staff.waiter;
+  if(job&&waiterPaymentTasks.has(job.task)&&(id===undefined||job.orderId===id))return {orderId:job.orderId,task:job.task,blocked:null};
+  const order=s.orders.find(order=>(id===undefined||order.id===id)&&order.paymentBy==='waiter');
+  if(order)return {orderId:order.id,task:order.phase==='change-ready'?'return-change':'prepare-change',blocked:this.canFundChange(order)?null:'change'};
+  const waiting=s.management.waiter&&s.orders.find(order=>(id===undefined||order.id===id)&&order.phase==='payment'&&(order.paymentMethod==='card'?s.payments.terminalCarried:!this.canFundChange(order)));
+  return waiting?{orderId:waiting.id,task:waiting.paymentMethod==='card'?'pickup-terminal':'collect-cash',blocked:waiting.paymentMethod==='card'?'terminal':'change'}:null;
+ }
+ waiterDestination(task,order){
+  if(['pickup-terminal','prepare-change','return-terminal'].includes(task))return {x:3,z:1.9};
+  const table=tables.find(table=>table.id===order?.tableId);
+  return table?{x:table.x+(table.x<6?1.35:-1.35),z:table.z}:order?{x:4.6+(order.slot||0)*1.4,z:4.8}:{x:1.05,z:4.5};
+ }
+ waiterRouteLength(route){return route.slice(1).reduce((length,p,index)=>length+Math.hypot(p.x-route[index].x,p.z-route[index].z),0)}
+ waiterRoute(from,to){
+  if(Math.hypot(from.x-to.x,from.z-to.z)<.001)return [{...from},{...to}];
+  const route=[{...from}],add=point=>{if(Math.hypot(point.x-route.at(-1).x,point.z-route.at(-1).z)>.001)route.push({...point})};
+  if(from.z<3.5||to.z<3.5){
+   if(from.z<3.5){add({x:from.x,z:1.9});if(to.z<3.5){add({x:to.x,z:1.9});add(to);if(route.length===1)route.push({...to});return route}add({x:.95,z:1.9});add({x:.95,z:4.9});}
+   if(to.z<3.5){if(from.z>=3.5){const aisle=from.x<6?3.1:8.8;add({x:aisle,z:from.z});add({x:aisle,z:4.9});add({x:.95,z:4.9});}add({x:.95,z:1.9});add({x:to.x,z:1.9});add(to);if(route.length===1)route.push({...to});return route;}
+  }
+  const source=route.at(-1),a=source.x<6?3.1:8.8,b=to.x<6?3.1:8.8;
+  add({x:a,z:source.z});add({x:a,z:4.9});add({x:b,z:4.9});add({x:b,z:to.z});add(to);if(route.length===1)route.push({...to});return route;
+ }
+ assignWaiterJob(task,order,duration){
+  const s=this.s,position=s.staff.waiterPosition||{x:1.05,z:4.5},target=this.waiterDestination(task,order),route=task==='wait-card'?[{...position},{...position}]:this.waiterRoute(position,target),travel=this.waiterRouteLength(route)/1.8;
+  const total=duration===undefined?Math.max(['serve','take-order'].includes(task)?6:2,travel+2):Math.max(.001,duration);
+  s.staff.waiter={orderId:order?.id??s.staff.waiter?.orderId??null,task,remaining:total,total,recipe:order?.recipe,route,travel:Math.min(travel,total)};
+  return s.staff.waiter;
+ }
+ updateWaiterPosition(job){
+  if(!job.route)return;let distance=this.waiterRouteLength(job.route)*Math.min(1,(job.total-job.remaining)/Math.max(.0001,job.travel));
+  for(let i=1;i<job.route.length;i++){const a=job.route[i-1],b=job.route[i],length=Math.hypot(b.x-a.x,b.z-a.z);if(distance<=length||i===job.route.length-1){const t=length?Math.min(1,distance/length):1;this.s.staff.waiterPosition={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};break}distance-=length;}
+ }
+ validWaiterJob(job,order){
+  if(job.task==='return-terminal')return this.s.payments.terminalWithWaiter;
+  if(!order)return false;
+  const expected={'take-order':'awaiting-order',serve:'preparing','collect-cash':'payment','prepare-change':'cash-collected','return-change':'change-ready','pickup-terminal':'payment','take-card':'payment','wait-card':'card-processing'}[job.task];
+  if(order.phase!==expected)return false;
+  if(!waiterPaymentTasks.has(job.task))return true;
+  if(order.paymentBy!=='waiter')return false;
+  if(['collect-cash','prepare-change','return-change'].includes(job.task))return order.paymentMethod==='cash';
+  return order.paymentMethod==='card'&&!this.s.payments.terminalCarried&&(job.task==='pickup-terminal'||this.s.payments.terminalWithWaiter);
+ }
+ canFundChange(order){return money(order.tender-order.due)<=money(this.s.payments.till+this.availableBank())}
+ paymentGuard(id,actor){
+  if(actor==='waiter')return this.paymentHandledByWaiter(id)?null:'Cet encaissement n’est pas réservé au serveur.';
+  return this.paymentHandledByWaiter(id)?'Le serveur s’occupe déjà de cet encaissement.':null;
  }
  orderPhase(order){return phases.has(order?.phase)?order.phase:'preparing'}
  orderPosition(order){return tables.find(table=>table.id===order?.tableId)||{x:4.6+(Number.isInteger(order?.slot)?order.slot:Math.max(0,this.s.orders.indexOf(order))%3)*1.4,z:2.1}}
@@ -181,17 +246,17 @@ class Game{
  trayDrinkIndex(order){return this.s.tray.findIndex(drink=>drink.recipe===order.recipe&&(!drink.orderId||drink.orderId===order.id))}
  serve(id,position){const s=this.s,order=s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous du client pour apporter sa boisson.';if(this.orderPhase(order)!=='preparing')return this.orderPhase(order)==='awaiting-order'?'Prenez d’abord sa commande.':'Ce client a déjà été servi.';if(s.staff.waiter?.task==='serve'&&s.staff.waiter.orderId===id)return 'Le serveur apporte déjà cette commande.';const index=this.trayDrinkIndex(order);if(index<0)return 'Préparez '+recipes[order.recipe].name+' et posez-le sur le plateau.';return this.deliverDrink(order,s.tray.splice(index,1)[0])}
  deliverDrink(order,drink){const s=this.s;if(drink.quality<40){this.removeOrder(order);s.lost++;return 'Boisson refusée : dosage trop éloigné de la recette.'}order.tip=drink.quality>=85&&order.patience>25?1:0;order.due=money(recipes[order.recipe].price+order.tip);order.paymentMethod=order.paymentMethod==='cash'?'cash':'card';order.tender=[5,10,20,50,100].find(note=>note>=order.due)||order.due;if(order.paymentMethod==='cash'&&order.tender===order.due&&order.id%2===1)order.tender=Math.min(100,order.tender*2);order.phase='drinking';order.drinkRemaining=order.tableId?8:4;order.patience=Math.max(25,order.patience);return 'Boisson servie. Le client vous demandera ensuite l’addition.'}
- collectCash(id,position){const order=this.s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous du client pour prendre les espèces.';if(this.orderPhase(order)!=='payment'||order.paymentMethod!=='cash')return 'Ce client ne vous remet pas d’espèces maintenant.';order.phase='cash-collected';return `${order.tender.toFixed(2)} € reçus. Rejoignez la caisse pour préparer la monnaie.`}
- prepareChange(id,amount,position){const s=this.s,order=s.orders.find(o=>o.id===id);if(!this.nearRegister(position))return 'Rejoignez la caisse au comptoir.';if(!order||this.orderPhase(order)!=='cash-collected')return 'Aucun encaissement en espèces à traiter pour ce client.';const expected=money(order.tender-order.due);if(!Number.isFinite(amount)||amount<0||Math.abs(amount-expected)>.000001)return 'Le montant de monnaie est incorrect. Vérifiez le total et les espèces reçues.';if(s.payments.till+1e-9<expected)return 'Le fond de caisse est insuffisant pour rendre la monnaie. Ajoutez des espèces depuis la trésorerie.';s.payments.till=money(s.payments.till+order.due);order.change=expected;order.phase='change-ready';return expected?`${expected.toFixed(2)} € de monnaie préparés. Rapportez-les au client.`:'Paiement exact. Rapportez le ticket au client.'}
- completeCash(id,position){const order=this.s.orders.find(o=>o.id===id);if(!order||this.orderPhase(order)!=='change-ready')return 'Préparez la monnaie à la caisse avant de revenir.';if(!this.canReachOrder(id,position))return 'Retournez auprès du client pour terminer l’encaissement.';this.finishPayment(order,'cash');return 'Monnaie et ticket remis. Paiement enregistré.'}
- pickupTerminal(position){const p=this.s.payments;if(!this.nearRegister(position))return 'Le terminal sans fil se trouve à côté de la caisse.';if(p.terminalCarried)return 'Vous avez déjà le terminal.';p.terminalCarried=true;return 'Terminal sans fil pris. Apportez-le au client qui paie par carte.'}
- returnTerminal(position){const p=this.s.payments;if(!this.nearRegister(position))return 'Reposez le terminal sur son socle au comptoir.';if(p.terminalOrderId!==null)return 'Attendez la confirmation du paiement en cours.';if(!p.terminalCarried)return 'Le terminal est déjà sur son socle.';p.terminalCarried=false;return 'Terminal reposé sur son socle.'}
- payCard(id,position){const s=this.s,order=s.orders.find(o=>o.id===id);if(!order||this.orderPhase(order)!=='payment'||order.paymentMethod!=='card')return 'Aucun paiement par carte disponible pour ce client.';if(!s.payments.terminalCarried)return 'Prenez le terminal sans fil au comptoir.';if(s.payments.terminalOrderId!==null)return 'Le terminal traite déjà un paiement.';if(!this.canReachOrder(id,position))return 'Apportez le terminal auprès du client.';order.phase='card-processing';order.cardRemaining=3;s.payments.terminalOrderId=id;return 'Carte présentée. Autorisation en cours…'}
+ collectCash(id,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const order=this.s.orders.find(o=>o.id===id);if(!order)return 'Ce client est déjà parti.';if(!this.canReachOrder(id,position))return 'Approchez-vous du client pour prendre les espèces.';if(this.orderPhase(order)!=='payment'||order.paymentMethod!=='cash')return 'Ce client ne vous remet pas d’espèces maintenant.';order.phase='cash-collected';return `${order.tender.toFixed(2)} € reçus. Rejoignez la caisse pour préparer la monnaie.`}
+ prepareChange(id,amount,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const s=this.s,order=s.orders.find(o=>o.id===id);if(!this.nearRegister(position))return 'Rejoignez la caisse au comptoir.';if(!order||this.orderPhase(order)!=='cash-collected')return 'Aucun encaissement en espèces à traiter pour ce client.';const expected=money(order.tender-order.due);if(!Number.isFinite(amount)||amount<0||Math.abs(amount-expected)>.000001)return 'Le montant de monnaie est incorrect. Vérifiez le total et les espèces reçues.';if(s.payments.till+1e-9<expected)return 'Le fond de caisse est insuffisant pour rendre la monnaie. Ajoutez des espèces depuis la trésorerie.';s.payments.till=money(s.payments.till+order.due);order.change=expected;order.phase='change-ready';return expected?`${expected.toFixed(2)} € de monnaie préparés. Rapportez-les au client.`:'Paiement exact. Rapportez le ticket au client.'}
+ completeCash(id,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const order=this.s.orders.find(o=>o.id===id);if(!order||this.orderPhase(order)!=='change-ready')return 'Préparez la monnaie à la caisse avant de revenir.';if(!this.canReachOrder(id,position))return 'Retournez auprès du client pour terminer l’encaissement.';this.finishPayment(order,'cash');return 'Monnaie et ticket remis. Paiement enregistré.'}
+ pickupTerminal(position,actor='player'){const p=this.s.payments;if(!this.nearRegister(position))return 'Le terminal sans fil se trouve à côté de la caisse.';if(actor==='waiter'){if(p.terminalCarried||p.terminalWithWaiter)return 'Le terminal est déjà utilisé.';p.terminalWithWaiter=true;return 'Terminal pris par le serveur.'}if(p.terminalWithWaiter||this.s.staff.waiter?.task==='pickup-terminal')return 'Le serveur utilise le terminal. Il le rapportera sur son socle.';if(p.terminalCarried)return 'Vous avez déjà le terminal.';p.terminalCarried=true;return 'Terminal sans fil pris. Apportez-le au client qui paie par carte.'}
+ returnTerminal(position,actor='player'){const p=this.s.payments;if(!this.nearRegister(position))return 'Reposez le terminal sur son socle au comptoir.';if(p.terminalOrderId!==null)return 'Attendez la confirmation du paiement en cours.';if(actor==='waiter'){p.terminalWithWaiter=false;return 'Terminal rapporté par le serveur.'}if(p.terminalWithWaiter)return 'Le serveur rapporte le terminal.';if(!p.terminalCarried)return 'Le terminal est déjà sur son socle.';p.terminalCarried=false;return 'Terminal reposé sur son socle.'}
+ payCard(id,position,actor='player'){const guard=this.paymentGuard(id,actor);if(guard)return guard;const s=this.s,order=s.orders.find(o=>o.id===id);if(!order||this.orderPhase(order)!=='payment'||order.paymentMethod!=='card')return 'Aucun paiement par carte disponible pour ce client.';if(!(actor==='waiter'?s.payments.terminalWithWaiter:s.payments.terminalCarried))return 'Prenez le terminal sans fil au comptoir.';if(s.payments.terminalOrderId!==null)return 'Le terminal traite déjà un paiement.';if(!this.canReachOrder(id,position))return 'Apportez le terminal auprès du client.';order.phase='card-processing';order.cardRemaining=3;s.payments.terminalOrderId=id;return 'Carte présentée. Autorisation en cours…'}
  finishPayment(order,method){const s=this.s;if(!s.orders.includes(order))return;const amount=money(order.due);s.cash=money(s.cash+amount);s.revenue=money(s.revenue+amount);s.payments[method==='cash'?'cashRevenue':'cardRevenue']=money(s.payments[method==='cash'?'cashRevenue':'cardRevenue']+amount);s.sold++;s.totalSold++;s.payments.receipts.unshift({id:order.id,day:s.day,customerName:order.name||'Client',tableId:order.tableId??null,recipe:order.recipe,method,amount,tip:order.tip||0,time:s.time});s.payments.receipts.length=Math.min(40,s.payments.receipts.length);this.removeOrder(order)}
  removeOrder(order){const s=this.s;s.orders=s.orders.filter(o=>o!==order);for(const drink of s.tray)if(drink.orderId===order.id)delete drink.orderId;if(s.payments.terminalOrderId===order.id)s.payments.terminalOrderId=null}
  upgrade(){return this.purchaseUpgrade('tray')}
  close(){if(!this.s.open)return;this.s.closing=true;return 'Dernières commandes : servez et encaissez les clients restants.'}
- end(){let s=this.s;if(s.orders.length)return null;const salaries=['assistant','bartender','waiter'].reduce((sum,id)=>sum+(s.management[id]?managementUpgrades[id].salary:0),0),charges=35+salaries;this.spend(charges);s.waste+=s.tray.length+(s.prep?1:0)+(s.staff.bartender?1:0)+(s.staff.waiter?.drink?1:0);s.lastReport={day:s.day,revenue:s.revenue,cashRevenue:s.payments.cashRevenue,cardRevenue:s.payments.cardRevenue,expenses:s.expenses,charges,salaries,profit:s.revenue-s.expenses-charges,sold:s.sold,lost:s.lost,waste:s.waste};s.open=false;s.closing=false;s.orders=[];s.tray=[];s.prep=null;s.staff={bartender:null,waiter:null};s.payments.cashRevenue=0;s.payments.cardRevenue=0;s.payments.terminalOrderId=null;s.management.restockTimer=0;s.gameOver=s.cash<0;s.day++;s.time=1020;s.sold=0;s.lost=0;s.revenue=0;s.expenses=0;s.waste=0;return s.lastReport}
+ end(){let s=this.s;if(s.orders.length||s.payments.terminalWithWaiter||s.staff.waiter?.task==='return-terminal')return null;const salaries=['assistant','bartender','waiter'].reduce((sum,id)=>sum+(s.management[id]?managementUpgrades[id].salary:0),0),charges=35+salaries;this.spend(charges);s.waste+=s.tray.length+(s.prep?1:0)+(s.staff.bartender?1:0)+(s.staff.waiter?.drink?1:0);s.lastReport={day:s.day,revenue:s.revenue,cashRevenue:s.payments.cashRevenue,cardRevenue:s.payments.cardRevenue,expenses:s.expenses,charges,salaries,profit:s.revenue-s.expenses-charges,sold:s.sold,lost:s.lost,waste:s.waste};s.open=false;s.closing=false;s.orders=[];s.tray=[];s.prep=null;s.staff={bartender:null,waiter:null,waiterPosition:{x:1.05,z:4.5}};s.payments.terminalWithWaiter=false;s.payments.cashRevenue=0;s.payments.cardRevenue=0;s.payments.terminalOrderId=null;s.management.restockTimer=0;s.gameOver=s.cash<0;s.day++;s.time=1020;s.sold=0;s.lost=0;s.revenue=0;s.expenses=0;s.waste=0;return s.lastReport}
  staffTick(dt){
   const s=this.s;
   let job=s.staff.bartender;
@@ -204,20 +269,60 @@ class Game{
    const order=s.orders.find(order=>this.orderPhase(order)==='preparing'&&(order.arrivalRemaining||0)<=0&&this.canMake(order.recipe)&&s.prep?.recipe!==order.recipe&&this.trayDrinkIndex(order)<0&&!(s.staff.waiter?.task==='serve'&&s.staff.waiter.orderId===order.id));
    if(order){for(const [key,amount]of Object.entries(recipes[order.recipe].ingredients))s.stock[key]-=amount;const total=Math.max(8,recipes[order.recipe].steps.length*2);s.staff.bartender={orderId:order.id,recipe:order.recipe,remaining:total,total}}
   }
-  job=s.staff.waiter;
+  this.waiterTick(dt);
+ }
+ waiterTick(dt){
+  const s=this.s,p=s.payments;let job=s.staff.waiter;
   if(job){
-   const order=s.orders.find(order=>order.id===job.orderId),expected=job.task==='take-order'?'awaiting-order':'preparing';
-   if(!s.management.waiter||!order||this.orderPhase(order)!==expected){
+   const order=s.orders.find(order=>order.id===job.orderId);
+   if(job.task==='wait-card'&&!order&&p.terminalWithWaiter){this.assignWaiterJob('return-terminal',null);job=s.staff.waiter;}
+   else if(!s.management.waiter||!this.validWaiterJob(job,order)){
     if(job.drink){delete job.drink.orderId;if(s.tray.length+(s.prep?1:0)+(s.staff.bartender?1:0)<s.capacity)s.tray.push(job.drink);else s.waste++}
+    if(order?.phase==='payment')delete order.paymentBy;
     s.staff.waiter=null;
-   }else{job.remaining=Math.max(0,job.remaining-dt);if(job.remaining<=1e-9){s.staff.waiter=null;if(job.task==='take-order')this.takeOrder(order.id,this.orderPosition(order));else this.deliverDrink(order,job.drink)}}
+    if(p.terminalWithWaiter){if(s.management.waiter)this.assignWaiterJob('return-terminal',null);else p.terminalWithWaiter=false;}
+    job=s.staff.waiter;
+   }
+   if(job){
+    job.remaining=Math.max(0,job.remaining-dt);this.updateWaiterPosition(job);
+    if(job.remaining<=1e-9){
+     const current=s.orders.find(order=>order.id===job.orderId);
+     switch(job.task){
+      case'take-order':this.takeOrder(current.id,this.orderPosition(current));s.staff.waiter=null;break;
+      case'serve':this.deliverDrink(current,job.drink);s.staff.waiter=null;break;
+      case'collect-cash':this.collectCash(current.id,this.orderPosition(current),'waiter');this.assignWaiterJob('prepare-change',current);break;
+      case'prepare-change':{
+       const change=money(current.tender-current.due),missing=money(Math.max(0,change-p.till));
+       if(missing>0&&this.availableBank()>=missing)this.fundTill(missing,registerPosition);
+       this.prepareChange(current.id,change,registerPosition,'waiter');
+       if(current.phase==='change-ready')this.assignWaiterJob('return-change',current);else s.staff.waiter=null;
+       break;
+      }
+      case'return-change':this.completeCash(current.id,this.orderPosition(current),'waiter');s.staff.waiter=null;break;
+      case'pickup-terminal':
+       this.pickupTerminal(registerPosition,'waiter');
+       if(p.terminalWithWaiter)this.assignWaiterJob('take-card',current);else {delete current.paymentBy;s.staff.waiter=null;}
+       break;
+      case'take-card':
+       this.payCard(current.id,this.orderPosition(current),'waiter');
+       this.assignWaiterJob(current.phase==='card-processing'?'wait-card':'return-terminal',current,current.phase==='card-processing'?current.cardRemaining:undefined);
+       break;
+      case'wait-card':break; // The shared card timer alone records the payment.
+      case'return-terminal':this.returnTerminal(registerPosition,'waiter');s.staff.waiter=null;break;
+     }
+    }
+   }
   }
-  if(s.management.waiter&&!s.staff.waiter){
-   const available=s.orders.filter(order=>(order.arrivalRemaining||0)<=0);
-   const serving=available.find(order=>this.orderPhase(order)==='preparing'&&this.trayDrinkIndex(order)>=0);
-   const order=serving||available.find(order=>this.orderPhase(order)==='awaiting-order');
-   if(order){const point=this.orderPosition(order),total=Math.max(6,Math.min(10,Math.hypot(point.x-1.05,point.z-4.5)/1.4+2));s.staff.waiter={orderId:order.id,task:serving?'serve':'take-order',remaining:total,total,recipe:order.recipe};if(serving)s.staff.waiter.drink=s.tray.splice(this.trayDrinkIndex(order),1)[0]}
-  }
+  if(!s.management.waiter||s.staff.waiter)return;
+  if(p.terminalWithWaiter){this.assignWaiterJob('return-terminal',null);return;}
+  const available=s.orders.filter(order=>(order.arrivalRemaining||0)<=0);
+  const unfinished=available.find(order=>order.paymentBy==='waiter'&&(order.phase==='change-ready'||order.phase==='cash-collected'&&this.canFundChange(order)));
+  if(unfinished){this.assignWaiterJob(unfinished.phase==='change-ready'?'return-change':'prepare-change',unfinished);return;}
+  const payment=available.find(order=>order.phase==='payment'&&(order.paymentMethod==='cash'?this.canFundChange(order):!p.terminalCarried&&p.terminalOrderId===null));
+  if(payment){payment.paymentBy='waiter';this.assignWaiterJob(payment.paymentMethod==='cash'?'collect-cash':'pickup-terminal',payment);return;}
+  const serving=available.find(order=>this.orderPhase(order)==='preparing'&&this.trayDrinkIndex(order)>=0);
+  const order=serving||available.find(order=>this.orderPhase(order)==='awaiting-order');
+  if(order){const assigned=this.assignWaiterJob(serving?'serve':'take-order',order);if(serving)assigned.drink=s.tray.splice(this.trayDrinkIndex(order),1)[0];}
  }
  spawnCustomer(){
   const s=this.s,freeTables=tables.filter(table=>!s.orders.some(order=>order.tableId===table.id)),freeSlots=[0,1,2].filter(slot=>!s.orders.some(order=>!order.tableId&&(Number.isInteger(order.slot)?order.slot:s.orders.indexOf(order)%3)===slot));

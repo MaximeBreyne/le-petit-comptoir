@@ -113,7 +113,7 @@ app.whenReady().then(async()=>{
   const hiddenHud=await win.webContents.insertCSS('body > :not(#world):not(script):not(style){visibility:hidden!important}');
   const labels=await evaluate(`(()=>{
    let count=0,worstAspectError=0;const regions=new Map();
-   for(const box of [...boxes,...BarVenue.labelTemplates].filter(box=>box.label||box.labelLines)){
+   for(const box of [...boxes,...BarVenue.labelTemplates,...BarScene.terminalLabelTemplates].filter(box=>box.label||box.labelLines)){
     const rect=renderer.label(box),face=box.labelFace||'front';
     if(!rect)throw Error('Missing label: '+box.label);
     if(!(rect.u0>=0&&rect.v0>=0&&rect.u1<=1&&rect.v1<=1&&rect.u1>rect.u0&&rect.v1>rect.v0))throw Error('Invalid label region: '+box.label);
@@ -211,7 +211,8 @@ app.whenReady().then(async()=>{
    ];
    state.management.bartender=true;state.management.waiter=true;
    state.staff.bartender={orderId:2,recipe:'beer',remaining:5,total:8};
-   state.staff.waiter={orderId:1,task:'take-order',remaining:4,total:6};
+   const taking=game.assignWaiterJob('take-order',state.orders.find(order=>order.id===1));
+   taking.remaining=taking.total-taking.travel*.7;game.updateWaiterPosition(taking);
    customerVisuals.clear();waiterVisual=null;visualTime=20;render();
    for(let i=0;i<100;i++){visualTime+=.05;render()}
    for(const order of state.orders.filter(order=>order.tableId)){
@@ -225,15 +226,18 @@ app.whenReady().then(async()=>{
   await evaluate('state.management.waiter=false;camera={x:BarScene.tableSeat(1).x-.70,y:1.3,z:BarScene.tableSeat(1).z,a:Math.PI/2,pitch:0};render();');
   await capture('preview-customer-face.png');
   const waiterTray=await evaluate(`(()=>{
-   state.management.waiter=true;state.staff.bartender=null;state.staff.waiter={orderId:2,task:'serve',recipe:'beer',drink:{recipe:'beer',quality:95,orderId:2},remaining:4,total:6};
-   for(let i=0;i<60;i++){visualTime+=.05;render()}
-   const p=alongRoute(waiterVisual.route,waiterVisual.progress),sn=Math.sin(p.angle),cs=Math.cos(p.angle);
+   state.management.waiter=true;state.staff.bartender=null;state.staff.waiterPosition={x:1.05,z:4.5};
+   const carrying=game.assignWaiterJob('serve',state.orders.find(order=>order.id===2));
+   carrying.drink={recipe:'beer',quality:95,orderId:2};carrying.remaining=carrying.total-carrying.travel*.85;
+   game.updateWaiterPosition(carrying);visualTime+=3;render();
+   const p=waiterVisual,expected=alongRoute(carrying.route,.85),sn=Math.sin(p.angle),cs=Math.cos(p.angle);
+   if(Math.hypot(p.x-expected.x,p.z-expected.z)>.001)throw Error('Waiter preview does not follow saved job position');
    const x=p.x-sn*.8+cs*1.5,z=p.z-cs*.8-sn*1.5;
    camera={x,y:1.5,z,a:Math.atan2(p.x-x,p.z-z),pitch:-.16};render();
    return {task:state.staff.waiter.task,recipe:state.staff.waiter.recipe,position:{x:p.x,z:p.z},camera:{...camera}};
   })()`);
   await capture('preview-waiter-tray.png');
-  await evaluate("state.staff.bartender={orderId:2,recipe:'beer',remaining:5,total:8};state.staff.waiter={orderId:1,task:'take-order',remaining:4,total:6};");
+  await evaluate("state.staff.bartender={orderId:2,recipe:'beer',remaining:5,total:8};const taking=game.assignWaiterJob('take-order',state.orders.find(order=>order.id===1));taking.remaining=taking.total-taking.travel*.5;game.updateWaiterPosition(taking);");
   await evaluate('camera={x:6,y:1.68,z:7.3,a:Math.PI,pitch:-.04};render();');
   await capture('preview-staff.png');
   await evaluate('camera={x:2.65,y:1.64,z:1.82,a:0,pitch:-.12};render();');

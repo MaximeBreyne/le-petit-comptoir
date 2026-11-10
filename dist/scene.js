@@ -4,6 +4,12 @@ const BarScene=(()=>{
  const playCamera={x:6,y:1.68,z:1.55,a:0,pitch:-.06};
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
  const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
+ const terminalScreen='#d8eee7',terminalInk='#193c35';
+ const terminalLabelTemplates=[
+  {w:.118,h:.001,d:.011,c:terminalScreen,label:'LE PETIT COMPTOIR'},
+  ...['PRÊT','LECTURE CARTE','ACCEPTÉ'].map(label=>({w:.111,h:.001,d:.014,c:terminalScreen,label})),
+  {w:.019,h:.001,d:.010,c:terminalScreen,label:'EUR'},
+ ].map(label=>({...label,labelFace:'top',labelColor:terminalInk,labelPixels:256,castShadow:false}));
  const tableLocations=globalThis.BarEngine?.tables||[{id:1,x:1.65,z:6.4},{id:2,x:1.65,z:8.6},{id:3,x:10.22,z:6.5},{id:4,x:10.22,z:8.65}];
  function tableSeat(id){
   const table=tableLocations.find(table=>table.id===Number(id));if(!table)return null;
@@ -390,8 +396,12 @@ const BarScene=(()=>{
   b(2.65,1.59,2.97,.68,.43,.055,'#1c302b',M.paint,{rx:.22});
   b(2.65,1.597,2.938,.595,.335,.009,'#234d3c',M.paint,{rx:.22,label:'CAISSE\nE : ENCAISSER',labelFace:'front',labelColor:'#edf4df',castShadow:false});
   // The cordless terminal rests beside the till until the player picks it up.
-  b(3.25,1.12,2.65,.205,.045,.29,'#2c3934',M.metal);
-  b(3.25,1.146,2.65,.16,.008,.25,'#101f1a',M.paint);
+  b(3.25,1.12,2.65,.185,.035,.27,'#273532',M.metal);
+  for(const dx of [-.082,.082])c(3.25+dx,1.12,2.65,.023,.035,.27,'#273532',M.metal);
+  b(3.25,1.139,2.65,.159,.006,.239,'#141d1b',M.paint);
+  for(const dx of [-.061,.061])for(const dz of [-.094,.094])c(3.25+dx,1.142,2.65+dz,.018,.006,.018,'#37413b',M.paint);
+  for(const dx of [-.018,.018])c(3.25+dx,1.144,2.69,.006,.005,.006,'#bbac70',M.metal);
+  b(3.25,1.126,2.512,.027,.005,.002,'#8ab9a1',M.light,noShadow);
   // Illuminated bottle fridge by the wall.
   b(10.96,1.04,.75,1.15,2.08,1.12,'#253330',M.metal,solid);
   b(10.96,1.11,1.32,.97,1.67,.025,'#c5d1bc',M.light);
@@ -472,21 +482,74 @@ const BarScene=(()=>{
    }
   }
  }
- function terminal(items,{x=3.25,y=1.175,z=2.65,angle=0,pitch=0}={}){
+ function terminal(items,{x=3.25,y=1.175,z=2.65,angle=0,pitch=0,status='ready',amount=null}={}){
   const source=geometry(items),cs=Math.cos(angle),sn=Math.sin(angle),cp=Math.cos(pitch),sp=Math.sin(pitch);
-  const b=(dx,dy,dz,w,h,d,color,mat=0)=>{
+  const b=(dx,dy,dz,w,h,d,color,mat=0,extra={})=>{
    const py=dy*cp-dz*sp,pz=dy*sp+dz*cp;
-   source.box(x+dx*cs+pz*sn,y+py,z-dx*sn+pz*cs,w,h,d,color,mat,{ry:angle,rx:pitch,castShadow:false});
+   source.box(x+dx*cs+pz*sn,y+py,z-dx*sn+pz*cs,w,h,d,color,mat,{...extra,ry:angle,rx:pitch,castShadow:false});
   };
-  b(0,0,0,.17,.05,.245,'#172a24',M.paint);
-  b(0,.027,-.066,.134,.007,.079,'#94c3a4',M.paint);
-  b(0,.032,-.078,.085,.003,.008,'#254a36',M.paint);
-  b(-.025,.032,-.057,.035,.003,.006,'#254a36',M.paint);
-  for(let row=0;row<4;row++)for(let col=0;col<3;col++){
-   const color=row===3?(col===0?'#b45746':col===2?'#6eab72':'#c2a65d'):'#c3c9b7';
-   b((col-1)*.04,.031,.004+row*.029,.031,.009,.022,color,M.paint);
+  const rounded=(dx,dy,dz,w,h,d,r,color,mat=M.paint)=>{
+   b(dx,dy,dz,w-2*r,h,d,color,mat);b(dx,dy,dz,w,h,d-2*r,color,mat);
+   for(const sx of [-1,1])for(const sz of [-1,1])b(dx+sx*(w/2-r),dy,dz+sz*(d/2-r),r*2,h,r*2,color,mat,{round:true});
+  };
+  // A moulded shell with a rubber bumper, seam and inset faceplate.
+  rounded(0,-.005,0,.169,.043,.263,.018,'#1b2525');
+  rounded(0,.012,0,.165,.018,.258,.017,'#626c69',M.metal);
+  rounded(0,.022,0,.159,.015,.252,.015,'#323d3c');
+  rounded(0,.030,0,.149,.004,.239,.013,'#222d2b');
+  for(const side of [-1,1]){
+   b(side*.083,-.002,.055,.003,.009,.055,'#101a19');
+   for(const dz of [-.084,.087])b(side*.060,-.027,dz,.016,.004,.019,'#111a18');
   }
-  b(.066,.029,-.078,.006,.004,.013,'#e0dcb4',M.paint);
+  // Flush screen glass sits inside the bezel, rather than above the enclosure.
+  rounded(0,.032,.055,.139,.005,.103,.007,'#0e1d1a');
+  b(0,.035,.055,.126,.001,.090,terminalScreen,M.light);
+  const text=(template,dx,dz)=>b(dx,.036,dz,template.w,template.h,template.d,template.c,M.paint,template);
+  text(terminalLabelTemplates[0],0,.090);
+  text(terminalLabelTemplates[status==='processing'?2:status==='approved'?3:1],0,.073);
+  const segments={0:'abcedf',1:'bc',2:'abged',3:'abgcd',4:'fgbc',5:'afgcd',6:'afgecd',7:'abc',8:'abcdefg',9:'abfgcd'};
+  function digit(character,cx,cz,width,height,y,color){
+   const thickness=width*.18,parts=segments[character]||'';
+   for(const part of parts){
+    const horizontal='adg'.includes(part),sx='fe'.includes(part)?-1:'bc'.includes(part)?1:0,sz=part==='a'?1:part==='d'?-1:part==='g'?0:'fb'.includes(part)?.5:-.5;
+    b(cx+sx*width/2,y,cz+sz*height/2,horizontal?width:thickness,.001,horizontal?thickness:height/2-thickness,color);
+   }
+  }
+  // Amount digits are geometry, so an evening's distinct bills cannot grow the label atlas.
+  const value=Number.isFinite(amount)&&amount>=0?Math.min(999.99,amount).toFixed(2):'0.00';
+  const advance=.014,start=-.022-(value.length-4)*advance/2;
+  for(let i=0;i<value.length;i++){
+   if(value[i]==='.')b(start+i*advance,.0365,.031,.0025,.001,.0025,terminalInk);
+   else digit(value[i],start+i*advance,.043,.009,.021,.0365,terminalInk);
+  }
+  text(terminalLabelTemplates[4],.047,.042);
+  // Contactless radio waves and battery level stay readable at normal hand distance.
+  for(let wave=0;wave<3;wave++)for(let part=0;part<11;part++){
+   const a=-.8+part*.16,r=.003+wave*.003;
+   b(-.047+Math.cos(a)*r,.037,.019+Math.sin(a)*r,.0012,.001,.0012,terminalInk);
+  }
+  b(.044,.037,.019,.017,.001,.007,terminalInk);b(.054,.037,.019,.003,.001,.003,terminalInk);b(.043,.038,.019,.011,.001,.0035,'#77ae91');
+  const keyLabels=['1','2','3','4','5','6','7','8','9','*','0','#'];
+  for(let row=0;row<4;row++)for(let col=0;col<3;col++){
+   const kx=(col-1)*.045,kz=-.012-row*.026,label=keyLabels[row*3+col];
+   rounded(kx,.035,kz,.034,.007,.021,.004,'#aeb6b0');
+   if(/[0-9]/.test(label))digit(label,kx,kz,.006,.011,.0393,'#1b2d27');
+   else if(label==='#'){
+    for(const offset of [-.002,.002]){b(kx+offset,.0393,kz,.001,.001,.012,'#1b2d27');b(kx,.0393,kz+offset,.009,.001,.001,'#1b2d27');}
+   }else{
+    b(kx,.0393,kz,.009,.001,.0012,'#1b2d27');b(kx,.0393,kz,.0012,.001,.010,'#1b2d27');
+    for(const offset of [-.0025,.0025])b(kx+offset,.0393,kz+offset,.002,.001,.002,'#1b2d27');
+   }
+  }
+  for(const [col,color]of ['#a84f41','#b7a260','#568f6c'].entries())rounded((col-1)*.045,.035,-.115,.034,.007,.016,.004,color);
+  // Cancel, correction and confirmation symbols are inset into their coloured keys.
+  for(const offset of [-.003,0,.003]){b(-.045+offset,.0393,-.115+offset,.0024,.001,.0024,'#f1ede1');b(-.045+offset,.0393,-.115-offset,.0024,.001,.0024,'#f1ede1');}
+  b(0,.0393,-.115,.012,.001,.0015,'#f1ede1');b(-.005,.0393,-.113,.002,.001,.004,'#f1ede1');
+  for(const [dx,dz]of [[-.004,0],[-.002,-.002],[0,0],[.002,.002],[.004,.004]])b(.045+dx,.0393,-.115+dz,.0023,.001,.0023,'#edf1df');
+  // Card insertion slot on the operator-facing edge and side power key.
+  b(0,-.004,-.132,.082,.011,.0015,'#080f10');b(0,-.002,-.133,.063,.004,.001,'#56615e',M.metal);
+  b(.084,.010,-.037,.003,.012,.023,'#6e7d76',M.metal);
+  b(-.058,.035,.112,.006,.001,.003,status==='processing'?'#ddb664':'#78b298',M.light);
  }
  function registerVisuals(items,state,{open=false}={}){
   const {box:b,cylinder:c}=geometry(items),z=open?2.59:2.94;
@@ -504,9 +567,9 @@ const BarScene=(()=>{
     for(let coin=0;coin<3;coin++)c(2.42+i*.15+(coin%2)*.04,1.145+Math.floor(coin/2)*.008,z-.15,.027,.007,.027,i%2?'#b4aa72':'#bdc0aa',M.metal);
    }
   }
-  if(!state?.payments?.terminalCarried)terminal(items);
+  if(!state?.payments?.terminalCarried&&!state?.payments?.terminalWithWaiter)terminal(items);
  }
- function customer(items,{x,z,id,time,moving,departing=false,patience=100,seated=false,angle,staffKind,carrying=false}){
+ function customer(items,{x,z,id,time,moving,departing=false,patience=100,seated=false,angle,staffKind,carrying=false,carryingTerminal=false}){
   const g=geometry(items),skin=['#c4916d','#956c51','#d4b191','#b18061'][id%4];
   const shirt=staffKind?'#d1d0b8':['#555f61','#815c4b','#6b7058','#525f74','#927e68'][id%5];
   const hair=['#45352a','#302c26','#8b7750','#62564b'][id%4];
@@ -582,7 +645,7 @@ const BarScene=(()=>{
   for(const side of [-1,1]){
    s(side*.172,1.28,.018,.16,.11,.12,shirt,M.fabric,{rz:side*.16});
    // A sleeve-sized round cap covers the arm's flat cylinder end at its joint.
-   s(side*(carrying&&!seated?.21:.245),1.305,0,.115,.07,.13,shirt,M.fabric);
+   s(side*((carrying||carryingTerminal)&&!seated?.21:.245),1.305,0,.115,.07,.13,shirt,M.fabric);
    const stride=!seated&&moving?Math.sin(time*7.2+id+side*1.57)*.34:0;
    const kneeZ=seated?-.35:Math.sin(stride)*.39,kneeY=seated?.81:.865-Math.cos(stride)*.39;
    c(side*.105,(.865+kneeY)/2,kneeZ/2,.15,Math.hypot(.865-kneeY,kneeZ),.16,'#38444a',M.fabric,{rx:seated?Math.atan2(-kneeZ,.865-kneeY):-stride,topRadius:1.12});
@@ -590,7 +653,11 @@ const BarScene=(()=>{
    const lower=stride+Math.max(0,-stride)*.8,ankleZ=seated?kneeZ:kneeZ+Math.sin(lower)*.38,ankleY=seated?.34:kneeY-Math.cos(lower)*.38;
    c(side*.105,(kneeY+ankleY)/2,(kneeZ+ankleZ)/2,.108,Math.hypot(kneeY-ankleY,kneeZ-ankleZ),.12,'#354147',M.fabric,{rx:seated?0:-lower,topRadius:1.15});
    s(side*.105,Math.max(.055,ankleY-.015),ankleZ-.055,.13,.1,.25,'#30332d',0);
-   if(carrying&&!seated){
+   if(carryingTerminal&&!seated){
+    const shoulder={x:side*.21,y:1.31,z:0},elbow={x:side*.20,y:1.09,z:-.10},wrist={x:side*.095,y:1.17,z:-.28};
+    armSegment(shoulder,elbow,.115,.13,shirt);s(elbow.x,elbow.y,elbow.z,.104,.105,.105,skin,M.skin);
+    armSegment(elbow,wrist,.085,.095,skin);s(wrist.x,wrist.y,wrist.z,.063,.055,.10,skin,M.skin);
+   }else if(carrying&&!seated){
     // Both hands support a tray at local (0,1.10,-.34), clear of the torso.
     const shoulder={x:side*.21,y:1.31,z:0},elbow={x:side*.20,y:1.08,z:-.15},wrist={x:side*.145,y:1.05,z:-.34};
     armSegment(shoulder,elbow,.115,.13,shirt);s(elbow.x,elbow.y,elbow.z,.104,.105,.105,skin,M.skin);
@@ -617,5 +684,5 @@ const BarScene=(()=>{
    b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
   }
  }
- return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,tableSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,prepStation,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

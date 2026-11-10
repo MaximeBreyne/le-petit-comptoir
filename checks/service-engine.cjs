@@ -125,13 +125,14 @@ test('bartender respects licenses, physical stock, player preparations and full 
  game.discard();game.s.tray=[{recipe:'wine',quality:90},{recipe:'wine',quality:90}];game.tick(.1);assert.equal(game.s.staff.bartender,null);assert.equal(game.s.stock.beer,50);
 });
 
-test('waiter takes table orders and delivers prepared drinks but never handles the payment',()=>{
+test('waiter takes table orders, delivers prepared drinks and then handles the payment',()=>{
  const game=session();game.s.management.waiter=true;game.s.management.bartender=true;const customer=order(game);
  game.tick(.1);assert.equal(game.s.staff.waiter.task,'take-order');assert.ok(game.s.staff.waiter.total>=6);assert.equal(customer.phase,'awaiting-order');
  advance(game,6.1);assert.equal(customer.phase,'preparing');advance(game,8.2);
  assert.equal(game.s.staff.waiter.task,'serve');assert.equal(game.s.staff.waiter.orderId,customer.id);assert.equal(game.s.tray.length,0);assert.ok(game.s.staff.waiter.drink);
  game.s.tray.push({recipe:'beer',quality:100});game.serve(customer.id,tables[0]);assert.equal(customer.phase,'preparing','Player cannot double-serve a reserved waiter delivery');assert.equal(game.s.tray.length,1);
- advance(game,15);assert.equal(customer.phase,'payment');assert.equal(game.s.cash,260);assert.equal(game.s.sold,0);assert.equal(game.s.staff.waiter,null);
+ advance(game,15);assert.equal(customer.phase,'payment');assert.equal(game.s.cash,260);assert.equal(game.s.sold,0);assert.equal(game.s.staff.waiter.task,'collect-cash');
+ advance(game,40);assert.equal(game.s.orders.length,0);assert.equal(game.s.cash,266);assert.equal(game.s.payments.cashRevenue,6);assert.equal(game.s.sold,1);
 });
 
 test('waiter keeps a carried drink and job through reload without consuming another tray item',()=>{

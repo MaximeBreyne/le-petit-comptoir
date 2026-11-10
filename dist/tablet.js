@@ -57,7 +57,7 @@ window.BarTablet=(()=>{
   serviceNote.textContent='Regardez un client et appuyez sur E ou cliquez pour prendre sa commande, servir sa boisson ou encaisser. La préparation se fait uniquement derrière le bar. Le panneau près de l’entrée ouvre et ferme le service.';
   roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
-  roomSummary.textContent=`${count} client${count>1?'s':''} · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalCarried?'avec vous':'au comptoir'}`;
+  roomSummary.textContent=`${count} client${count>1?'s':''} · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalWithWaiter?'avec le serveur':payments.terminalCarried?'avec vous':'au comptoir'}`;
   const counterOrders=orders.filter(order=>!order.tableId);
   for(const [key,entry]of seats){
    const [kind,index]=key.split(':'),order=kind==='table'?orders.find(order=>order.tableId===Number(index)):counterOrders.find((order,i)=>(order.slot??i)===Number(index));
@@ -94,6 +94,13 @@ window.BarTablet=(()=>{
    }
    if(phase==='cash-collected')enable('register',true,'Préparer la monnaie en caisse');
    if(phase==='change-ready')enable('change',near,(order.tender||0)>(order.due||0)?'Remettre la monnaie':'Remettre le ticket');
+   const paymentStatus=game.waiterPaymentStatus?.(order.id);
+   if(game.paymentHandledByWaiter?.(order.id)){
+    entry.badge.textContent=paymentStatus?.blocked?'Serveur en attente':'Encaissement par le serveur';
+    entry.detail.textContent=waiterPaymentMessage(paymentStatus);entry.proximity.hidden=false;
+    entry.proximity.textContent=paymentStatus?.blocked==='change'?'Alimentez le fond de caisse pour permettre au serveur de rendre la monnaie.':'Le serveur termine ce règlement ; vous pouvez continuer le service.';
+    for(const item of Object.values(entry.buttons))item.disabled=true;
+   }else if(paymentStatus?.blocked==='terminal'&&phase==='payment')entry.proximity.textContent=waiterPaymentMessage(paymentStatus);
   }
  }
 
@@ -118,13 +125,13 @@ window.BarTablet=(()=>{
   const entry={card,title,details,expected,coins,input,reset,confirm,hint};cashCards.set(order.id,entry);return entry;
  }
  function refreshRegister(s){
-  const payments=s.payments||{},near=!!game.nearRegister?.(camera),bank=game.availableBank?.()??Math.max(0,s.cash-(payments.till||0));
+  const payments=s.payments||{},near=!!game.nearRegister?.(camera),bank=game.availableBank?.()??Math.max(0,s.cash-(payments.till||0)),terminalReserved=s.staff.waiter?.task==='pickup-terminal';
   registerNote.textContent=near?'Vous êtes devant la caisse. Comptez la monnaie, rechargez le tiroir ou prenez le terminal.':'Rejoignez la caisse derrière le bar pour manipuler l’argent ou prendre le terminal sans fil.';registerNote.classList.toggle('tablet-reserve-present',near);
   amounts.till.textContent=money(payments.till||0);amounts.bank.textContent=money(bank);amounts.cash.textContent=money(payments.cashRevenue||0);amounts.card.textContent=money(payments.cardRevenue||0);
-  terminalState.textContent=payments.terminalOrderId?'Terminal : paiement en cours':payments.terminalCarried?'Terminal sans fil : avec vous':'Terminal sans fil : sur son socle';
-  terminalDetail.textContent=payments.terminalCarried?'Présentez-le au client depuis Service. Reposez-le ici lorsque vous avez terminé.':'Emportez-le auprès des clients qui règlent par carte. Le terminal est inclus avec votre caisse.';
+  terminalState.textContent=payments.terminalWithWaiter?'Terminal sans fil : avec le serveur':terminalReserved?'Terminal réservé : le serveur arrive':payments.terminalOrderId?'Terminal : paiement en cours':payments.terminalCarried?'Terminal sans fil : avec vous':'Terminal sans fil : sur son socle';
+  terminalDetail.textContent=payments.terminalWithWaiter?'Le serveur encaisse par carte puis rapporte le terminal sur son socle.':payments.terminalCarried?'Présentez-le directement au client, puis reposez-le sur son socle pour le partager avec le serveur.':'Le terminal est partagé avec le serveur. Il le prend pour les cartes et le rapporte après chaque encaissement.';
   pickupTerminal.hidden=!!payments.terminalCarried;returnTerminal.hidden=!payments.terminalCarried;
-  pickupTerminal.disabled=!near||s.gameOver;returnTerminal.disabled=!near||!!payments.terminalOrderId||s.gameOver;fundAmount.disabled=!near||s.gameOver;const funding=Number(fundAmount.value);fundTill.disabled=!near||s.gameOver||!Number.isFinite(funding)||funding<=0||bank<funding||!game.fundTill;
+  pickupTerminal.disabled=!near||s.gameOver||payments.terminalWithWaiter||terminalReserved;returnTerminal.disabled=!near||!!payments.terminalOrderId||s.gameOver;fundAmount.disabled=!near||s.gameOver;const funding=Number(fundAmount.value);fundTill.disabled=!near||s.gameOver||!Number.isFinite(funding)||funding<=0||bank<funding||!game.fundTill;
   const pending=s.orders.filter(order=>order.phase==='cash-collected'),ids=new Set(pending.map(order=>order.id));
   for(const [id,entry]of cashCards)if(!ids.has(id)){entry.card.remove();cashCards.delete(id);}
   cashEmpty.hidden=pending.length>0;
@@ -132,8 +139,10 @@ window.BarTablet=(()=>{
    const entry=cashCards.get(order.id)||cashCard(order),change=Math.round(((order.tender||0)-(order.due||0))*100)/100;
    entry.card.classList.toggle('tablet-order-selected',order.id===selectedOrderId);entry.title.textContent=`${orderPlace(order)} · ${order.name||'Client'}`;
    entry.details.textContent=`Addition : ${money(order.due||0)} · Espèces reçues : ${money(order.tender||0)}`;entry.expected.textContent=`À rendre : ${money(change)}`;
-   entry.input.disabled=entry.reset.disabled=entry.confirm.disabled=!near||s.gameOver;for(const item of entry.coins.children)item.disabled=!near||s.gameOver;
+   const handled=game.paymentHandledByWaiter?.(order.id);
+   entry.input.disabled=entry.reset.disabled=entry.confirm.disabled=!near||s.gameOver||handled;for(const item of entry.coins.children)item.disabled=!near||s.gameOver||handled;
    entry.hint.textContent=!near?'Rejoignez la caisse pour compter la monnaie.':change>(payments.till||0)?'Le tiroir manque de monnaie. Ajoutez-y de la trésorerie avant de continuer.':'Sélectionnez les pièces et billets, puis rapportez la monnaie et le ticket au client.';
+   if(handled)entry.hint.textContent=waiterPaymentMessage(game.waiterPaymentStatus(order.id));
   }
   const history=payments.receipts||[],signature=JSON.stringify(history);if(signature!==receiptsSignature){receiptsSignature=signature;receipts.replaceChildren();if(!history.length)receipts.append(make('p','tablet-empty','Aucun règlement encaissé pour le moment.'));for(const receipt of history.slice(0,10)){const row=make('div','tablet-receipt');row.append(make('span',null,`${receipt.customerName||'Client'} · ${receipt.tableId?'Table '+receipt.tableId:'Comptoir'}`),make('span',null,receipt.method==='card'?'Carte bancaire':'Espèces'),make('strong',null,money(receipt.amount||0)));receipts.append(row);}}
  }
@@ -184,7 +193,7 @@ window.BarTablet=(()=>{
  const summary=make('div','tablet-building-summary');summary.append(make('span','tablet-eyebrow','VOTRE ADRESSE'),make('h3',null,'Un bar de quartier à faire grandir.'),make('p',null,'Une salle ouverte aux clients, un comptoir équipé et une réserve séparée pour organiser le service.'));building.append(summary);
  const licenses=pages.get('licenses'),team=pages.get('team');
  const licenseIntro=make('div','tablet-management-intro');licenseIntro.append(icon('licenses'),make('div',null));licenseIntro.lastChild.append(make('h3',null,'Une carte qui grandit avec votre réputation.'),make('p',null,'La carte de base est incluse. Servez des clients pour débloquer les licences suivantes, puis achetez-les ici.'));licenses.append(licenseIntro);
- const teamIntro=make('div','tablet-management-intro');teamIntro.append(icon('team'),make('div',null));teamIntro.lastChild.append(make('h3',null,'Un coup de main pendant le service.'),make('p',null,'Confiez les stocks, la préparation et le service à votre équipe. Les encaissements restent entre vos mains.'));team.append(teamIntro);
+ const teamIntro=make('div','tablet-management-intro');teamIntro.append(icon('team'),make('div',null));teamIntro.lastChild.append(make('h3',null,'Un coup de main pendant le service.'),make('p',null,'Confiez les stocks et la préparation à votre équipe. Le serveur prend les commandes, apporte les boissons et encaisse les espèces comme les cartes. Il partage le terminal avec vous.'));team.append(teamIntro);
  const upgradeLists=new Map();for(const key of ['building','licenses','team']){const list=make('div','tablet-upgrade-list');pages.get(key).append(list);upgradeLists.set(key,list)}
  for(const key of ['building','licenses','team'])pages.get(key).append(make('p','tablet-section-note','Les déblocages dépendent du nombre total de clients servis. Les achats et recrutements sont conservés dans votre sauvegarde.'));
  const newBarNotice=make('div','tablet-service-notice'),newBarAction=button('Nouveau bar','new-bar','tablet-button tablet-button-subtle');
@@ -222,7 +231,8 @@ window.BarTablet=(()=>{
    const requirements=[];if(s.totalSold<offer.requiredSales)requirements.push(`${s.totalSold} / ${offer.requiredSales} clients servis pour débloquer`);if(offer.unmetPrerequisites?.length)requirements.push('À acheter d’abord : '+offer.unmetPrerequisites.map(key=>BarEngine.managementUpgrades[key].name).join(', '));
    entry.statusText.textContent=offer.owned?(offer.category==='team'?`${s.open?'En poste':'Prêt pour le prochain service'} · ${money(offer.salary||0)} de salaire par soir`:'Disponible pour tous les prochains services'):requirements.length?requirements.join(' · '):(s.cash<offer.cost?`Débloqué · Il manque ${money(offer.cost-s.cash)}`:'Débloqué · Achat disponible');entry.purchase.disabled=offer.owned||!offer.unlocked||s.cash<offer.cost||s.gameOver;entry.purchase.textContent=offer.owned?(offer.category==='team'?'Dans votre équipe':'Déjà acquis'):`${offer.category==='team'?'Recruter':'Acheter'} · ${money(offer.cost)}`;
   }
-  for(const id of ['bartender','waiter']){const job=s.staff?.[id],entry=upgradeCards.get(id);if(!job||!entry)continue;const order=s.orders.find(order=>order.id===job.orderId);entry.statusText.textContent=`${id==='bartender'?'Prépare '+(recipes[job.recipe]?.name||'une boisson'):job.task==='take-order'?'Prend une commande':'Apporte une boisson'}${order?' · '+orderPlace(order):''} · ${Math.ceil(job.remaining)} s`;}
+  for(const id of ['bartender','waiter']){const job=s.staff?.[id],entry=upgradeCards.get(id);if(!job||!entry)continue;const order=s.orders.find(order=>order.id===job.orderId);entry.statusText.textContent=`${id==='bartender'?'Prépare '+(recipes[job.recipe]?.name||'une boisson'):job.task==='take-order'?'Prend une commande':job.task==='serve'?'Apporte une boisson':waiterPaymentMessage(game.waiterPaymentStatus?.())}${order?' · '+orderPlace(order):''} · ${Math.ceil(job.remaining)} s`;}
+  if(s.management.waiter&&!s.staff.waiter){const waiting=game.waiterPaymentStatus?.();if(waiting)upgradeCards.get('waiter').statusText.textContent=waiterPaymentMessage(waiting);}
  }
  function focusOrder(id){selectedOrderId=Number.isSafeInteger(id)?id:null;refresh(true);const entry=[...seats.values()].find(entry=>Number(entry.card.dataset.serviceOrder)===selectedOrderId);const card=current==='register'?cashCards.get(selectedOrderId)?.card:entry?.card;if(card){card.focus({preventScroll:true});card.scrollIntoView({block:'nearest'});}}
  function open(tab='drinks',orderId){
