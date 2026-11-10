@@ -8,8 +8,14 @@ if errorlevel 1 (
  pause
  exit /b 1
 )
+node scripts/check-build-dependencies.cjs
+if errorlevel 2 goto failed
+if not errorlevel 1 goto dependencies_ready
 call npm.cmd ci --no-audit --no-fund
 if errorlevel 1 goto failed
+node scripts/check-build-dependencies.cjs
+if errorlevel 1 goto failed
+:dependencies_ready
 call npm.cmd test
 if errorlevel 1 goto failed
 call npm.cmd run dist:win

@@ -8,6 +8,7 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const { buildWindows } = require('../scripts/build-windows.cjs');
 const { selectReleaseVersion, writeReleaseVersion } = require('../scripts/release-version.cjs');
+const { checkBuildDependencies } = require('../scripts/check-build-dependencies.cjs');
 
 function fixture(t, version = '0.6.0') {
   const parent = fs.realpathSync(os.tmpdir());
@@ -330,4 +331,120 @@ test('an unreadable lock is retained and does not start a build or delete old re
   assert.equal(spawned, false);
   assert.equal(fs.readFileSync(f.lock, 'utf8'), 'incomplete lock');
   f.previousIntact();
+});
+
+function dependencyFixture(t) {
+  const parent = fs.realpathSync(os.tmpdir());
+  const root = fs.mkdtempSync(path.join(parent, 'comptoir-dependency-check-'));
+  t.after(() => {
+    assert.equal(path.dirname(path.resolve(root)), parent);
+    assert.ok(path.basename(root).startsWith('comptoir-dependency-check-'));
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  });
+  const write = (relative, value) => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+  };
+  const source = { name: 'dependency-fixture', version: '1.0.0', devDependencies: { electron: '45.2.3', 'electron-builder': '26.18.0' } };
+  const packages = Object.fromEntries([
+    ['electron', '45.2.3'], ['electron-builder', '26.18.0'], ['transitive-helper', '1.2.3'],
+  ].map(([name, version]) => ['node_modules/' + name, { version, resolved: 'https://registry.npmjs.org/' + name + '/-/' + name + '-' + version + '.tgz', integrity: 'sha512-fixture-' + name }]));
+  const lock = { name: source.name, version: source.version, lockfileVersion: 3, packages: { '': source, ...packages } };
+  const installed = { name: source.name, version: source.version, lockfileVersion: 3, packages: structuredClone(packages) };
+  write('package.json', source);write('package-lock.json', lock);write('node_modules/.package-lock.json', installed);
+  for (const [directory, entry] of Object.entries(packages)) write(directory + '/package.json', { name: path.basename(directory), version: entry.version });
+  write('node_modules/electron/path.txt', 'electron.exe');
+  write('node_modules/electron/dist/electron.exe', 'Fixture binary, never executed');
+  write('node_modules/electron-builder/out/cli/cli.js', '// Fixture CLI, never executed');
+  const sourceBytes = ['package.json', 'package-lock.json', 'node_modules/.package-lock.json'].map(file => [file, fs.readFileSync(path.join(root, file))]);
+  const unchanged = () => {
+    for (const [file, bytes] of sourceBytes) assert.deepEqual(fs.readFileSync(path.join(root, file)), bytes, 'Read-only dependency checking preserves ' + file);
+  };
+  return { root, write, source, lock, installed, unchanged };
+}
+
+test('an intact locked dependency installation is reused without writing manifests or starting a process', t => {
+  const f = dependencyFixture(t);
+  const spawn = t.mock.method(cp, 'spawnSync', () => assert.fail('Checking dependencies must remain read-only'));
+  const result = checkBuildDependencies(f.root);
+  assert.equal(result.ready, true);
+  assert.equal(typeof result.reason, 'string');
+  assert.equal(spawn.mock.callCount(), 0);
+  f.unchanged();
+});
+
+test('missing installed dependencies request installation instead of trusting an existing directory', t => {
+  const f = dependencyFixture(t);
+  const modules = path.join(f.root, 'node_modules');
+  assert.equal(path.dirname(path.resolve(modules)), f.root);
+  fs.rmSync(modules, { recursive: true });
+  assert.equal(checkBuildDependencies(f.root).ready, false);
+  fs.mkdirSync(modules);
+  assert.equal(checkBuildDependencies(f.root).ready, false);
+});
+
+test('changed declarations must have an updated source lock before dependency preparation', t => {
+  const f = dependencyFixture(t);
+  f.source.devDependencies['electron-builder'] = '26.19.0';
+  f.write('package.json', f.source);
+  assert.throws(() => checkBuildDependencies(f.root));
+});
+
+test('a changed transitive version or stale installed lock requests a clean installation', async t => {
+  for (const change of ['actual version', 'installed version', 'installed integrity', 'installed source', 'extra package', 'missing required package', 'corrupt installed lock']) {
+    await t.test(change, st => {
+      const f = dependencyFixture(st), location = 'node_modules/transitive-helper';
+      switch (change) {
+        case 'actual version': f.write(location + '/package.json', { name: 'transitive-helper', version: '1.2.4' });break;
+        case 'installed version': f.installed.packages[location].version = '1.2.4';break;
+        case 'installed integrity': f.installed.packages[location].integrity = 'sha512-other';break;
+        case 'installed source': f.installed.packages[location].resolved = 'https://example.invalid/package.tgz';break;
+        case 'extra package': f.installed.packages['node_modules/extra'] = { version: '1.0.0' };break;
+        case 'missing required package': delete f.installed.packages[location];break;
+        case 'corrupt installed lock': f.write('node_modules/.package-lock.json', '{');break;
+      }
+      if (!['actual version', 'corrupt installed lock'].includes(change)) f.write('node_modules/.package-lock.json', f.installed);
+      assert.equal(checkBuildDependencies(f.root).ready, false);
+    });
+  }
+});
+
+test('an optional dependency omitted by npm does not force endless reinstalls', t => {
+  const f = dependencyFixture(t);
+  f.lock.packages['node_modules/platform-optional'] = { version: '1.0.0', optional: true, os: ['darwin'], cpu: ['arm64'] };
+  f.write('package-lock.json', f.lock);
+  assert.equal(checkBuildDependencies(f.root).ready, true);
+});
+
+test('an incomplete Electron runtime or builder CLI triggers dependency repair', async t => {
+  for (const file of ['node_modules/electron/path.txt', 'node_modules/electron/dist/electron.exe', 'node_modules/electron-builder/out/cli/cli.js']) {
+    await t.test(file, st => {
+      const f = dependencyFixture(st);
+      fs.unlinkSync(path.join(f.root, file));
+      assert.equal(checkBuildDependencies(f.root).ready, false);
+    });
+  }
+  await t.test('wrong runtime entry point', st => {
+    const f = dependencyFixture(st);
+    f.write('node_modules/electron/path.txt', 'missing.exe');
+    assert.equal(checkBuildDependencies(f.root).ready, false);
+  });
+});
+
+test('malformed source metadata cannot silently bypass dependency verification', async t => {
+  for (const file of ['package.json', 'package-lock.json']) {
+    await t.test(file, st => {
+      const f = dependencyFixture(st);
+      f.write(file, '{');
+      assert.throws(() => checkBuildDependencies(f.root));
+    });
+  }
+});
+
+test('lock entries outside node_modules are rejected', t => {
+  const f = dependencyFixture(t);
+  f.lock.packages['node_modules/../../outside'] = { version: '1.0.0' };
+  f.write('package-lock.json', f.lock);
+  assert.throws(() => checkBuildDependencies(f.root));
 });

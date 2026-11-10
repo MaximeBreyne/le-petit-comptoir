@@ -122,10 +122,18 @@ compilation sont conservés.
 ## Préparer la version suivante
 
 Après avoir modifié le jeu, double-cliquez sur `FABRIQUER-MISE-A-JOUR.cmd`.
-Ce raccourci installe les dépendances verrouillées avec `npm ci`, teste le jeu,
+Ce raccourci vérifie les dépendances installées et réutilise celles qui correspondent
+au verrouillage. Il exécute `npm ci` lorsqu’une installation est nécessaire, teste le jeu,
 calcule automatiquement le numéro suivant et fabrique le nouvel installateur
 dans le dossier surveillé. Il laisse `package.json` et `package-lock.json` inchangés.
 Il utilise la copie locale de Node.js lorsqu'elle est présente dans `.build`.
+
+Les messages npm `warn deprecated` concernent des bibliothèques anciennes utilisées
+par les outils Electron. Les versions stables utilisées les incluent encore.
+La vérification évite de réinstaller ces outils à chaque compilation ; les messages
+peuvent donc encore apparaître lors d’une première installation ou d’un changement
+de dépendances. Ils restent visibles, ainsi que les erreurs : une erreur
+d’installation arrête le script et conserve le précédent installateur.
 
 Vous pouvez aussi lancer les tests et la compilation directement :
 

@@ -208,6 +208,11 @@ Les mises à jour utilisent uniquement un dossier local, sans publication en lig
 Sur ce PC, release-final est surveillé automatiquement ; si le dossier est
 déplacé, choisissez-le dans Réglages > Mises à jour du jeu.
 FABRIQUER-MISE-A-JOUR.cmd prépare la version suivante et actualise ce dossier.
+Il vérifie les dépendances déjà installées et les réutilise si elles correspondent
+au verrouillage. Il lance npm ci seulement si elles manquent ou ont changé.
+Les avertissements npm « deprecated » signalent des bibliothèques anciennes
+utilisées par les outils Electron ; ils peuvent encore apparaître lors d’une
+installation des dépendances. Une erreur d’installation arrête la fabrication.
 Le numéro de version augmente automatiquement à chaque compilation réussie,
 sans modifier package.json ni package-lock.json. Il est injecté uniquement dans
 l’application compilée. Le dernier numéro est conservé dans .build/release-version.json,
