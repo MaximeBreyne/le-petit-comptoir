@@ -7,15 +7,20 @@ const yaml = require('js-yaml');
 const asar = require('@electron/asar');
 const { verifyAppIcon } = require('./verify-app-icon.cjs');
 
-function verifyRelease(directory, expectedPackage = require('../package.json')) {
+function verifyRelease(directory, expectedPackage) {
   const root = path.resolve(directory);
   const metadata = yaml.load(fs.readFileSync(path.join(root, 'latest.yml'), 'utf8'));
+  // The build supplies its selected version. Standalone verification uses the
+  // published version, which can advance independently of the source package.
+  expectedPackage ??= { ...require('../package.json'), version: metadata?.version };
+  assert.match(metadata?.version || '', /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/, 'Numéro de version invalide.');
   assert.equal(metadata.version, expectedPackage.version, 'La version de latest.yml diffère du jeu.');
   assert.ok(Array.isArray(metadata.files) && metadata.files.length > 0, 'latest.yml ne contient aucun installateur.');
   const entries = metadata.files.filter(file => typeof file.url === 'string' && file.url.endsWith('.exe'));
   assert.equal(entries.length, 1, 'Un seul installateur Windows x64 est attendu.');
   const entry = entries[0];
   const installer = decodeURIComponent(entry.url);
+  assert.equal(installer, `Le-Petit-Comptoir-Bar-${metadata.version}-Setup.exe`, 'Le nom de l’installateur diffère de sa version.');
   assert.equal(path.basename(installer), installer, 'Le manifeste doit désigner un fichier local sans sous-dossier.');
   assert.ok(!installer.includes('/') && !installer.includes('\\'), 'Chemin de fichier invalide.');
   const data = fs.readFileSync(path.join(root, installer));
@@ -36,7 +41,7 @@ function verifyRelease(directory, expectedPackage = require('../package.json')) 
   assert.ok(path.isAbsolute(localSource.directory), 'Le dossier de mise à jour par défaut doit être absolu.');
   const archive = path.join(resources, 'app.asar');
   const packed = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
-  assert.equal(packed.version, expectedPackage.version, 'La version installée diffère du manifeste.');
+  assert.equal(packed.version, metadata.version, 'La version installée diffère du manifeste.');
   const iconPath = path.resolve(__dirname, '..', expectedPackage.build.win.icon);
   verifyAppIcon(path.join(root, 'win-unpacked', `${expectedPackage.build.productName}.exe`), iconPath);
   verifyAppIcon(path.join(root, installer), iconPath);

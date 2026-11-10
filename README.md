@@ -208,6 +208,10 @@ Les mises à jour utilisent uniquement un dossier local, sans publication en lig
 Sur ce PC, release-final est surveillé automatiquement ; si le dossier est
 déplacé, choisissez-le dans Réglages > Mises à jour du jeu.
 FABRIQUER-MISE-A-JOUR.cmd prépare la version suivante et actualise ce dossier.
+Le numéro de version augmente automatiquement à chaque compilation réussie,
+sans modifier package.json ni package-lock.json. Il est injecté uniquement dans
+l’application compilée. Le dernier numéro est conservé dans .build/release-version.json,
+un fichier local ignoré par Git, et dans release-final/latest.yml.
 La nouvelle version disponible s’installe à la fermeture normale du jeu.
 Après un build réussi et vérifié, les anciennes versions et leurs fichiers de
 compilation sont supprimés automatiquement. Seuls le build actuel et ses fichiers

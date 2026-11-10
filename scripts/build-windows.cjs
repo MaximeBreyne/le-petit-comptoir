@@ -4,6 +4,7 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const { verifyRelease } = require('./verify-release.cjs');
 const { cleanReleases, releaseDirectory } = require('./clean-releases.cjs');
+const { selectReleaseVersion, writeReleaseVersion } = require('./release-version.cjs');
 
 // Prevent another build from publishing or being cleaned up while this one runs.
 function acquireBuildLock(root) {
@@ -46,6 +47,9 @@ function buildWindows({ root = path.resolve(__dirname, '..'), spawnSync = cp.spa
   try {
     fs.mkdirSync(path.join(root, 'release-final'), { recursive: true });
     const destination = releaseDirectory(root);
+    const sourcePackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    const version = selectReleaseVersion(root, sourcePackage.version);
+    logger.log(`Version de l’installateur : ${version} (fichiers package inchangés).`);
     const runtime = path.join(root, '.build', 'electron-runtime');
     fs.mkdirSync(runtime, { recursive: true });
     // First installation on this PC already knows where subsequent builds appear.
@@ -64,11 +68,12 @@ function buildWindows({ root = path.resolve(__dirname, '..'), spawnSync = cp.spa
       cli, '--win', 'nsis', '--x64', '--publish', 'never',
       '--config.electronDist=' + runtime,
       '--config.directories.output=' + output,
+      '--config.extraMetadata.version=' + version,
     ], { stdio: 'inherit', env: process.env, cwd: root });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(`La compilation Windows a échoué (code ${result.status ?? 'inconnu'}).`);
 
-    const verified = verify(output);
+    const verified = verify(output, { ...sourcePackage, version });
     // Expose metadata last and atomically: a running game sees only a complete build.
     for (const file of verified.artifacts.filter(file => file !== 'latest.yml')) {
       fs.copyFileSync(path.join(output, file), path.join(destination, file));
@@ -76,6 +81,10 @@ function buildWindows({ root = path.resolve(__dirname, '..'), spawnSync = cp.spa
     const pendingManifest = path.join(destination, 'latest.yml.tmp');
     fs.copyFileSync(path.join(output, 'latest.yml'), pendingManifest);
     fs.renameSync(pendingManifest, path.join(destination, 'latest.yml'));
+    try { writeReleaseVersion(root, version); }
+    catch (error) {
+      logger.warn(`Installateur créé ; historique conservé dans latest.yml, copie dans .build indisponible : ${error.message}`);
+    }
     logger.log(`Installateur Windows ${verified.version} vérifié : ${path.join(destination, verified.installer)}`);
     logger.log(`Fichiers de mise à jour : ${verified.artifacts.join(', ')}`);
 

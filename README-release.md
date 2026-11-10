@@ -122,21 +122,29 @@ compilation sont conservés.
 ## Préparer la version suivante
 
 Après avoir modifié le jeu, double-cliquez sur `FABRIQUER-MISE-A-JOUR.cmd`.
-Ce raccourci installe les dépendances nécessaires, teste le jeu, augmente son
-numéro de version et fabrique le nouvel installateur dans le dossier surveillé.
+Ce raccourci installe les dépendances verrouillées avec `npm ci`, teste le jeu,
+calcule automatiquement le numéro suivant et fabrique le nouvel installateur
+dans le dossier surveillé. Il laisse `package.json` et `package-lock.json` inchangés.
 Il utilise la copie locale de Node.js lorsqu'elle est présente dans `.build`.
 
-Après modification et validation du jeu, augmentez la version puis reconstruisez :
+Vous pouvez aussi lancer les tests et la compilation directement :
 
 ```powershell
-npm.cmd version patch --no-git-tag-version
 npm.cmd test
 npm.cmd run dist:win
 ```
 
-`npm version patch --no-git-tag-version` augmente la version dans `package.json`
-et `package-lock.json`, sans commit ni tag Git. Le nouvel installateur et sa
-blockmap sont copiés dans `release-final`, puis le manifeste `latest.yml` est
+La version est injectée dans l’application compilée, sans réécrire les fichiers
+source et sans créer de commit ou de tag Git. Le script part de la dernière
+version réussie et augmente son correctif, par exemple `0.11.1` devient `0.11.2`.
+Une version supérieure définie volontairement dans `package.json` sert de nouvelle
+base ; sans historique local, la première compilation utilise cette version.
+Le dernier numéro réussi est conservé dans `.build/release-version.json`, ignoré
+par Git, et dans `release-final/latest.yml`. Gardez au moins l’un de ces fichiers
+pour continuer la numérotation si vous nettoyez les fichiers générés. Une erreur
+de compilation ou de vérification ne consomme pas de numéro.
+
+Le nouvel installateur et sa blockmap sont copiés dans `release-final`, puis le manifeste `latest.yml` est
 remplacé en dernier. Le jeu ne peut ainsi voir que les fichiers d’une génération
 terminée. Une modification du code seule ne met pas à jour une application
 installée : chaque nouvelle version doit être reconstruite avec un numéro supérieur.

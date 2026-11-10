@@ -8,16 +8,15 @@ if errorlevel 1 (
  pause
  exit /b 1
 )
-call npm.cmd install --no-audit --no-fund
+call npm.cmd ci --no-audit --no-fund
 if errorlevel 1 goto failed
 call npm.cmd test
-if errorlevel 1 goto failed
-call npm.cmd version patch --no-git-tag-version
 if errorlevel 1 goto failed
 call npm.cmd run dist:win
 if errorlevel 1 goto failed
 echo.
 echo Nouvelle version disponible dans release-final.
+echo Le numero de version est automatique, sans modifier les fichiers package JSON.
 echo Le nettoyage des anciennes versions est automatique apres verification.
 echo Les anciens fichiers bloques sont signales et leur suppression sera retentee au prochain build reussi.
 echo Le jeu installe detectera cette version, puis l'installera a sa fermeture.

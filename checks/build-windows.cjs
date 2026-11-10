@@ -7,8 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 const cp = require('node:child_process');
 const { buildWindows } = require('../scripts/build-windows.cjs');
+const { selectReleaseVersion, writeReleaseVersion } = require('../scripts/release-version.cjs');
 
-function fixture(t) {
+function fixture(t, version = '0.6.0') {
   const parent = fs.realpathSync(os.tmpdir());
   const root = fs.mkdtempSync(path.join(parent, 'comptoir-build-pipeline-'));
   t.after(() => {
@@ -21,6 +22,13 @@ function fixture(t) {
     fs.writeFileSync(file, data);
     return file;
   };
+  const sourcePackage = { name: 'comptoir-fixture', version, description: 'Local build fixture', dependencies: { 'electron-updater': '6.8.11' } };
+  const packageFile = write(path.join(root, 'package.json'), JSON.stringify(sourcePackage, null, 4) + '\r\n');
+  const lockFile = write(path.join(root, 'package-lock.json'), JSON.stringify({ name: sourcePackage.name, version, lockfileVersion: 3, packages: { '': sourcePackage } }, null, 2) + '\n');
+  const sourceBytes = [packageFile, lockFile].map(file => [file, fs.readFileSync(file)]);
+  const sourceIntact = () => {
+    for (const [file, bytes] of sourceBytes) assert.deepEqual(fs.readFileSync(file), bytes, 'Source manifest must stay byte-for-byte unchanged: ' + path.basename(file));
+  };
   write(path.join(root, 'node_modules', 'electron', 'dist', 'electron.exe'), 'fake runtime, never executed');
   write(path.join(root, 'node_modules', 'electron', 'dist', 'resources', 'default_app.asar'), 'Electron demo');
   fs.mkdirSync(path.join(root, '.build'));
@@ -32,9 +40,13 @@ function fixture(t) {
     unpacked: write(path.join(release, 'build-100', 'win-unpacked', 'resources', 'app.asar'), 'previous working game'),
   };
   const previousBytes = Object.fromEntries(Object.entries(previous).map(([key, file]) => [key, fs.readFileSync(file)]));
-  const installer = 'Le-Petit-Comptoir-Bar-0.6.1-Setup.exe';
-  const verified = { version: '0.6.1', installer, artifacts: [installer, installer + '.blockmap', 'latest.yml'] };
-  const manifest = JSON.stringify({ version: verified.version, path: installer });
+  let verified, manifest;
+  const generated = version => {
+    const installer = 'Le-Petit-Comptoir-Bar-' + version + '-Setup.exe';
+    verified = { version, installer, artifacts: [installer, installer + '.blockmap', 'latest.yml'] };
+    manifest = JSON.stringify({ version, path: installer });
+  };
+  generated('0.6.1');
   let output;
   const logs = [];
   const warnings = [];
@@ -43,6 +55,11 @@ function fixture(t) {
     assert.equal(command, process.execPath);
     assert.equal(options.cwd, root);
     assert.equal(args[args.indexOf('--publish') + 1], 'never', 'Builds must remain local');
+    const injected = args.find(value => value.startsWith('--config.extraMetadata.version='));
+    assert.ok(injected, 'Version is injected into the package copy created by electron-builder');
+    generated(injected.slice('--config.extraMetadata.version='.length));
+    const { installer } = verified;
+    sourceIntact();
     output = args.find(value => value.startsWith('--config.directories.output=')).split('=').slice(1).join('=');
     assert.equal(path.dirname(output), release);
     write(path.join(output, installer), 'new verified installer');
@@ -51,18 +68,23 @@ function fixture(t) {
     write(path.join(output, 'win-unpacked', 'resources', 'app.asar'), 'new unpacked game');
     return { status: 0 };
   };
-  const verify = directory => {
+  const verify = (directory, expectedPackage) => {
     assert.equal(directory, output);
+    assert.deepEqual(expectedPackage, { ...sourcePackage, version: verified.version }, 'Verification uses the injected version and unchanged dependency metadata');
+    sourceIntact();
     return verified;
   };
   const previousIntact = () => {
     for (const [key, file] of Object.entries(previous)) assert.deepEqual(fs.readFileSync(file), previousBytes[key], key);
   };
   return {
-    root, release, previous, previousIntact, verified, manifest, write, spawnSync, verify, logger, logs, warnings,
+    root, release, previous, previousIntact, sourceIntact, sourcePackage, write, spawnSync, verify, logger, logs, warnings,
     lock: path.join(root, '.build', 'windows-build.lock'),
+    versionFile: path.join(root, '.build', 'release-version.json'),
     options: { root, spawnSync, verify, logger },
     get output() { return output; },
+    get verified() { return verified; },
+    get manifest() { return manifest; },
   };
 }
 
@@ -72,10 +94,10 @@ test('a successful build verifies and publishes every artifact before removing t
   let published = false;
   const result = buildWindows({
     ...f.options,
-    verify: directory => {
+    verify: (directory, expectedPackage) => {
       f.previousIntact();
       verified = true;
-      return f.verify(directory);
+      return f.verify(directory, expectedPackage);
     },
     logger: {
       log: message => {
@@ -106,6 +128,8 @@ test('a successful build verifies and publishes every artifact before removing t
   assert.equal(fs.existsSync(f.lock), false);
   assert.equal(fs.existsSync(path.join(f.root, '.build', 'electron-runtime', 'resources', 'default_app.asar')), false);
   assert.ok(fs.existsSync(path.join(f.root, 'node_modules', 'electron', 'dist', 'resources', 'default_app.asar')));
+  assert.equal(JSON.parse(fs.readFileSync(f.versionFile, 'utf8')).version, '0.6.1');
+  f.sourceIntact();
 });
 
 test('builder failures keep all previous release bytes and release the build lock', async t => {
@@ -127,7 +151,9 @@ test('builder failures keep all previous release bytes and release the build loc
       f.previousIntact();
       assert.equal(fs.existsSync(f.lock), false);
       assert.ok(fs.existsSync(f.output), 'Unverified output is kept until a subsequent successful build');
-      assert.deepEqual(f.logs, []);
+      assert.ok(!f.logs.some(message => message.startsWith('Installateur Windows')));
+      assert.equal(fs.existsSync(f.versionFile), false, 'Failed builds do not consume a release number');
+      f.sourceIntact();
     });
   }
 });
@@ -144,6 +170,111 @@ test('verification failure preserves the previous installer, manifest and unpack
   f.previousIntact();
   assert.equal(fs.existsSync(path.join(f.release, f.verified.installer)), false);
   assert.equal(fs.existsSync(f.lock), false);
+  assert.equal(fs.existsSync(f.versionFile), false, 'Failed verification does not consume a release number');
+  f.sourceIntact();
+});
+
+test('successive builds increase the installer version without touching either source manifest', t => {
+  const f = fixture(t);
+  const first = buildWindows(f.options);
+  const second = buildWindows(f.options);
+  assert.equal(first.version, '0.6.1');
+  assert.equal(second.version, '0.6.2');
+  assert.equal(JSON.parse(fs.readFileSync(f.versionFile, 'utf8')).version, '0.6.2');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.release, 'latest.yml'), 'utf8')).version, '0.6.2');
+  assert.equal(fs.existsSync(path.join(f.release, first.installer)), false, 'Cleanup removes the older automatic version');
+  assert.ok(fs.existsSync(path.join(f.release, second.installer)));
+  f.sourceIntact();
+});
+
+test('a higher source version is used for a new series, then automatic patch numbering resumes', t => {
+  const f = fixture(t, '0.7.0');
+  const first = buildWindows(f.options);
+  assert.equal(first.version, '0.7.0');
+  assert.equal(buildWindows(f.options).version, '0.7.1');
+  f.sourceIntact();
+});
+
+test('the first build uses the source version when no successful release is recorded', t => {
+  const f = fixture(t);
+  fs.unlinkSync(f.previous.manifest);
+  assert.equal(selectReleaseVersion(f.root, '0.6.0'), '0.6.0');
+  assert.equal(buildWindows(f.options).version, '0.6.0');
+  f.sourceIntact();
+});
+
+test('the retained local version prevents a downgrade after release artifacts have been removed', t => {
+  const f = fixture(t);
+  const first = buildWindows(f.options);
+  assert.equal(first.version, '0.6.1');
+  assert.equal(path.dirname(path.resolve(f.release)), f.root);
+  fs.rmSync(f.release, { recursive: true, force: true });
+  assert.equal(selectReleaseVersion(f.root, '0.6.0'), '0.6.2');
+  const second = buildWindows(f.options);
+  assert.equal(second.version, '0.6.2');
+  f.sourceIntact();
+});
+
+test('version selection reconciles both successful records using numeric version order', t => {
+  const f = fixture(t);
+  writeReleaseVersion(f.root, '0.9.10');
+  fs.writeFileSync(f.previous.manifest, 'version: 0.9.9\n');
+  assert.equal(selectReleaseVersion(f.root, '0.6.0'), '0.9.11');
+  fs.writeFileSync(f.previous.manifest, 'version: 0.10.2\n');
+  assert.equal(selectReleaseVersion(f.root, '0.6.0'), '0.10.3');
+  assert.equal(selectReleaseVersion(f.root, '1.0.0'), '1.0.0');
+  assert.deepEqual(fs.readdirSync(path.dirname(f.versionFile)), ['release-version.json'], 'Atomic recording leaves no temporary version file');
+  f.sourceIntact();
+});
+
+test('a failed build leaves an existing successful version record untouched and retries the same number', t => {
+  const f = fixture(t);
+  writeReleaseVersion(f.root, '0.6.0');
+  const bytes = fs.readFileSync(f.versionFile);
+  assert.throws(() => buildWindows({ ...f.options, spawnSync: (...args) => { f.spawnSync(...args); return { status: 1 }; } }));
+  assert.deepEqual(fs.readFileSync(f.versionFile), bytes);
+  assert.equal(selectReleaseVersion(f.root, '0.6.0'), '0.6.1');
+  assert.equal(buildWindows(f.options).version, '0.6.1');
+  f.sourceIntact();
+});
+
+test('a blocked local history write keeps the successful release and derives the next version from its manifest', t => {
+  const f = fixture(t);
+  writeReleaseVersion(f.root, '0.6.0');
+  fs.mkdirSync(f.versionFile + '.tmp');
+  const result = buildWindows(f.options);
+  assert.equal(result.version, '0.6.1');
+  assert.equal(JSON.parse(fs.readFileSync(f.previous.manifest, 'utf8')).version, '0.6.1');
+  assert.equal(JSON.parse(fs.readFileSync(f.versionFile, 'utf8')).version, '0.6.0', 'The last valid history file survives');
+  assert.equal(selectReleaseVersion(f.root, '0.6.0'), '0.6.2');
+  assert.equal(result.cleanup.removed.length, 3);
+  assert.equal(f.warnings.length, 1);
+  assert.match(f.warnings[0], /latest\.yml/);
+  assert.equal(fs.existsSync(f.lock), false);
+  f.sourceIntact();
+});
+
+test('invalid existing version records fail safely instead of resetting the release sequence', async t => {
+  for (const [file, data] of [
+    ['release-final/latest.yml', 'version: invalid\n'],
+    ['release-final/latest.yml', 'version: 0.6.2-beta.1\n'],
+    ['release-final/latest.yml', 'version: ['],
+    ['.build/release-version.json', '{'],
+    ['.build/release-version.json', '{}'],
+    ['.build/release-version.json', '{"version":"0.06.2"}'],
+  ]) {
+    await t.test(file + ': ' + data, st => {
+      const f = fixture(st), record = path.join(f.root, file);
+      f.write(record, data);
+      let spawned = false;
+      assert.throws(() => buildWindows({ ...f.options, spawnSync: () => { spawned = true; return { status: 0 }; } }));
+      assert.equal(spawned, false);
+      assert.equal(fs.existsSync(f.lock), false);
+      assert.equal(fs.readFileSync(record, 'utf8'), data);
+      assert.ok(fs.existsSync(f.previous.installer));
+      f.sourceIntact();
+    });
+  }
 });
 
 test('a concurrent build is refused without disturbing the active lock; a failed build can be retried', t => {

@@ -7,6 +7,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {createHash}=require('node:crypto');
 const assert=require('node:assert/strict');
+const asar=require('@electron/asar');
 const {pathToFileURL}=require('node:url');
 const {NsisUpdater}=require('electron-updater');
 const {ElectronHttpExecutor}=require('electron-updater/out/electronHttpExecutor');
@@ -19,9 +20,12 @@ const timeout=setTimeout(()=>{console.error('Update integration timed out');app.
 app.whenReady().then(async()=>{
  let source;
  try{
-  const root=path.resolve(__dirname,'..'),version=require('../package.json').version;
+  const root=path.resolve(__dirname,'..');
   const builds=fs.readdirSync(path.join(root,'release-final')).filter(n=>/^build-\d+$/.test(n)).sort();
   const resources=path.join(root,'release-final',builds.at(-1),'win-unpacked','resources');
+  const {version}=JSON.parse(asar.extractFile(path.join(resources,'app.asar'),'package.json').toString('utf8'));
+  const manifest=require('js-yaml').load(fs.readFileSync(path.join(root,'release-final/latest.yml'),'utf8'));
+  assert.equal(manifest.version,version,'Published update version must match the packaged game, independently of the source package version');
   source=await createLocalUpdateSource({app,resourcesPath:resources,dialog:{showOpenDialog:async()=>({canceled:true,filePaths:[]})},getWindow:()=>win});
   let quitHandler,installOptions;
   const adapter={version:'0.3.0',name:'comptoir-update-test',isPackaged:true,appUpdateConfigPath:path.join(resources,'app-update.yml'),userDataPath:profile,baseCachePath:path.join(profile,'cache'),whenReady:()=>Promise.resolve(),onQuit:fn=>{quitHandler=fn},quit:()=>assert.fail('Must not quit during play'),relaunch:()=>assert.fail('Must not restart during play')};
@@ -44,7 +48,6 @@ app.whenReady().then(async()=>{
   assert.equal(info.version,version);assert.equal(controller.getStatus().state,'ready');
   assert.equal(installOptions,undefined,'Downloading must not install while playing');
   assert.deepEqual(external,[],'Update must not contact online servers');
-  const manifest=require('js-yaml').load(fs.readFileSync(path.join(root,'release-final/latest.yml'),'utf8'));
   assert.equal(createHash('sha512').update(fs.readFileSync(info.downloadedFile)).digest('base64'),manifest.files[0].sha512);
   await win.loadURL(url);
   const restored=await win.webContents.executeJavaScript('({cash:game.s.cash,beer:game.s.stock.beer,status:document.getElementById("settingsModal").textContent})');
