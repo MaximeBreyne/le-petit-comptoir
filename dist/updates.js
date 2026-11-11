@@ -6,7 +6,7 @@
  const title=document.createElement('h3');title.textContent='Mises à jour du jeu';
  const version=document.createElement('p');
  const status=document.createElement('p');status.setAttribute('role','status');
- const explanation=document.createElement('p');explanation.textContent='Le jeu recherche les nouvelles versions dans le dossier choisi sur votre PC. Fermez le jeu normalement pour les installer ; votre sauvegarde est conservée.';
+ const explanation=document.createElement('p');
  const source=document.createElement('p');source.style.overflowWrap='anywhere';
  const choose=document.createElement('button');choose.type='button';choose.textContent='Choisir le dossier des mises à jour';
  const button=document.createElement('button');button.type='button';button.textContent='Rechercher une mise à jour';
@@ -15,7 +15,11 @@
  let lastState;
  function show(value){
   if(!value)return;
-  version.textContent='Version installée : '+value.version;
+  const development=value.isPackaged===false;
+  version.textContent=(development?'Version de base du projet (développement) : ':'Version installée : ')+value.version;
+  explanation.textContent=development
+   ?'Vous jouez depuis les sources. Le numéro de base de package.json reste inchangé ; chaque fabrication réussie attribue son propre numéro à l’installateur. L’installation conserve ce numéro.'
+   :'Le jeu recherche les nouvelles versions dans le dossier choisi sur votre PC. Fermez le jeu normalement pour les installer ; votre sauvegarde est conservée.';
   status.textContent=value.message||'Recherche automatique activée.';
   source.textContent=value.sourceDirectory?'Dossier : '+value.sourceDirectory:'Aucun dossier choisi.';
   if(value.state==='downloading'&&Number.isFinite(value.progress))status.textContent+=' '+Math.round(value.progress)+' %';

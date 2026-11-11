@@ -66,6 +66,8 @@ test('packaged Windows checks after startup and periodically; background downloa
   assert.equal(f.checks(), 1, 'Do not check again while a download is active');
   f.autoUpdater.emit('update-downloaded', { version: '0.5.0' });
   assert.equal(f.controller.getStatus().state, 'ready');
+  assert.equal(f.controller.getStatus().version, '0.4.0', 'Downloading another release does not change the running game version');
+  assert.equal(f.controller.getStatus().isPackaged, true);
   await f.controller.check();
   assert.equal(f.checks(), 1, 'Do not replace a ready update');
   f.app.emit('before-quit');
@@ -79,6 +81,7 @@ test('development and other platforms never check or schedule updates', async ()
   for (const options of [{ app: { isPackaged: false } }, { platform: 'linux' }]) {
     const f = fixture(options); f.controller.start();
     assert.equal((await f.controller.check()).state, 'disabled');
+    assert.equal(f.controller.getStatus().isPackaged, options.app?.isPackaged ?? true, 'An unsupported platform is still an installed build, unlike development');
     assert.equal(f.scheduled.size, 0);
     assert.equal(f.checks(), 0);
     assert.equal(f.autoUpdater.autoDownload, undefined);

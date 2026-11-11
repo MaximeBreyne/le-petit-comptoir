@@ -23,6 +23,7 @@ function setupUpdater({
   let status = {
     state: enabled ? 'idle' : 'disabled',
     version: app.getVersion(),
+    isPackaged: app.isPackaged,
     sourceDirectory: localSource?.getDirectory() || null,
     message: enabled
       ? localSource?.getDirectory()

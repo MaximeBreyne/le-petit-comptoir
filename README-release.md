@@ -184,6 +184,11 @@ source et sans créer de commit ou de tag Git. Le script part de la dernière
 version réussie et augmente son correctif, par exemple `0.11.1` devient `0.11.2`.
 Une version supérieure définie volontairement dans `package.json` sert de nouvelle
 base ; sans historique local, la première compilation utilise cette version.
+Le champ `version` de `package.json` peut donc rester à `0.11.7` pendant que les
+installateurs passent à `0.11.8`, puis `0.11.9`. L’incrément a lieu à la fabrication ;
+l’installation et la mise à jour conservent le numéro du fichier reçu.
+Avec `npm start`, les réglages affichent la version de base du projet en développement.
+Le jeu installé affiche sa propre version, identique à celle de son installateur.
 Le dernier numéro réussi est conservé dans `.build/release-version.json`, ignoré
 par Git, et dans `release-final/latest.yml`. Gardez au moins l’un de ces fichiers
 pour continuer la numérotation si vous nettoyez les fichiers générés. Une erreur

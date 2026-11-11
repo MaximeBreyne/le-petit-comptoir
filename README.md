@@ -272,6 +272,10 @@ Le numéro de version augmente automatiquement à chaque compilation réussie,
 sans modifier package.json ni package-lock.json. Il est injecté uniquement dans
 l’application compilée. Le dernier numéro est conservé dans .build/release-version.json,
 un fichier local ignoré par Git, et dans release-final/latest.yml.
+Le champ version de package.json est une base, pas le numéro du dernier installateur.
+L’installation et la mise à jour conservent exactement le numéro de l’installateur :
+elles ne l’augmentent pas. Avec npm start, les réglages indiquent la version de base
+du projet en développement ; dans le jeu installé, ils indiquent sa version réelle.
 La nouvelle version disponible s’installe à la fermeture normale du jeu.
 Après un build réussi et vérifié, les anciennes versions et leurs fichiers de
 compilation sont supprimés automatiquement. Seuls le build actuel et ses fichiers
