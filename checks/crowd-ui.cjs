@@ -71,7 +71,7 @@ app.whenReady().then(async()=>{
     check(pose&&pose.seated&&!pose.moving&&Math.hypot(pose.x-seat.x,pose.z-seat.z)<.001,'Customer sits at assigned chair '+order.id);
     if(!order.tableId)check(pose.seatHeight===seat.seatHeight&&pose.angle===0,'Counter customer sits at stool height facing the bar '+order.slot);
    }
-   check(renderer.people.length===52&&Array.from({length:13},(_,i)=>renderer.people[i*4+3]).every(value=>value===1),'All thirteen people have contact shadows');
+   check(renderer.people.length===BarRenderer.maxContactPeople*4&&Array.from({length:13},(_,i)=>renderer.people[i*4+3]).every(value=>value===1),'All thirteen people have contact shadows in the expanded renderer capacity');
    window.__crowdQA.savedIds=state.orders.map(order=>order.id);ui();
    return {tiers,fullCapacity:state.orders.length,visiblePeople:poses.length,contactShadows:13};
   })()`);

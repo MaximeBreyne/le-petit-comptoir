@@ -1,5 +1,7 @@
 const $=id=>document.getElementById(id), money=n=>n.toLocaleString('fr-BE',{style:'currency',currency:'EUR'});
 const {Game,ingredients,recipes}=BarEngine;
+function controlName(action){return window.BarControls?.label(action)||preferences.bindings[action]?.label||{interact:'E',tablet:'Tab',manage:'R',pour:'Espace',sprint:'Maj'}[action]||action}
+function controlMarkup(action){return controlName(action).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
 function waiterPaymentMessage(status){
  if(!status)return '';
  if(status.blocked==='change')return 'Le serveur attend : le fond de caisse manque de monnaie.';
@@ -14,7 +16,7 @@ function save(force=false){if(force!==true&&window.GameMenu&&!GameMenu.canAutosa
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,4000)}
 function modal(title,html){game.setPour(false);keys={};window.BarTablet?.close({suspend:true});if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();$('modalTitle').textContent=title;$('modalContent').innerHTML=html;$('modal').showModal()}
 function act(fn){if(paused){toast('Reprenez la partie pour continuer.');return}const sales=game.s.totalSold,result=fn();toast(result);audio.chime(game.s.totalSold>sales?'sale':'click');state=game.s;save();ui()}
-function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;const t=Math.min(1440,state.time);$('clock').textContent=t>=1440?'00:00':String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('pause').textContent=paused?'Reprendre':'Pause';
+function ui(){state=game.s;syncBuilding();$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;const t=Math.min(1440,state.time);$('clock').textContent=t>=1440?'00:00':String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('pause').textContent=paused?'Reprendre':'Pause';
  const day=BarVenue.dayProgress(state),status=BarVenue.serviceState(state);
  $('serviceHud').dataset.state=status;
  $('serviceStatus').textContent={closed:'FERMÉ',open:'OUVERT',closing:'DERNIÈRE TOURNÉE'}[status];
@@ -31,13 +33,23 @@ function ui(){state=game.s;$('cash').textContent=money(state.cash);$('day').text
 }
 $('tablet').onclick=()=>BarTablet.open('orders');$('register').onclick=()=>window.BarService?.openRegister();
 $('close').onclick=()=>$('modal').close();
-$('help').onclick=()=>modal('Bienvenue derrière le bar',`<p><strong>Ouvrir le bar.</strong> Regardez le panneau de la porte et appuyez sur E, ou utilisez Service sur la tablette.</p><p><strong>Commandes et service.</strong> Approchez-vous d’un client, regardez-le et appuyez sur E ou cliquez. Pour une commande à prendre, la tablette s’ouvre : validez la commande à proximité du client. Les boissons demandées apparaissent dans À préparer et dans votre vue du bar. Pour servir ou encaisser, interagissez directement avec le client.</p><p><strong>Préparer derrière le bar.</strong> Regardez le rangement des verres derrière le bar et appuyez sur E. Choisissez la boisson : vous prenez son récipient. Posez-le au poste indiqué. Cinq emplacements permettent de garder deux bières, un café et deux autres boissons en cours. Regardez une préparation laissée au poste et appuyez sur E pour la reprendre. Prenez chaque ingrédient dans les bouteilles ou bacs étiquetés avec E, puis utilisez-le au poste. Les quantités sont retirées du stock à la prise ; la bière au premier tirage.</p><p><strong>Doser et terminer.</strong> Restez près du poste et maintenez la touche de dosage. Regardez le verre et appuyez sur E pour valider, mélanger si nécessaire et prendre la boisson sur le plateau. S’éloigner arrête le versement. Pour abandonner, regardez le verre, faites un clic droit et choisissez Jeter cette préparation. Sur le plateau, regardez une boisson et appuyez sur E pour ouvrir ses options. Un plateau plein laisse la boisson terminée au poste.</p><p><strong>Espèces.</strong> Prenez l’argent auprès du client avec E. Regardez l’écran de caisse derrière le bar pour l’ouvrir. Sélectionnez les pièces et billets à rendre, validez, puis rapportez la monnaie et le ticket au client avec E. Le paiement est enregistré une seule fois, à la fin.</p><p><strong>Carte bancaire.</strong> Prenez le terminal sur son socle près de la caisse avec E. Regardez le client pour lui présenter le terminal, puis attendez trois secondes. Reposez-le sur son socle après utilisation.</p><p><strong>Gestion.</strong> La tablette regroupe les commandes, la liste des boissons à préparer, les stocks, les licences, les améliorations et les employés. Les livraisons arrivent en réserve après dix secondes ; rejoignez cette pièce pour transférer les stocks. Le serveur prend les commandes, sert et encaisse les espèces et les cartes. Il compte la monnaie à la caisse et partage votre terminal : reposez-le sur son socle après utilisation. Si le fond de caisse manque de monnaie, il utilise la trésorerie disponible ou attend un réapprovisionnement.</p><p><strong>Maj : courir · Tab : tablette · Échap : pause · F11 : plein écran.</strong> Le bilan attend la fin des commandes et des paiements. Charges de base : 35 € plus les salaires.</p>`);
+$('help').onclick=()=>modal('Bienvenue derrière le bar',`<p><strong>Ouvrir le bar.</strong> Regardez le panneau de la porte et appuyez sur ${controlMarkup('interact')}, ou utilisez Service sur la tablette.</p><p><strong>Commandes et service.</strong> Approchez-vous d’un client, regardez-le et appuyez sur ${controlMarkup('interact')} ou cliquez. Pour une commande à prendre, la tablette s’ouvre : validez la commande à proximité du client. Les boissons demandées apparaissent dans À préparer et dans votre vue du bar. Pour servir ou encaisser, interagissez directement avec le client.</p><p><strong>Préparer derrière le bar.</strong> Regardez le rangement des verres derrière le bar et appuyez sur ${controlMarkup('interact')}. Choisissez la boisson : vous prenez son récipient. Posez-le au poste indiqué. Cinq emplacements permettent de garder deux bières, un café et deux autres boissons en cours. Regardez une préparation laissée au poste et appuyez sur ${controlMarkup('interact')} pour la reprendre. Prenez chaque ingrédient dans les bouteilles ou bacs étiquetés avec ${controlMarkup('interact')}, puis utilisez-le au poste. Les quantités sont retirées du stock à la prise ; la bière au premier tirage.</p><p><strong>Doser et terminer.</strong> Restez près du poste et maintenez la touche de dosage. Regardez le verre et appuyez sur ${controlMarkup('interact')} pour valider, mélanger si nécessaire et prendre la boisson sur le plateau. S’éloigner arrête le versement. Pour abandonner, regardez le verre, utilisez la commande Gérer (${controlMarkup('manage')}, ou clic droit à la souris) et choisissez Jeter cette préparation. Sur le plateau, regardez une boisson et appuyez sur ${controlMarkup('interact')} pour ouvrir ses options. Un plateau plein laisse la boisson terminée au poste.</p><p><strong>Espèces.</strong> Prenez l’argent auprès du client avec ${controlMarkup('interact')}. Regardez l’écran de caisse derrière le bar pour l’ouvrir. Sélectionnez les pièces et billets à rendre, validez, puis rapportez la monnaie et le ticket au client avec ${controlMarkup('interact')}. Le paiement est enregistré une seule fois, à la fin.</p><p><strong>Carte bancaire.</strong> Prenez le terminal sur son socle près de la caisse avec ${controlMarkup('interact')}. Regardez le client pour lui présenter le terminal, puis attendez trois secondes. Reposez-le sur son socle après utilisation.</p><p><strong>Agrandir le bar.</strong> Ouvrez Bâtiment dans la tablette pour acheter deux extensions de 27 m² puis leurs tables. Les achats demandent des clients encaissés, de la trésorerie et les aménagements indiqués. Fermez le bar et terminez le service avant les travaux. Une salle vide apporte de l’espace ; chaque table achetée ajoute une place client, jusqu’à huit tables et quatorze clients avec le comptoir entièrement débloqué.</p><p><strong>Décoration.</strong> La rubrique Décoration de la tablette permet de changer les tables, les chaises, les murs, le plafond et le sol. Achetez les finitions débloquées, puis réappliquez gratuitement celles que vous possédez. Les changements se font entre deux services et sont conservés dans votre sauvegarde.</p><p><strong>Manette.</strong> Utilisez le stick gauche pour marcher et le droit pour regarder. Les menus se parcourent avec la croix directionnelle ou le stick gauche ; le bouton du bas valide et celui de droite revient en arrière. Le stick droit fait défiler les pages. Réglages permet de modifier les touches, les boutons, la sensibilité et la zone morte des sticks.</p><p><strong>Gestion.</strong> La tablette regroupe les commandes, la liste des boissons à préparer, les stocks, les licences, les améliorations et les employés. Les livraisons arrivent en réserve après dix secondes ; rejoignez cette pièce pour transférer les stocks. Le serveur prend les commandes, sert et encaisse les espèces et les cartes. Il compte la monnaie à la caisse et partage votre terminal : reposez-le sur son socle après utilisation. Si le fond de caisse manque de monnaie, il utilise la trésorerie disponible ou attend un réapprovisionnement.</p><p><strong>${controlMarkup('sprint')} : courir · ${controlMarkup('tablet')} : tablette · Échap : pause · F11 : plein écran.</strong> Le bilan attend la fin des commandes et des paiements. Charges de base : 35 € plus les salaires.</p>`);
 // Static architecture and dynamic props use the same depth-tested scene.
-const canvas=$('world');let camera={...BarScene.playCamera},keys={};const boxes=BarScene.create();
+const canvas=$('world');let camera={...BarScene.playCamera},keys={};let boxes=BarScene.create(state);
 BarVenue.addFrame(boxes);
 let renderer=null,visualTime=0;const customerVisuals=new Map();
 let waiterVisual=null;
 try{renderer=new BarRenderer(canvas,boxes,{labels:[...BarVenue.labelTemplates,...(BarScene.terminalLabelTemplates||[])]})}catch(error){$('graphicsError').hidden=false;$('graphicsError').textContent=error.message;console.error(error)}
+function buildingSignature(){return BarEngine.buildingLayout(state).level+':'+game.activeTables().map(table=>table.id).join(',')+':'+Object.values(BarEngine.decorStyle?.(state)||{}).map(style=>style.id).join(',')}
+let buildingKey=buildingSignature();
+function syncBuilding(){
+ const key=buildingSignature();if(key===buildingKey)return;
+ boxes=BarScene.create(state);BarVenue.addFrame(boxes);
+ obstacles=boxes.filter(b=>b.solid&&b.y-b.h/2<1.7&&b.y+b.h/2>.2);
+ renderer?.setScene(boxes);buildingKey=key;customerVisuals.clear();waiterVisual=null;
+ // Loading a smaller bar or buying furniture must never trap the player.
+ if(!BarScene.containsWalkablePosition(camera.x,camera.z,state)||collidesWithScene(camera.x,camera.z))camera={...BarScene.playCamera};
+}
 function interactionTarget(){
  const direct=[window.BarPreparation?.target(camera),window.BarService?.target(camera)].filter(Boolean).sort((a,b)=>a.aimScore-b.aimScore||a.distance-b.distance);
  if(direct.length)return direct[0];
@@ -68,6 +80,7 @@ function alongRoute(route,progress){
 }
 function customerRoute(order){
  const seat=BarScene.tableSeat(order.tableId);
+ if(seat&&seat.x>12){const aisle=seat.x<16.5?12.9:17.4;return [{x:6,z:9.3},{x:6,z:5.25},{x:aisle,z:5.25},{x:aisle,z:seat.z},seat]}
  if(seat)return [{x:6,z:9.3},{x:6,z:seat.z+.65},{x:seat.x+(seat.x<6?.6:-.6),z:seat.z+.65},seat];
  const counter=BarScene.counterSeat(order.slot);
  // The central aisle and the gap in front of the tables stay clear at every seat.
@@ -115,7 +128,7 @@ function render(){if(!renderer)return;const dynamic=[];
  }
  for(const [id,v]of customerVisuals){
   if(!v.active&&visualTime-v.left>=v.departureTime){customerVisuals.delete(id);continue}
-  const o=v.customer,progress=Number.isFinite(o.arrivalRemaining)?1-o.arrivalRemaining/3:Math.min(1,(visualTime-v.born)/3);
+  const o=v.customer,duration=o.arrivalDuration||3,progress=Number.isFinite(o.arrivalRemaining)?1-o.arrivalRemaining/duration:Math.min(1,(visualTime-v.born)/duration);
   const p=v.active?alongRoute(v.route,progress):alongRoute(v.departure,(visualTime-v.left)/v.departureTime),seated=v.active&&progress>=1;
   const seat=BarScene.tableSeat(v.tableId)||BarScene.counterSeat(v.slot);
   v.x=p.x;v.z=p.z;
@@ -136,23 +149,26 @@ function render(){if(!renderer)return;const dynamic=[];
  }
  const home=window.GameMenu?.isHome();renderer.render(home?BarScene.homeCamera:camera,dynamic,preferences,home?1020:state.time);
 }
-const obstacles=boxes.filter(b=>b.solid&&b.y-b.h/2<1.7&&b.y+b.h/2>.2);
+let obstacles=boxes.filter(b=>b.solid&&b.y-b.h/2<1.7&&b.y+b.h/2>.2);
+function collidesWithScene(x,z){
+ return obstacles.some(b=>{
+  const angle=b.ry||0,c=Math.cos(angle),s=Math.sin(angle),px=x-b.x,pz=z-b.z;
+  const localX=px*c-pz*s,localZ=px*s+pz*c;
+  if(b.round)return Math.hypot(localX/(b.w/2+.2),localZ/(b.d/2+.2))<1;
+  return Math.abs(localX)<b.w/2+.2&&Math.abs(localZ)<b.d/2+.2;
+ });
+}
 function walk(dx,dz){
  if(!Number.isFinite(dx)||!Number.isFinite(dz))return;
  // Short steps prevent running through thin door frames and chair backs.
  const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.08));
  for(let i=0;i<steps;i++){
   const nx=camera.x+dx/steps,nz=camera.z+dz/steps;
-  if(!BarScene.containsWalkablePosition(nx,nz))break;
-  const blocked=obstacles.some(b=>{
-   const angle=b.ry||0,c=Math.cos(angle),s=Math.sin(angle),px=nx-b.x,pz=nz-b.z;
-   const localX=px*c-pz*s,localZ=px*s+pz*c;
-   if(b.round)return Math.hypot(localX/(b.w/2+.2),localZ/(b.d/2+.2))<1;
-   return Math.abs(localX)<b.w/2+.2&&Math.abs(localZ)<b.d/2+.2;
-  });
+  if(!BarScene.containsWalkablePosition(nx,nz,state))break;
+  const blocked=collidesWithScene(nx,nz);
   if(blocked||(state.management?.assistant&&Math.hypot(nx-3,nz+2.1)<.38)||(state.management?.bartender&&Math.hypot(nx-8,nz-1.72)<.36)||(waiterVisual&&Math.hypot(nx-waiterVisual.x,nz-waiterVisual.z)<.32)||[...customerVisuals.values()].some(v=>v.active&&Number.isFinite(v.x)&&Math.hypot(nx-v.x,nz-v.z)<.38))break;
   camera.x=nx;camera.z=nz;
  }
 }
-function frame(now){const dt=Math.max(0,Math.min(.05,(now-last)/1000));last=now;if(!paused&&!menusOpen()){visualTime+=dt;movement(dt);if(state.prep?.pouring&&!game.nearPrepStation(camera))game.setPour(false);const orderId=state.nextId,sales=state.totalSold;const report=game.tick(dt);if(state.nextId>orderId)audio.chime('arrival');if(state.totalSold>sales){audio.chime('sale');toast(state.payments.receipts[0]?.method==='cash'?'Paiement en espèces encaissé.':'Paiement par carte confirmé.');save()}if(report){save();modal('Bilan du soir '+report.day,`<p>${report.sold} clients servis et encaissés · ${report.lost} clients perdus · ${report.waste} boissons jetées</p><p>Recettes et pourboires : ${money(report.revenue)} · espèces : ${money(report.cashRevenue||0)} · cartes : ${money(report.cardRevenue||0)}</p><p>Achats et améliorations : ${money(report.expenses)}</p><p>Charges : ${money(report.charges)}, dont ${money(report.salaries||0)} de salaires</p><h2>Résultat : ${money(report.profit)}</h2><p>${state.gameOver?'Trésorerie épuisée. Vous pouvez commencer un nouveau bar.':'Le prochain service commence à 17 h. Votre partie est sauvegardée.'}</p>`)}elapsed+=dt;if(elapsed>.12){ui();elapsed=0}}audio.setState(!paused&&!menusOpen()&&state.open,!!state.prep?.pouring);if(now-lastRender>=1000/preferences.fps-.5){render();lastRender=now}requestAnimationFrame(frame)}
+function frame(now){const dt=Math.max(0,Math.min(.05,(now-last)/1000));last=now;window.BarGamepad?.update(dt);if(!paused&&!menusOpen()){visualTime+=dt;movement(dt);if(state.prep?.pouring&&!game.nearPrepStation(camera))game.setPour(false);const orderId=state.nextId,sales=state.totalSold;const report=game.tick(dt);if(state.nextId>orderId)audio.chime('arrival');if(state.totalSold>sales){audio.chime('sale');toast(state.payments.receipts[0]?.method==='cash'?'Paiement en espèces encaissé.':'Paiement par carte confirmé.');save()}if(report){save();modal('Bilan du soir '+report.day,`<p>${report.sold} clients servis et encaissés · ${report.lost} clients perdus · ${report.waste} boissons jetées</p><p>Recettes et pourboires : ${money(report.revenue)} · espèces : ${money(report.cashRevenue||0)} · cartes : ${money(report.cardRevenue||0)}</p><p>Achats et améliorations : ${money(report.expenses)}</p><p>Charges : ${money(report.charges)}, dont ${money(report.salaries||0)} de salaires</p><h2>Résultat : ${money(report.profit)}</h2><p>${state.gameOver?'Trésorerie épuisée. Vous pouvez commencer un nouveau bar.':'Le prochain service commence à 17 h. Votre partie est sauvegardée.'}</p>`)}elapsed+=dt;if(elapsed>.12){ui();elapsed=0}}audio.setState(!paused&&!menusOpen()&&state.open,!!state.prep?.pouring);if(now-lastRender>=1000/preferences.fps-.5){render();lastRender=now}requestAnimationFrame(frame)}
 ui();setInterval(save,5000);addEventListener('beforeunload',()=>{if(!window.GameMenu||GameMenu.hasSession())save(true)});

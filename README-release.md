@@ -23,6 +23,21 @@ La souris commande la caméra dès l’entrée ou la reprise de la partie.
 Maintenez **Maj** en vous déplaçant pour courir. La touche de course est
 configurable dans les réglages.
 
+Une manette compatible avec la disposition standard Windows (Xbox ou équivalente)
+permet de jouer et de parcourir les menus.
+Par défaut : stick gauche pour marcher, stick droit pour regarder, **A** pour
+interagir, **Y** pour la tablette, **X** pour gérer une préparation, **RT** pour
+verser, clic du stick gauche pour courir et **Menu** pour la pause. Dans les
+menus, **A** valide, **B** revient, la croix directionnelle navigue et le stick
+droit fait défiler. Les boutons de jeu, touches clavier, sensibilités et zone
+morte sont personnalisables dans **Réglages**. Échap et F11 restent réservés.
+Les raccourcis de cette notice correspondent aux réglages par défaut.
+
+Dans **Tablette > Décoration**, choisissez les finitions des tables, chaises,
+murs, plafonds et sols. Chaque finition achetée reste disponible et peut être
+réappliquée gratuitement, entre deux services. Les couleurs et matériaux
+s’appliquent également aux agrandissements et sont conservés dans les sauvegardes.
+
 **Tab** ouvre ou range la tablette. Ses rubriques regroupent les boissons,
 les stocks, le bâtiment, les licences et l’équipe. La rubrique **À préparer**
 affiche les boissons commandées, également visibles dans le jeu. Pour commencer
@@ -49,7 +64,26 @@ servis et la trésorerie le permettent :
 | Préparateur de boissons | 24 clients encaissés | 300 € | Préparer les commandes avec le stock du comptoir ; salaire de 18 € par soir |
 | Serveur | 32 clients encaissés | 380 € | Prendre les commandes à table et apporter les boissons ; salaire de 22 € par soir |
 
-Les clients s’installent aux quatre tables ou au comptoir, dont les six places
+Dans **Tab > Bâtiment**, deux agrandissements de **27 m²** débloquent de
+nouvelles salles, à meubler avec les tables achetées séparément. Les travaux
+nécessitent un bar fermé et aucun client restant.
+
+| Achat | Clients encaissés | Prix | Achat préalable |
+| --- | --- | --- | --- |
+| Premier agrandissement | 20 | 450 € | Aucun |
+| Table 5 | 20 | 130 € | Premier agrandissement |
+| Table 6 | 30 | 160 € | Table 5 |
+| Deuxième agrandissement | 55 | 900 € | Table 6 |
+| Table 7 | 55 | 180 € | Deuxième agrandissement |
+| Table 8 | 75 | 220 € | Table 7 |
+
+Chaque table achetée ajoute une place client. Le bar passe de quatre à huit
+tables et peut accueillir **14 clients** avec les six places du comptoir
+débloquées. Les salles vides n’augmentent pas la capacité ; la fréquentation
+de départ reste inchangée. Les achats et la position dans les nouvelles
+salles sont conservés dans les sauvegardes.
+
+Les clients s’installent aux tables achetées ou au comptoir, dont les six places
 sont utilisées progressivement. Approchez une table et appuyez sur **E** pour
 ouvrir sa commande dans **Service** sur la tablette, puis validez la prise de
 commande. Apportez ensuite la boisson préparée et servez directement avec **E**.

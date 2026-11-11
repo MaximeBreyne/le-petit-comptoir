@@ -112,11 +112,11 @@ app.whenReady().then(async()=>{
    GameMenu.pause();GameMenu.openSettings();
    for(const code of ['Tab','KeyE','F11']){
     click('[data-bind="forward"]');const original=preferences.bindings.forward.code;key(code,code);
-    check(capturing==='forward'&&preferences.bindings.forward.code===original,'Reserved shortcut cannot be rebound: '+code);key('Escape','Escape');
+    check(capturing==='forward'&&preferences.bindings.forward.code===original,'Reserved or already assigned shortcut cannot be duplicated: '+code);key('Escape','Escape');
    }
    const oldPreferences=defaultPreferences();oldPreferences.bindings.forward={code:'Tab',label:'Tab'};oldPreferences.bindings.pour={code:'KeyE',label:'E'};delete oldPreferences.bindings.sprint;
    localStorage.setItem(PREF_KEY,JSON.stringify(oldPreferences));const migrated=loadPreferences();
-   check(migrated.bindings.forward.code!=='Tab'&&migrated.bindings.pour.code!=='KeyE'&&migrated.bindings.sprint.code==='ShiftLeft','Existing bindings migrate away from reserved shortcuts and gain sprint');
+   check(migrated.bindings.forward.code==='Tab'&&migrated.bindings.pour.code==='KeyE'&&migrated.bindings.sprint.code==='ShiftLeft'&&migrated.bindings.tablet.code!=='Tab'&&migrated.bindings.interact.code!=='KeyE','User bindings are preserved and new actions receive distinct free shortcuts');
    preferences=defaultPreferences();savePreferences();GameMenu.closeSettings();GameMenu.returnHome();await flush();
    check(!locked&&GameMenu.isHome(),'Returning home releases camera');
    const homePrep=state.prep;key('Digit4',"'");check(state.prep===homePrep,'Welcome rejects preparation shortcuts');

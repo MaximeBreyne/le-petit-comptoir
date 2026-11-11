@@ -1,6 +1,6 @@
 ﻿/* Offline WebGL renderer: procedural materials, area lights, cached shadows and a label atlas. */
 class BarRenderer {
- static maxContactPeople=13;
+ static maxContactPeople=17;
  constructor(canvas,boxes,{labels=[]}={}){
   this.canvas=canvas;
   this.sceneLabels=labels;
@@ -20,7 +20,7 @@ class BarRenderer {
     gl_Position=vec4(x*projection.x,y*projection.y,1.002002*z-0.1001001,z);
     tint=color;world=position;faceNormal=normal;surface=material;labelUV=texcoord;viewDepth=z;
    }`;
-  const shadowPosition=`vec3 lightPosition(vec3 p){p-=vec3(6.0,0.8,5.0);return vec3(dot(p,vec3(0.614,0.0,-0.789))/9.0,dot(p,vec3(-0.649,0.574,-0.505))/9.0,-dot(p,vec3(0.452,0.823,0.351))/12.0);}`;
+  const shadowPosition=`uniform float buildingWidth;vec3 lightPosition(vec3 p){float extension=max(0.0,buildingWidth-12.0);p-=vec3(buildingWidth*.5,0.8,5.0);return vec3(dot(p,vec3(0.614,0.0,-0.789))/(9.0+extension*.45),dot(p,vec3(-0.649,0.574,-0.505))/(9.0+extension*.45),-dot(p,vec3(0.452,0.823,0.351))/(12.0+extension*.4));}`;
   const fragment=`${derivatives?'#extension GL_OES_standard_derivatives : enable':''}
    precision highp float;
    varying vec3 tint;varying vec3 world;varying vec3 faceNormal;varying float surface;varying vec2 labelUV;varying float viewDepth;
@@ -33,13 +33,22 @@ class BarRenderer {
     if(shadowInfo.x<.5)return 1.0;
     vec3 q=lightPosition(world)*.5+.5;
     if(q.x<.005||q.x>.995||q.y<.005||q.y>.995||q.z<0.0||q.z>1.0)return 1.0;
-    float sum=0.0,bias=.0014+.0014*(1.0-max(0.0,dot(normalize(faceNormal),vec3(.452,.823,.351))));
-    for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++){
-     vec4 storedDepth=texture2D(shadowMap,q.xy+vec2(float(x),float(y))*shadowInfo.y);
+    // Compare each filter tap with the receiving plane at that tap, not with
+    // the center depth. A fixed bias leaves diagonal acne on vertical faces.
+    vec3 n=normalize(faceNormal),u=vec3(.614,0.0,-.789),v=vec3(-.649,.574,-.505),w=vec3(-.452,-.823,-.351);
+    float extension=max(0.0,buildingWidth-12.0),ratio=(9.0+extension*.45)/(12.0+extension*.4),divisor=dot(n,cross(u,v));
+    divisor=abs(divisor)<.05?(divisor<0.0?-.05:.05):divisor;
+    vec2 slope=clamp(-ratio*vec2(dot(n,cross(v,w)),dot(n,cross(w,u)))/divisor,vec2(-8.0),vec2(8.0));
+    float sum=0.0,bias=.00018;
+    vec2 texel=q.xy/shadowInfo.y-.5,cell=floor(texel),blend=fract(texel);
+    for(int x=0;x<=1;x++)for(int y=0;y<=1;y++){
+     vec2 corner=vec2(float(x),float(y)),uv=(cell+corner+.5)*shadowInfo.y;
+     vec4 storedDepth=texture2D(shadowMap,uv);
      float d=storedDepth.r+storedDepth.g/255.0;
-     sum+=q.z-bias<=d?1.0:0.0;
+     vec2 weight=mix(1.0-blend,blend,corner);
+     sum+=(q.z+dot(slope,uv-q.xy)-bias<=d?1.0:0.0)*weight.x*weight.y;
     }
-    return .30+.70*sum/9.0;
+    return .30+.70*sum;
    }
    vec3 bump(vec3 n,float height){
     ${derivatives?'vec3 dx=dFdx(world),dy=dFdy(world),r1=cross(dy,n),r2=cross(n,dx);float det=dot(dx,r1);return normalize(abs(det)*n-sign(det)*(dFdx(height)*r1+dFdy(height)*r2));':'return n;'}
@@ -89,6 +98,9 @@ class BarRenderer {
     }else if(surface>11.5&&surface<12.5){
      float stone=noise(uv*5.0),fleck=noise(uv*155.0);
      base*=.94+.11*stone+(fleck-.5)*.065*detail;roughness=.28+.12*stone;spec=.23;height=(fleck-.5)*detail*.00008;
+    }else if(surface>12.5&&surface<13.5){
+     float pores=noise(uv*130.0),folds=noise(uv*8.0);
+     base*=.92+.09*folds+(pores-.5)*.045*detail;roughness=.47+.12*folds;spec=.19;height=(pores-.5)*detail*.00013;
     }
     if(labelUV.x>=0.0){base=texture2D(labels,labelUV).rgb;roughness=.82;spec=.04;height=0.0;}
     n=bump(n,height);
@@ -106,9 +118,10 @@ class BarRenderer {
     vec3 key=normalize(vec3(.45,.82,.35));
     light+=mix(vec3(.065,.09,.14),vec3(.43,.49,.57),daylight)*max(0.0,dot(n,key))*visibility;
     vec3 reflection=vec3(0.0);float power=mix(120.0,7.0,roughness);
-    for(int i=0;i<3;i++){
-     vec3 delta=vec3(3.0+float(i)*3.0,2.62,4.5)-world;
-     float attenuation=inside/(1.0+dot(delta,delta)*.42);vec3 l=normalize(delta);
+    for(int i=0;i<7;i++){
+     float index=float(i-3);vec3 lampPosition=i<3?vec3(3.0+float(i)*3.0,2.62,4.5):vec3(14.25+floor(index*.5)*4.5,2.62,6.2+mod(index,2.0)*2.2);
+     vec3 delta=lampPosition-world;
+     float attenuation=inside*step(lampPosition.x,buildingWidth-.25)/(1.0+dot(delta,delta)*.42);vec3 l=normalize(delta);
      vec3 lamp=vec3(1.72,1.28,.82)*attenuation*(.55+.45*max(0.0,l.y));
      light+=lamp*max(0.0,dot(n,l));
      reflection+=lamp*pow(max(0.0,dot(n,normalize(l+v))),power)*spec;
@@ -133,9 +146,10 @@ class BarRenderer {
    }`;
   this.program=this.makeProgram(vertex,fragment);
   this.attributes=Object.fromEntries(['position','color','material','normal','texcoord'].map(k=>[k,gl.getAttribLocation(this.program,k)]));
-  this.uniforms=Object.fromEntries(['camera','angle','projection','brightness','daylight','labels','shadowMap','shadowInfo','people[0]'].map(k=>[k,gl.getUniformLocation(this.program,k)]));
+  this.uniforms=Object.fromEntries(['camera','angle','projection','brightness','daylight','labels','shadowMap','shadowInfo','buildingWidth','people[0]'].map(k=>[k,gl.getUniformLocation(this.program,k)]));
   this.shadowProgram=this.makeProgram(`precision highp float;attribute vec3 position;${shadowPosition}void main(){gl_Position=vec4(lightPosition(position),1.0);}`,`precision highp float;void main(){vec2 e=fract(gl_FragCoord.z*vec2(1.0,255.0));e.x-=e.y/255.0;gl_FragColor=vec4(e,0.0,1.0);}`);
   this.shadowAttribute=gl.getAttribLocation(this.shadowProgram,'position');
+  this.shadowBuildingWidth=gl.getUniformLocation(this.shadowProgram,'buildingWidth');
   this.staticBuffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.shadowBuffer=gl.createBuffer();this.glassBuffer=gl.createBuffer();this.glassCapacity=0;
   this.labelTexture=gl.createTexture();this.shadowTexture=gl.createTexture();this.shadowFramebuffer=gl.createFramebuffer();this.shadowDepth=gl.createRenderbuffer();
   this.people=new Float32Array(BarRenderer.maxContactPeople*4);this.shadowSize=0;this.shadowDirty=true;
@@ -257,16 +271,18 @@ class BarRenderer {
   const out=this.scratch;let offset=0;
   for(const b of boxes){
    let rgb=this.colors.get(b.c);if(!rgb){const hex=b.c||'#ffffff';rgb=[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];this.colors.set(b.c,rgb)}
+   let sideRGB=rgb;if(b.sideColor){sideRGB=this.colors.get(b.sideColor);if(!sideRGB){sideRGB=[1,3,5].map(index=>parseInt(b.sideColor.slice(index,index+2),16)/255);this.colors.set(b.sideColor,sideRGB)}}
    const mat=b.mat??b.wood??(['#b39872','#634631','#d4b27c','#ba9968','#a98555','#684d37'].includes(b.c)?1:0);
    const cx=Math.cos(b.rx||0),sx=Math.sin(b.rx||0),cy=Math.cos(b.ry||0),sy=Math.sin(b.ry||0),cz=Math.cos(b.rz||0),sz=Math.sin(b.rz||0);
    const halfW=b.w/2,halfH=b.h/2,halfD=b.d/2,normalW=Math.max(.00001,b.w),normalH=Math.max(.00001,b.h),normalD=Math.max(.00001,b.d);
    const emit=(x,y,z,nx,ny,nz,u=-1,v=-1)=>{
+    const color=Math.abs(ny)<.25?sideRGB:rgb;
     x*=halfW;y*=halfH;z*=halfD;
     let a=y*cx-z*sx;z=y*sx+z*cx;y=a;a=x*cy+z*sy;z=-x*sy+z*cy;x=a;a=x*cz-y*sz;y=x*sz+y*cz;x=a;
     nx/=normalW;ny/=normalH;nz/=normalD;
     a=ny*cx-nz*sx;nz=ny*sx+nz*cx;ny=a;a=nx*cy+nz*sy;nz=-nx*sy+nz*cy;nx=a;a=nx*cz-ny*sz;ny=nx*sz+ny*cz;nx=a;
     const length=Math.hypot(nx,ny,nz)||1;
-    out[offset++]=b.x+x;out[offset++]=b.y+y;out[offset++]=b.z+z;out[offset++]=rgb[0];out[offset++]=rgb[1];out[offset++]=rgb[2];out[offset++]=mat;out[offset++]=nx/length;out[offset++]=ny/length;out[offset++]=nz/length;out[offset++]=u;out[offset++]=v;
+    out[offset++]=b.x+x;out[offset++]=b.y+y;out[offset++]=b.z+z;out[offset++]=color[0];out[offset++]=color[1];out[offset++]=color[2];out[offset++]=mat;out[offset++]=nx/length;out[offset++]=ny/length;out[offset++]=nz/length;out[offset++]=u;out[offset++]=v;
    };
    if(b.shape==='sphere'){
     const model=this.sphereModel(b);
@@ -298,6 +314,7 @@ class BarRenderer {
  }
  setScene(boxes){
   const gl=this.gl;this.resetAtlas();
+  this.buildingWidth=Math.max(12,...boxes.filter(box=>box.roomFloor||box.mat===10&&box.y<0).map(box=>box.x+box.w/2));
   // Largest regions first; stable ties keep packing deterministic across reloads.
   [...boxes,...this.sceneLabels].filter(b=>b.label||b.labelLines).map(b=>({box:b,...this.labelDimensions(b)})).sort((a,b)=>(b.w+16)*(b.h+16)-(a.w+16)*(a.h+16)||b.h-a.h||b.w-a.w).forEach(item=>this.label(item.box));
   this.staticGlass=boxes.filter(b=>b.mat===11);
@@ -320,9 +337,14 @@ class BarRenderer {
    this.shadowSupported=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;
   }
   if(this.shadowDirty&&this.shadowSupported){
+   // Dithering color channels corrupts our packed RG depth by a full 1/255,
+   // producing patterned self-shadowing on metal, walls and shelving.
+   const dither=gl.isEnabled(gl.DITHER);gl.disable(gl.DITHER);
    gl.bindFramebuffer(gl.FRAMEBUFFER,this.shadowFramebuffer);gl.viewport(0,0,size,size);gl.useProgram(this.shadowProgram);gl.clearColor(1,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+   gl.uniform1f(this.shadowBuildingWidth,this.buildingWidth);
    for(const attribute of Object.values(this.attributes))if(attribute!==this.shadowAttribute)gl.disableVertexAttribArray(attribute);
    gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);gl.enableVertexAttribArray(this.shadowAttribute);gl.vertexAttribPointer(this.shadowAttribute,3,gl.FLOAT,false,48,0);gl.drawArrays(gl.TRIANGLES,0,this.shadowCount);this.shadowDirty=false;
+   if(dither)gl.enable(gl.DITHER);
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
  }
@@ -346,6 +368,7 @@ class BarRenderer {
   gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.useProgram(this.program);gl.clearColor(.13,.17,.19,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const focal=1/Math.tan(settings.fov*Math.PI/360);
   gl.uniform3f(this.uniforms.camera,camera.x,camera.y,camera.z);gl.uniform2f(this.uniforms.angle,camera.a,camera.pitch||0);gl.uniform2f(this.uniforms.projection,focal/(this.canvas.width/this.canvas.height),focal);gl.uniform1f(this.uniforms.brightness,settings.brightness/100);gl.uniform1f(this.uniforms.daylight,BarRenderer.daylightAt(serviceTime));
+  gl.uniform1f(this.uniforms.buildingWidth,this.buildingWidth);
   this.contactShadows(dynamic);
   gl.uniform4fv(this.uniforms['people[0]'],this.people);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.labelTexture);gl.uniform1i(this.uniforms.labels,0);

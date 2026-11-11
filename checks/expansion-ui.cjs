@@ -1,0 +1,76 @@
+'use strict';
+const {app,BrowserWindow}=require('electron');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'comptoir-expansion-')));
+let win;const timeout=setTimeout(()=>{console.error('Expansion UI timed out');app.exit(1)},90000);
+app.whenReady().then(async()=>{
+ try{
+  const errors=[];
+  win=new BrowserWindow({show:false,width:1440,height:960,useContentSize:true,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
+  win.webContents.on('console-message',event=>{if(event.level==='error'||event.level===3)errors.push(event.message)});
+  await win.loadFile(path.resolve(process.env.BAR_QA_TARGET||'dist/index.html'));
+  const evaluate=code=>win.webContents.executeJavaScript(code,true);
+  async function capture(name){
+   await evaluate('render();renderer.gl.finish()');await new Promise(resolve=>setTimeout(resolve,150));
+   const png=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('No capture '+name)),5000);win.webContents.once('paint',(_event,_rect,image)=>{clearTimeout(timer);resolve(image.toPNG())});win.webContents.invalidate()});
+   const directory=path.join(__dirname,'artifacts');fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,name+'.png'),png);
+  }
+  const result=await evaluate(`(async()=>{
+   const check=(value,message)=>{if(!value)throw Error(message)},flush=()=>new Promise(resolve=>setTimeout(resolve,30));
+   const click=selector=>{const button=document.querySelector(selector);check(button&&!button.disabled&&!button.closest('[hidden]'),'Usable control '+selector);button.click()};
+   const key=code=>window.dispatchEvent(new KeyboardEvent('keydown',{code,key:code,bubbles:true,cancelable:true}));
+   const aimAt=point=>{const dx=point.x-camera.x,dy=point.y-camera.y,dz=point.z-camera.z;camera.a=Math.atan2(dx,dz);camera.pitch=Math.atan2(dy,Math.hypot(dx,dz));};
+   let locked=null;Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>locked});
+   canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
+   document.exitPointerLock=()=>queueMicrotask(()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))});
+   window.requestAnimationFrame=()=>0;await flush();click('[data-menu-action="new"]');await flush();
+   check(game.activeTables().length===4&&game.crowdInfo().capacity===7&&state.orders.length===0,'Initial capacity and empty room are unchanged');
+   const base=JSON.parse(JSON.stringify(state));
+   camera={...BarScene.playCamera,x:11.2,z:5.25};walk(2,0);check(camera.x<11.75,'Unbought room has a real closed wall');
+   BarTablet.open('building');check(document.querySelector('[data-tablet-upgrade="expansion1"]').disabled,'Progression locks the first extension');
+   state.totalSold=80;state.cash=10000;BarTablet.refresh(true);
+   const updates={count:0},originalSetScene=renderer.setScene.bind(renderer);renderer.setScene=(shapes)=>{updates.count++;return originalSetScene(shapes)};
+   game.open();ui();BarTablet.refresh(true);const before=state.cash;
+   check(document.querySelector('[data-tablet-upgrade="expansion1"]').disabled,'Building work is disabled during service');
+   game.purchaseUpgrade('expansion1');check(state.cash===before&&!state.management.expansion1,'The engine also rejects work during service');game.close();game.end();ui();BarTablet.refresh(true);
+   const startingCash=state.cash;click('[data-tablet-upgrade="expansion1"]');
+   check(state.cash===startingCash-450&&game.activeTables().length===4&&game.buildingInfo().area===147,'Extension creates space and charges once without granting tables');
+   check(!boxes.some(box=>box.label==='TABLE 5')&&renderer.buildingWidth===16.5,'Empty extension is rendered immediately');
+   BarTablet.close();await flush();camera={...BarScene.playCamera,x:11.2,z:5.25};walk(1.7,0);check(Math.abs(camera.x-12.9)<.02,'The new doorway is traversable');
+   walk(3.9,0);check(camera.x<16.25,'The second extension is still physically closed');
+   BarTablet.open('building');click('[data-tablet-upgrade="table5"]');click('[data-tablet-upgrade="table6"]');
+   check(boxes.some(box=>box.label==='TABLE 5')&&boxes.some(box=>box.label==='TABLE 6'),'Purchased tables appear in the room');
+   check(game.crowdInfo().capacity===12,'Only purchased tables add customer capacity');
+   click('[data-tablet-upgrade="expansion2"]');click('[data-tablet-upgrade="table7"]');click('[data-tablet-upgrade="table8"]');
+   check(game.buildingInfo().area===174&&game.activeTables().length===8&&game.crowdInfo().capacity===14,'Full expansion reaches eight tables and fourteen guests');
+   check(startingCash-state.cash===2040,'All six purchases charge their exact prices once');
+   const rebuilds=updates.count;for(let i=0;i<20;i++)ui();check(rebuilds===6&&updates.count===rebuilds,'Static geometry uploads only on an actual building change');
+   BarTablet.open('service');check([...document.querySelectorAll('[data-service-seat^="table:"]')].filter(card=>!card.hidden).length===8,'Service includes the purchased tables');
+   BarTablet.close();await flush();camera={...BarScene.playCamera,x:11.2,z:5.25};walk(6.2,0);check(Math.abs(camera.x-17.4)<.02,'Both doorways connect the second annex');
+   walk(0,3.4);check(Math.abs(camera.z-8.65)<.02,'The far table has a clear access aisle');
+   const savedCamera={...camera};GameMenu.pause();click('[data-menu-action="save"]');click('[data-menu-action="save-slot"][data-slot="1"]');await flush();
+   const saved=JSON.parse(localStorage.getItem('comptoir-bar-slot-v1-1'));check(saved.state.management.table8&&saved.camera.x>16.5,'Manual save includes building and annex camera');
+   click('[data-menu-action="back"]');GameMenu.resume();await flush();game.s=new Game(base).s;state=game.s;ui();
+   check(renderer.buildingWidth===12&&camera.x<12&&!boxes.some(box=>box.label==='TABLE 5'),'Loading a smaller room rebuilds walls and prevents trapping the camera');
+   GameMenu.pause();click('[data-menu-action="load"]');click('[data-menu-action="load-slot"][data-slot="1"]');click('[data-menu-action="confirm"]');await flush();
+   check(state.management.table8&&renderer.buildingWidth===21&&Math.abs(camera.x-savedCamera.x)<.02,'Loading restores the full room and saved annex camera');
+   game.open();state.spawn=999;for(let i=0;i<20;i++)game.spawnCustomer();state.spawn=999;
+   check(state.orders.length===14&&new Set(state.orders.map(order=>order.tableId?'t'+order.tableId:'c'+order.slot)).size===14,'Every bought seat fills once without overbooking');
+   const arriving=state.orders.find(order=>order.tableId===8);check(arriving.arrivalDuration>10,'Far guests have time to walk to their table');
+   arriving.arrivalRemaining=arriving.arrivalDuration/2;render();const midpoint=alongRoute(customerRoute(arriving),.5),visual=customerVisuals.get(arriving.id);
+   check(Math.hypot(visual.x-midpoint.x,visual.z-midpoint.z)<.001,'Rendering follows the actual arrival duration through the annex doors');
+   for(const order of state.orders){order.arrivalRemaining=0;order.patience=100;}ui();render();visualTime+=30;render();
+   const far=state.orders.find(order=>order.tableId===8);check(far&&far.phase==='awaiting-order','A client can arrive at the far new table');
+   camera={...BarScene.playCamera,x:17.65,z:8.65};aimAt({...BarScene.tableSeat(8),y:1.25});key('KeyE');
+   check(BarTablet.isOpen(),'The far seated guest is directly interactable');click('[data-tablet-order-action="take"][data-order-id="'+far.id+'"]');check(far.phase==='preparing','The tablet takes the far table order');
+   BarTablet.close();await flush();state.tray=[{recipe:far.recipe,quality:95,orderId:far.id}];ui();key('KeyE');check(far.phase==='drinking','Serving directly works in the new room');
+   render();check(renderer.gl.getError()===0,'Expanded scene renders without WebGL errors');
+   window.__expansionQA={check,flush,click,base,aimAt};
+   return {tables:8,capacity:14,area:174,paidUpgrades:6,rebuilds,annexCameraSaved:true,directService:true,gl:0};
+  })()`);
+  await evaluate("camera={...BarScene.playCamera,x:12.9,z:5.3,a:1.2,pitch:-.08};render()");await capture('expanded-bar');
+  await evaluate("BarTablet.open('building');__expansionQA.check(document.querySelector('.tablet-main').scrollTop===0,'Opening building starts at its summary')");await capture('expansion-building');
+  if(errors.length)throw Error(errors.join('\n'));
+  console.log('EXPANSION UI OK',JSON.stringify(result));clearTimeout(timeout);win.destroy();app.exit(0);
+ }catch(error){console.error(error);clearTimeout(timeout);win?.destroy();app.exit(1)}
+});

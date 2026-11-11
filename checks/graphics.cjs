@@ -41,13 +41,32 @@ app.whenReady().then(async()=>{
    renderer.render(BarScene.homeCamera,crowd,preferences,1020);renderer.gl.finish();const begin=performance.now();
    for(let i=0;i<12;i++){renderer.render(BarScene.homeCamera,crowd,preferences,1020);renderer.gl.finish()}
    const crowdMs=(performance.now()-begin)/12,contacts=renderer.people.filter((v,i)=>i%4===3&&v===1).length;
-   const gl=renderer.gl,dayPixel=new Uint8Array(4),nightPixel=new Uint8Array(4);
-   renderer.render(BarScene.homeCamera,[],preferences,1020);gl.readPixels(renderer.canvas.width/2,renderer.canvas.height/2,1,1,gl.RGBA,gl.UNSIGNED_BYTE,dayPixel);
-   renderer.render(BarScene.homeCamera,[],preferences,1440);gl.readPixels(renderer.canvas.width/2,renderer.canvas.height/2,1,1,gl.RGBA,gl.UNSIGNED_BYTE,nightPixel);
-   if(JSON.stringify([...dayPixel])===JSON.stringify([...nightPixel]))throw Error('Day/night lighting does not change');
-   if(Math.max(...nightPixel.slice(0,3))<25)throw Error('Interior becomes unreadable at night');
+   const gl=renderer.gl;
+   // The center lands on a dark bottle. Read useful surfaces over whole areas
+   // instead: a foreground tabletop, the service counter and the walkable floor.
+   // Bounds use the same top-left normalized coordinates as the review images.
+   const zones={table:[.08,.80,.28,.92],worktop:[.40,.52,.60,.55],floor:[.58,.72,.81,.87]};
+   const snapshot=time=>{
+    renderer.render(BarScene.homeCamera,[],preferences,time);gl.finish();
+    const center=new Uint8Array(4);gl.readPixels(renderer.canvas.width/2,renderer.canvas.height/2,1,1,gl.RGBA,gl.UNSIGNED_BYTE,center);
+    const regions={};
+    for(const [name,[left,top,right,bottom]]of Object.entries(zones)){
+     const x=Math.floor(left*renderer.canvas.width),y=Math.floor((1-bottom)*renderer.canvas.height),w=Math.floor((right-left)*renderer.canvas.width),h=Math.floor((bottom-top)*renderer.canvas.height),data=new Uint8Array(w*h*4);
+     gl.readPixels(x,y,w,h,gl.RGBA,gl.UNSIGNED_BYTE,data);
+     let luminance=0,readable=0;const rgb=[0,0,0];
+     for(let i=0;i<data.length;i+=4){const value=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];luminance+=value;if(value>=25)readable++;for(let channel=0;channel<3;channel++)rgb[channel]+=data[i+channel];}
+     const pixels=w*h;regions[name]={pixels,rgb:rgb.map(value=>Number((value/pixels).toFixed(2))),luminance:Number((luminance/pixels).toFixed(2)),readableFraction:Number((readable/pixels).toFixed(4))};
+    }
+    return {time,center:[...center],regions};
+   };
+   const lighting={day:snapshot(1020),twilight:snapshot(1200),night:snapshot(1440)};
+   for(const name of Object.keys(zones)){
+    const day=lighting.day.regions[name],twilight=lighting.twilight.regions[name],night=lighting.night.regions[name];
+    if(night.luminance<40||night.readableFraction<.90)throw Error('Night '+name+' is unreadable: '+JSON.stringify(night));
+    if(!(day.luminance>twilight.luminance+2&&twilight.luminance>night.luminance+2&&day.luminance>night.luminance+5))throw Error('Day/twilight/night transition failed for '+name+': '+JSON.stringify({day,twilight,night}));
+   }
    const error=gl.getError();if(error!==gl.NO_ERROR)throw Error('Rendering WebGL error '+error);
-   return {opaque,through,inFront,crowdMs,vertices:renderer.mesh(crowd).length/12,contacts,dayPixel:[...dayPixel],nightPixel:[...nightPixel],gl:error};
+   return {opaque,through,inFront,crowdMs,vertices:renderer.mesh(crowd).length/12,contacts,dayPixel:lighting.day.center,nightPixel:lighting.night.center,lighting,gl:error};
   })()`);
   if(errors.length)throw Error(errors.join('\n'));
   fs.writeFileSync(path.join(artifacts,'graphics-review.json'),JSON.stringify(checks,null,2));console.log('GRAPHICS REVIEW OK',JSON.stringify(checks));clearTimeout(timeout);win.destroy();app.exit(0);

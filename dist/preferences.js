@@ -1,6 +1,8 @@
 const PREF_KEY='comptoir-bar-settings-v1';
-const isReservedGameKey=code=>/^(Escape|F11|Tab|KeyE)$/.test(code);
-const defaultPreferences=()=>({quality:'medium',fps:60,fov:75,brightness:100,sensitivity:1,invertY:false,volume:70,effects:80,ambience:25,muted:false,bindings:{forward:{code:'KeyW',label:'Z / W'},back:{code:'KeyS',label:'S'},left:{code:'KeyA',label:'Q / A'},right:{code:'KeyD',label:'D'},turnLeft:{code:'ArrowLeft',label:'←'},turnRight:{code:'ArrowRight',label:'→'},sprint:{code:'ShiftLeft',label:'Maj'},pause:{code:'KeyP',label:'P'},pour:{code:'Space',label:'Espace'}}});
+const isReservedGameKey=code=>/^(Escape|F11)$/.test(code);
+const isBindableGameKey=code=>/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Space|Tab|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Enter|Backspace|Home|End|PageUp|PageDown)$/.test(code)&&!isReservedGameKey(code);
+const defaultGamepadPreferences=()=>({enabled:true,sensitivity:1,deadzone:.18,invertY:false,bindings:{interact:0,tablet:3,manage:2,pour:7,sprint:10,pause:9}});
+const defaultPreferences=()=>({quality:'medium',fps:60,fov:75,brightness:100,sensitivity:1,invertY:false,volume:70,effects:80,ambience:25,muted:false,gamepad:defaultGamepadPreferences(),bindings:{forward:{code:'KeyW',label:'Z / W'},back:{code:'KeyS',label:'S'},left:{code:'KeyA',label:'Q / A'},right:{code:'KeyD',label:'D'},turnLeft:{code:'ArrowLeft',label:'←'},turnRight:{code:'ArrowRight',label:'→'},sprint:{code:'ShiftLeft',label:'Maj'},pause:{code:'KeyP',label:'P'},pour:{code:'Space',label:'Espace'},interact:{code:'KeyE',label:'E'},tablet:{code:'Tab',label:'Tab'},manage:{code:'KeyR',label:'R'}}});
 function loadPreferences(){
  const result=defaultPreferences(),defaults=result.bindings;let saved;
  try{saved=JSON.parse(localStorage.getItem(PREF_KEY))}catch{}
@@ -8,15 +10,21 @@ function loadPreferences(){
  const used=new Set(),bindings={};
  for(const action of Object.keys(defaults)){
   const value=saved?.bindings?.[action];
-  if(value&&/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Enter|Backspace|Home|End|PageUp|PageDown)$/.test(value.code)&&!isReservedGameKey(value.code)&&!used.has(value.code)){
+  if(value&&isBindableGameKey(value.code)&&!used.has(value.code)){
    bindings[action]={code:value.code,label:String(value.label||value.code).slice(0,20)};used.add(value.code);
   }
  }
  for(const action of Object.keys(defaults))if(!bindings[action]){
-  const code=[defaults[action].code,'ShiftLeft','ShiftRight','ControlLeft','ControlRight','KeyR','KeyT','KeyF','KeyG','KeyH','KeyJ'].find(code=>!used.has(code)&&!isReservedGameKey(code));
+  const code=[defaults[action].code,'ShiftLeft','ShiftRight','ControlLeft','ControlRight',...'RTFGHJKLUIOBCNVXYZ'.split('').map(key=>'Key'+key)].find(code=>!used.has(code)&&!isReservedGameKey(code));
   bindings[action]={code,label:code===defaults[action].code?defaults[action].label:code.startsWith('Shift')?'Maj':code.startsWith('Control')?'Ctrl':code.replace('Key','')};used.add(code);
  }
  result.bindings=bindings;
+ const pad=defaultGamepadPreferences(),stored=saved?.gamepad,assigned=new Set();
+ for(const key of ['enabled','invertY'])if(typeof stored?.[key]==='boolean')pad[key]=stored[key];
+ for(const [key,min,max]of [['sensitivity',.2,3],['deadzone',.05,.4]])if(Number.isFinite(stored?.[key]))pad[key]=Math.min(max,Math.max(min,stored[key]));
+ const padBindings={};for(const action of Object.keys(pad.bindings)){const index=stored?.bindings?.[action];if(Number.isInteger(index)&&index>=0&&index<=11&&!assigned.has(index)){padBindings[action]=index;assigned.add(index)}}
+ for(const action of Object.keys(pad.bindings))if(padBindings[action]===undefined){const index=[pad.bindings[action],...Array.from({length:12},(_,i)=>i)].find(i=>!assigned.has(i));padBindings[action]=index;assigned.add(index)}
+ pad.bindings=padBindings;result.gamepad=pad;
  if(!['low','medium','high'].includes(result.quality))result.quality='medium';if(![30,60,120].includes(result.fps))result.fps=60;
  for(const [k,min,max]of [['fov',60,100],['brightness',65,140],['sensitivity',.2,3],['volume',0,100],['effects',0,100],['ambience',0,100]])result[k]=Number.isFinite(result[k])?Math.min(max,Math.max(min,result[k])):defaultPreferences()[k];
  return result;

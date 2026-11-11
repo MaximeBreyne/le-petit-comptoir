@@ -69,14 +69,24 @@ test('window daylight fades through the evening while invalid or out-of-range ti
  assert.equal(Renderer.daylightAt(NaN),1);
 });
 
-test('all ten clients and three employees cast contacts that clear when people leave',()=>{
- assert.equal(Renderer.maxContactPeople,13);
+test('all fourteen clients and three employees cast contacts that clear when people leave',()=>{
+ assert.equal(Renderer.maxContactPeople,17);
  const r=renderer(4096);r.people=new Float32Array(Renderer.maxContactPeople*4);
- const people=Array.from({length:14},(_,index)=>({x:index+1,z:index/2,contactShadow:true}));
+ const people=Array.from({length:18},(_,index)=>({x:index+1,z:index/2,contactShadow:true}));
  r.contactShadows([{x:100,z:100},...people]);
- for(let i=0;i<13;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.equal(r.people[i*4+3],1);}
- assert.equal(r.people.length,52,'Departing extras cannot grow the fixed GPU upload');
+ for(let i=0;i<17;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.equal(r.people[i*4+3],1);}
+ assert.equal(r.people.length,68,'Departing extras cannot grow the fixed GPU upload');
  r.contactShadows([people[0]]);assert.equal(r.people[3],1);assert.ok([...r.people.subarray(4)].every(value=>value===0));
+});
+
+for(const limit of [2048,4096])test(`expansion rebuilds fit the ${limit}px atlas and adjust the shadow extent`,()=>{
+ const r=renderer(limit),game=new context.BarEngine.Game();game.s.cash=10000;game.s.totalSold=80;
+ for(const id of ['expansion1','table5','table6','expansion2','table7','table8']){
+  game.purchaseUpgrade(id);const boxes=Scene.create(game.s);Venue.addFrame(boxes);r.setScene(boxes);
+  assert.equal(r.buildingWidth,game.buildingInfo().width);inspectAtlas(r);
+ }
+ assert.equal(r.buildingWidth,21);
+ r.setScene(Scene.create());assert.equal(r.buildingWidth,12,'Starting over restores the original shadow volume');
 });
 
 test('clear panes are separated from opaque depth and shadow geometry',()=>{
@@ -85,4 +95,25 @@ test('clear panes are separated from opaque depth and shadow geometry',()=>{
  const pane={...solid,z:2,mat:11};r.setScene([solid,pane]);
  assert.equal(r.staticGlass.length,1);assert.equal(r.staticGlass[0],pane);
  assert.equal(r.count,36);assert.equal(r.shadowCount,36);assert.deepEqual(uploaded,[36,36]);
+});
+
+test('table edge finishes reach only the sides of the actual mesh without adding intersecting surfaces',()=>{
+ const r=renderer(4096),shape={x:0,y:1,z:0,w:1,h:.1,d:1,c:'#ffffff',sideColor:'#000000',mat:12,round:true};
+ const data=r.mesh([shape]).slice(),plain=r.mesh([{...shape,sideColor:undefined}]);
+ assert.equal(data.length,plain.length,'Edge finish does not require a second coplanar mesh');
+ let top=0,edge=0;
+ for(let i=0;i<data.length;i+=12){
+  assert.deepEqual([...data.subarray(i,i+3)],[...plain.subarray(i,i+3)]);
+  const horizontal=Math.abs(data[i+8])>.99;assert.deepEqual([...data.subarray(i+3,i+6)],horizontal?[1,1,1]:[0,0,0]);
+  if(horizontal)top++;else edge++;
+ }
+ assert.ok(top>0&&edge>0);
+});
+
+test('tiled annexes retain the complete light and shadow volume after changing floor materials',()=>{
+ const game=new context.BarEngine.Game();game.s.cash=10000;game.s.totalSold=80;
+ for(const id of ['expansion1','table5','table6','expansion2','table7','table8'])game.purchaseUpgrade(id);
+ game.purchaseDecor('floor','terracotta');const r=renderer(4096);r.setScene(Scene.create(game.s));
+ assert.equal(r.buildingWidth,21);
+ game.purchaseDecor('floor','oak');r.setScene(Scene.create(game.s));assert.equal(r.buildingWidth,21);
 });

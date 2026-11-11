@@ -15,7 +15,7 @@ app.whenReady().then(async()=>{let win;const errors=[];try{
  canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
  document.exitPointerLock=()=>queueMicrotask(()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))});
  GameMenu.newGame();if(GameMenu.getMode()==='confirm')document.querySelector('[data-menu-action="confirm"]').click();preferences=defaultPreferences();settingsUI();render();
- check(renderer&&renderer.gl.isEnabled(renderer.gl.DEPTH_TEST),'Depth test enabled');check(Object.keys(preferences.bindings).length===9&&preferences.bindings.sprint.code==='ShiftLeft','Sprint is included in configurable controls');
+ check(renderer&&renderer.gl.isEnabled(renderer.gl.DEPTH_TEST),'Depth test enabled');check(Object.keys(preferences.bindings).length===12&&preferences.bindings.sprint.code==='ShiftLeft'&&preferences.bindings.interact.code==='KeyE'&&preferences.bindings.tablet.code==='Tab','All game actions are included in configurable controls');
  // Intersecting, differently-sized objects must occlude identically regardless of insertion order.
  const probe=document.createElement('canvas');probe.style.cssText='width:200px;height:200px;position:fixed;left:-500px';document.body.append(probe);
  // Isolate depth from cached static shadows, whose lighting changes when a mesh becomes dynamic.

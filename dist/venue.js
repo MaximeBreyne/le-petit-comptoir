@@ -3,8 +3,8 @@
 const BarVenue=(()=>{
  const sign={x:6.78,y:1.91,z:9.76,w:1.02,h:.48};
  const faces={
-  closed:{label:'FERMÉ\nE : OUVRIR',c:'#402f29'},
-  open:{label:'OUVERT\nE : FERMER',c:'#203f37'},
+  closed:{label:'FERMÉ\nOUVRIR LE BAR',c:'#402f29'},
+  open:{label:'OUVERT\nFERMER LE BAR',c:'#203f37'},
   closing:{label:'DERNIÈRE TOURNÉE\nFIN DU SERVICE',c:'#403923'},
  };
  const labelTemplates=Object.values(faces).map(face=>({...sign,d:.012,mat:0,...face,labelColor:'#f4e8c9',labelPixels:480,labelFace:'front',castShadow:false}));

@@ -31,7 +31,7 @@ window.BarPreparation=(()=>{
     const messages={
      'place-vessel':'Poser le récipient · '+recipes[p.recipe].name,
      'place-ingredient':p.held?.key?'Utiliser : '+ingredients[p.held.key].name:'Poser l’ingrédient',
-     pour:p.amount>0?'Valider le dosage · '+recipes[p.recipe].name:'Maintenir '+preferences.bindings.pour.label+' pour '+(p.recipe==='coffee'?'extraire':'verser'),
+     pour:p.amount>0?'Valider le dosage · '+recipes[p.recipe].name:'Maintenir '+controlName('pour')+' pour '+(p.recipe==='coffee'?'extraire':'verser'),
      mix:'Mélanger et terminer · '+recipes[p.recipe].name,ready:'Prendre sur le plateau · '+recipes[p.recipe].name,
     };
     if(messages[status.stage])add({...status.station,y:status.station.y+.18},.17,{kind:status.stage,prepId:p.id,label:messages[status.stage]});
@@ -61,7 +61,7 @@ window.BarPreparation=(()=>{
     case'vessel':return game.takeVessel(camera);
     case'ingredient':return game.takeIngredient(current.key,camera);
     case'place-vessel':case'place-ingredient':return game.placeHeld(camera);
-    case'pour':if(game.s.prep.amount<=0)return 'Maintenez '+preferences.bindings.pour.label+' pour doser la boisson.';return game.finishPour(camera);
+    case'pour':if(game.s.prep.amount<=0)return 'Maintenez '+controlName('pour')+' pour doser la boisson.';return game.finishPour(camera);
     case'mix':return game.finishMix(camera);
     case'ready':return game.plate(camera);
    }
@@ -161,23 +161,23 @@ window.BarPreparation=(()=>{
   refreshPicker();
   const p=game.s.prep,status=game.preparationStatus(camera),inBar=game.canWork(camera),count=preparations().length;
   $('workbench').hidden=!inBar||!count&&!game.s.tray.length;
-  if(!p){updateHTML($('prep'),'<p class="empty">'+(count?count+' préparation'+(count>1?'s':'')+' sur le comptoir. Regardez un verre et appuyez sur E pour le reprendre.':'Regardez les verres derrière vous et appuyez sur E pour choisir une boisson.')+'</p>');return;}
+  if(!p){updateHTML($('prep'),'<p class="empty">'+(count?count+' préparation'+(count>1?'s':'')+' sur le comptoir. Regardez un verre et appuyez sur '+safe(controlName('interact'))+' pour le reprendre.':'Regardez les verres derrière vous et appuyez sur '+safe(controlName('interact'))+' pour choisir une boisson.')+'</p>');return;}
   const r=recipes[p.recipe],held=p.held,ingredientNames=status.remaining.filter(key=>!layout.ingredients[key]?.fixed).map(key=>ingredients[key].name);
-  let instruction={vessel:'Prenez un récipient au rangement derrière le bar.','place-vessel':'Apportez le récipient au poste indiqué.',ingredient:ingredientNames.length?'À prendre : '+ingredientNames.join(', '):'Rejoignez le poste de préparation.','place-ingredient':'Apportez '+(held?.key?ingredients[held.key].name.toLocaleLowerCase('fr-BE'):'l’ingrédient')+' à ce verre.',pour:'Au poste : maintenez '+preferences.bindings.pour.label+' pour doser, puis E pour valider.',mix:'Regardez ce verre et appuyez sur E pour terminer.',ready:'Regardez la boisson et appuyez sur E pour la prendre sur le plateau.'}[status.stage]||'';
+  let instruction={vessel:'Prenez un récipient au rangement derrière le bar.','place-vessel':'Apportez le récipient au poste indiqué.',ingredient:ingredientNames.length?'À prendre : '+ingredientNames.join(', '):'Rejoignez le poste de préparation.','place-ingredient':'Apportez '+(held?.key?ingredients[held.key].name.toLocaleLowerCase('fr-BE'):'l’ingrédient')+' à ce verre.',pour:'Au poste : maintenez '+controlName('pour')+' pour doser, puis '+controlName('interact')+' pour valider.',mix:'Regardez ce verre et appuyez sur '+controlName('interact')+' pour terminer.',ready:'Regardez la boisson et appuyez sur '+controlName('interact')+' pour la prendre sur le plateau.'}[status.stage]||'';
   if(!status.nearStation&&['pour','mix','ready'].includes(status.stage))instruction='Rejoignez '+(status.station.label||r.station).toLocaleLowerCase('fr-BE')+' derrière le comptoir.';
   let html='<div class="sectionTitle"><strong>'+safe(r.name)+'</strong><span>'+count+' préparation'+(count>1?'s':'')+' en cours</span></div><p class="prep-station">'+safe(status.station.label||r.station)+' · '+safe(r.glass)+'</p><p class="prep-instruction">'+safe(instruction)+'</p>';
   if(held)html+='<p class="prep-held">En main : <strong>'+safe(held.kind==='vessel'?r.glass:ingredients[held.key].name)+'</strong></p>';
   if(status.stage==='pour')html+='<p>Objectif : '+r.target+' '+safe(r.unit)+' · <strong>'+p.amount.toFixed(1)+'</strong></p><div class="pourbar"><em></em><i style="width:'+Math.min(100,p.amount/(r.target*1.5)*100)+'%"></i></div>';
   if(p.ready)html+='<p>Dosage : <strong>'+p.quality+' %</strong></p>';
-  if(!held)html+='<p class="prep-parallel-hint">E sur un autre verre pour le reprendre · E au rangement pour une autre boisson.</p>';
+  if(!held)html+='<p class="prep-parallel-hint">'+safe(controlName('interact'))+' sur un autre verre pour le reprendre · '+safe(controlName('interact'))+' au rangement pour une autre boisson.</p>';
   html+='<button class="prep-manage" data-open-preparation="'+p.id+'"'+(!status.nearStation?' disabled':'')+'>Gérer cette préparation</button>';
   updateHTML($('prep'),html);
  }
  function refreshPrompt(){
   const active=GameMenu.getMode()==='play'&&!paused&&!menusOpen()&&!BarTablet.isOpen();
   const item=active?interactionTarget():null,node=$('interactionPrompt');
-  node.hidden=!item;if(item){const text='E · '+item.label.replace(/^E\s*:\s*/,'')+(managesVessel(item)?' · Clic droit : gérer':'');if(node.textContent!==text)node.textContent=text;}
-  $('aimDot').hidden=!active||!BarInput.isLooking();
+  node.hidden=!item;if(item){const text=controlName('interact')+' · '+item.label.replace(/^E\s*:\s*/,'')+(managesVessel(item)?' · '+controlName('manage')+' : gérer':'');if(node.textContent!==text)node.textContent=text;}
+  $('aimDot').hidden=!active||!BarInput.isLooking()&&!window.BarGamepad?.isActive();
  }
  refresh();return {target,use,refresh,refreshPrompt,openVessels,isChoosingVessel,handleEscape,openPreparation,openTray};
 })();

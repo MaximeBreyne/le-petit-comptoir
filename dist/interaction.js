@@ -49,6 +49,7 @@ window.BarInput=(()=>{
  }
  function enterLook(){
   if(!active())return;
+  if(window.BarGamepad?.isActive()){enterGamepad();return;}
   mode='look';suspended=false;stopActions();refresh();
   canvas.tabIndex=-1;canvas.focus({preventScroll:true});
   if(document.pointerLockElement===canvas||pending||releasing||recoveryTimer!==null)return;
@@ -61,6 +62,11 @@ window.BarInput=(()=>{
    if(attempt.promise)result.then(()=>settled(attempt),error=>failed(attempt,error));
    if(pending===attempt)attempt.timeout=setTimeout(()=>failed(attempt),5000);
   }catch(error){failed(attempt,error)}
+ }
+ function enterGamepad(){
+  if(!active())return;
+  cancelRecovery();mode='gamepad';suspended=false;stopActions();release();refresh();
+  canvas.tabIndex=-1;canvas.focus({preventScroll:true});
  }
  function toggle(){if(!active())return;if(mode==='look')enterCursor();else enterLook()}
  document.addEventListener('pointerlockchange',()=>{
@@ -91,5 +97,5 @@ window.BarInput=(()=>{
  observer.observe($('modal'),{attributes:true,attributeFilter:['open']});
  observer.observe($('settingsModal'),{attributes:true,attributeFilter:['open']});
  refresh();
- return {enterLook,enterCursor,toggle,suspend,refresh,isLooking:()=>mode==='look'&&!suspended,isCursorMode:()=>mode==='cursor'&&!suspended};
+ return {enterLook,enterGamepad,enterCursor,toggle,suspend,refresh,isLooking:()=>['look','gamepad'].includes(mode)&&!suspended,isCursorMode:()=>mode==='cursor'&&!suspended};
 })();

@@ -26,7 +26,7 @@ window.GameMenu=(()=>{
   for(const p of preparations){const r=recipes[p.recipe];if(!r||!Number.isInteger(p.step)||p.step<0||p.step>=r.steps.length||!Number.isFinite(p.amount)||p.amount<0||p.amount>r.target*1.60001||!Number.isFinite(p.quality)||p.quality<0||p.quality>100||typeof p.ready!=='boolean')return false}
   return true;
  }
- function validCamera(value){return value&&['x','y','z','a','pitch'].every(k=>Number.isFinite(value[k]))&&BarScene.containsWalkablePosition(value.x,value.z)&&value.y>0&&value.y<3}
+ function validCamera(value){return value&&['x','y','z','a','pitch'].every(k=>Number.isFinite(value[k]))&&BarScene.containsWalkablePosition(value.x,value.z,game.s)&&value.y>0&&value.y<3}
  function snapshot(slot){
   if(slot==='auto'){const s=read(AUTO_KEY),meta=read(META_KEY);return validState(s)?{state:s,savedAt:meta?.savedAt,camera:meta?.camera}:null}
   const value=read(SLOT_PREFIX+slot);return value?.schema===1&&validState(value.state)?value:null;

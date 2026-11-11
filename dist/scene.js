@@ -1,6 +1,6 @@
 /* Original shop geometry. Dimensions are in metres; static meshes are uploaded once. */
 const BarScene=(()=>{
- const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10,clearGlass:11,stone:12};
+ const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10,clearGlass:11,stone:12,leather:13};
  const playCamera={x:6,y:1.68,z:1.55,a:0,pitch:-.06};
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
  const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
@@ -36,11 +36,16 @@ const BarScene=(()=>{
   {key:'tonic',label:'TONIC',pack:100,x:.43,y:1.02,z:-1.12,side:true,kind:'bottle',color:'#a1b9a3'},
   {key:'cola',label:'COLA',pack:100,x:.43,y:1.02,z:-2.18,side:true,kind:'bottle',color:'#604536'},
  ];
- function containsWalkablePosition(x,z){
+ function containsWalkablePosition(x,z,state){
   if(!Number.isFinite(x)||!Number.isFinite(z))return false;
+  const level=globalThis.BarEngine?.buildingLayout?.(state)?.level||0;
   return (x>=.3&&x<=11.7&&z>=.3&&z<=9.6)||
    (x>=.3&&x<=4.3&&z>=-3.9&&z<=-.3)||
-   (x>=.55&&x<=1.35&&z>=-.35&&z<=.35);
+   (x>=.55&&x<=1.35&&z>=-.35&&z<=.35)||
+   (level>=1&&x>=11.7&&x<=12.3&&z>=4.9&&z<=5.6)||
+   (level>=1&&x>=12.3&&x<=16.2&&z>=4.3&&z<=9.6)||
+   (level>=2&&x>=16.2&&x<=16.8&&z>=4.9&&z<=5.6)||
+   (level>=2&&x>=16.8&&x<=20.7&&z>=4.3&&z<=9.6);
  }
  const inStockroom=position=>!!position&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
  function prepStation(preparation){
@@ -48,7 +53,18 @@ const BarScene=(()=>{
   const key=recipe==='beer'?'beer':recipe==='coffee'?'coffee':'cocktails';
   const slot=typeof preparation==='object'&&globalThis.BarEngine?.preparationSlots?.find(slot=>slot.id===preparation?.slotId);
   const point=slot||globalThis.BarEngine?.preparationLayout?.stations[key]||({beer:{x:4.15,y:1.133,z:2.72},coffee:{x:8.43,y:1.152,z:2.47},cocktails:{x:6.5,y:1.133,z:3.05}})[key];
-  const stream=key==='beer'?{y:1.53,h:.18}:key==='coffee'?{y:1.316,h:.072}:{y:1.51,h:.24};
+  let stream=key==='beer'?{y:1.53,h:.18}:key==='coffee'?{y:1.316,h:.072}:{y:1.51,h:.24};
+  if(typeof preparation==='object'){
+   const info=globalThis.BarEngine?.recipes?.[recipe],vessel=info?.vessel;
+   if(info){
+    const volume=Object.entries(info.ingredients).reduce((sum,[key,amount])=>sum+(globalThis.BarEngine.ingredients[key].unit==='cl'?amount:0),0);
+    const portion=info.finishStep!==undefined&&volume?Math.min(1,info.target/volume):1;
+    const fill=preparation.ready?1:Math.min(1,Math.max(0,preparation.amount/info.target))*portion;
+    const range=vessel==='cup'?[.041,.123]:vessel==='wine'?[.12,.226]:vessel==='coupe'?[.12,.195]:vessel==='rocks'?[.012,.095]:[.012,vessel==='pint'?.267:.247];
+    const bottom=point.y+range[0]+fill*(range[1]-range[0]),top=key==='beer'?1.612:key==='coffee'?1.33:point.y+.50;
+    stream={y:(top+bottom)/2,h:Math.max(.005,top-bottom)};
+   }
+  }
   return {x:point.x,y:point.y,z:point.z,stream:{x:point.x,z:point.z,...stream}};
  }
  function trayPosition(index){return {x:4.98+(index%2)*.26,y:1.133,z:2.85+Math.floor(index/2)*.32}}
@@ -228,27 +244,82 @@ const BarScene=(()=>{
   const angle=camera.a+Math.PI,cs=Math.cos(angle),sn=Math.sin(angle);
   for(const item of local)items.push({...item,x:origin.x+item.x*cs+item.z*sn,y:origin.y+item.y,z:origin.z-item.x*sn+item.z*cs,ry:(item.ry||0)+angle,castShadow:false});
  }
- function create(){
+ function create(state){
   const items=[],g=geometry(items),{box:b,cylinder:c,sphere:s}=g;
   const solid={solid:true},noShadow={castShadow:false};
-  // Shell: old plaster, brick, timber wainscoting and a glazed street frontage.
-  b(6,-.11,5,12,.22,10,'#826749',M.floor);
-  b(6,3.45,5,12,.18,10,'#b4aa96',M.plaster,noShadow);
-  b(0,1.7,5,.2,3.4,10,'#807264',M.brick,{...solid,...noShadow});
-  b(12,1.7,5,.2,3.4,10,'#b7b0a0',M.plaster,{...solid,...noShadow});
-  // The former blank wall now has a real doorway to the stockroom.
-  b(.15,1.7,0,.3,3.4,.2,'#b2ab98',M.plaster,{...solid,...noShadow});
-  b(6.8,1.7,0,10.4,3.4,.2,'#b2ab98',M.plaster,{...solid,...noShadow});
-  b(.95,2.85,0,1.3,1.1,.2,'#b2ab98',M.plaster,noShadow);
-  for(const x of [.12,11.88]){
-   b(x,.58,5,.12,1.16,10,'#31453f',M.wood);
-   b(x,1.18,5,.17,.06,10,'#615b48',M.wood);
-   b(x,.075,5,.18,.15,10,'#303833',M.wood);
-   b(x,3.24,5,.18,.11,10,'#d5cbb4',M.plaster,noShadow);
+  const decor=BarEngine.decorStyle(state),wall=decor.walls.colors,ceiling=decor.ceiling.colors;
+  const table=decor.tables.colors,chairColors=decor.chairs.colors,floor=decor.floor.colors;
+  const floorMaterial=M[decor.floor.material]??M.floor,tableMaterial=M[decor.tables.material]??M.wood,seatMaterial=M[decor.chairs.material]??M.fabric;
+  const building=globalThis.BarEngine?.buildingLayout?.(state)||{level:0,width:12};
+  const activeTables=globalThis.BarEngine?.availableTables?.(state)||tableLocations.filter(table=>!table.upgrade);
+  // A room purchase changes the shell. Furniture is a separate purchase, so an
+  // empty salon remains accessible without creating extra customer places.
+  function sideWall(x,start,end,door=false){
+   const spans=door?[[start,4.6],[5.9,end]]:[[start,end]];
+   for(const [from,to]of spans)b(x,1.7,(from+to)/2,.2,3.4,to-from,wall.plaster,M.plaster,{...solid,...noShadow});
+   if(door){
+    b(x,2.95,5.25,.2,.9,1.3,wall.plaster,M.plaster,noShadow);
+    for(const z of [4.6,5.9])b(x,1.25,z,.26,2.5,.065,'#4d5e51',M.wood,solid);
+    b(x,2.52,5.25,.26,.09,1.43,'#4d5e51',M.wood,noShadow);
+    b(x,.006,5.25,.25,.012,1.25,'#ad9670',M.metal,noShadow);
+   }
   }
-  b(6,3.24,.16,12,.11,.18,'#d5cbb4',M.plaster,noShadow);
-  b(.15,.58,.15,.3,1.16,.14,'#33443b',M.wood);
-  b(6.8,.58,.15,10.4,1.16,.14,'#33443b',M.wood);
+  function sidePanel(x,start,end,door=false){
+   for(const [from,to]of door?[[start,4.6],[5.9,end]]:[[start,end]]){
+    const z=(from+to)/2,d=to-from;
+    b(x,.58,z,.12,1.16,d,wall.panel,M.wood);
+    b(x,1.18,z,.17,.06,d,wall.trim,M.wood);
+    b(x,.075,z,.18,.15,d,wall.trim,M.wood);
+   }
+   b(x,3.24,(start+end)/2,.18,.11,end-start,ceiling.trim,M.plaster,noShadow);
+  }
+  // Shell: old plaster, brick, timber wainscoting and a glazed street frontage.
+  b(6,-.11,5,12,.22,10,floor.surface,floorMaterial,{roomFloor:true,decorCategory:'floor'});
+  b(6,3.45,5,12,.18,10,ceiling.surface,M.plaster,noShadow);
+  b(0,1.7,5,.2,3.4,10,decor.walls.id==='cream'?'#807264':wall.plaster,decor.walls.id==='cream'?M.brick:M.plaster,{...solid,...noShadow});
+  sideWall(12,0,10,building.level>=1);
+  // The former blank wall now has a real doorway to the stockroom.
+  b(.15,1.7,0,.3,3.4,.2,wall.plaster,M.plaster,{...solid,...noShadow});
+  b(6.8,1.7,0,10.4,3.4,.2,wall.plaster,M.plaster,{...solid,...noShadow});
+  b(.95,2.85,0,1.3,1.1,.2,wall.plaster,M.plaster,noShadow);
+  sidePanel(.12,0,10);
+  sidePanel(11.88,0,10,building.level>=1);
+  for(let room=0;room<building.level;room++){
+   const left=12+room*4.5,right=left+4.5,middle=(left+right)/2;
+   b(middle,-.11,7,4.5,.22,6,floor.surface,floorMaterial,{roomFloor:true,decorCategory:'floor'});
+   b(middle,3.45,7,4.5,.18,6,ceiling.surface,M.plaster,noShadow);
+   b(middle,1.7,4,4.5,3.4,.2,wall.plaster,M.plaster,{...solid,...noShadow});
+   sidePanel(left+.12,4,10,true);
+   sideWall(right,4,10,room+1<building.level);
+   sidePanel(right-.12,4,10,room+1<building.level);
+   b(middle,.58,4.12,4.26,1.16,.12,wall.panel,M.wood);
+   b(middle,1.18,4.12,4.26,.06,.17,wall.trim,M.wood);
+   b(middle,.075,4.12,4.26,.15,.18,wall.trim,M.wood);
+   b(middle,3.24,4.12,4.26,.11,.18,ceiling.trim,M.plaster,noShadow);
+   // Framed glazing and a solid sill close every edge along the new frontage.
+   b(middle,3.13,9.98,4.5,.55,.2,wall.plaster,M.plaster,noShadow);
+   for(const x of [left+.12,right-.12])b(x,1.6,9.96,.18,3.2,.2,'#273a38',M.metal,{...solid,...noShadow});
+   b(middle,.35,9.97,4.32,.7,.2,wall.panel,M.wood,solid);
+   b(middle,.73,9.86,4.32,.07,.32,'#5d5141',M.wood);
+   for(const y of [2.28,2.77])b(middle,y,9.94,4.32,.06,.12,'#283c3b',M.metal,noShadow);
+   b(middle,1.75,9.94,.05,2,.12,'#283c3b',M.metal,noShadow);
+   b(middle,1.515,9.99,4.32,1.53,.009,'#c0d1cf',M.clearGlass,noShadow);
+   b(middle,2.525,9.99,4.32,.46,.009,'#c0d1cf',M.clearGlass,noShadow);
+   b(left-.145,2.82,5.25,1.15,.25,.025,'#263e36',M.paint,{ry:Math.PI/2,label:room?'GRANDE SALLE':'SALON',labelColor:'#f2e9cf',labelPixels:256,castShadow:false});
+   b(left+.145,2.82,5.25,1.15,.25,.025,'#263e36',M.paint,{ry:-Math.PI/2,label:'COMPTOIR',labelColor:'#f2e9cf',labelPixels:256,castShadow:false});
+   // Tables retain a clear aisle on their left, including when both rows exist.
+   for(const z of [6.2,8.4]){
+    c(middle,3.05,z,.018,.62,.018,'#273632',M.metal,noShadow);
+    c(middle,2.7,z,.57,.20,.57,'#364137',M.metal,{topRadius:.32});
+    c(middle,2.59,z,.50,.016,.50,'#f2d799',M.light,noShadow);
+    s(middle,2.565,z,.10,.075,.10,'#f9e4b7',M.light,noShadow);
+   }
+   b(middle,2.17,4.14,1.5,.83,.045,'#4b4436',M.wood);
+   b(middle,2.17,4.17,1.34,.67,.02,'#a79266',M.paint,{label:room?'LES SOIRÉES\nDU COMPTOIR':'PRENEZ\nLE TEMPS',labelFace:'back',labelColor:'#263b34',labelPixels:256,castShadow:false});
+  }
+  b(6,3.24,.16,12,.11,.18,ceiling.trim,M.plaster,noShadow);
+  b(.15,.58,.15,.3,1.16,.14,wall.panel,M.wood);
+  b(6.8,.58,.15,10.4,1.16,.14,wall.panel,M.wood);
   for(const x of [.29,1.61])b(x,1.16,.12,.075,2.32,.16,'#5a6758',M.wood,solid);
   b(.95,2.33,.12,1.4,.09,.16,'#5a6758',M.wood);
   b(.95,2.59,.122,1.18,.25,.035,'#263e36',0,{label:'RÉSERVE',labelFace:'back',labelColor:'#f2e9cf',castShadow:false});
@@ -279,15 +350,15 @@ const BarScene=(()=>{
   b(4.05,.93,-1.18,.76,.055,1.35,'#9e9479',M.wood,solid);
   for(const x of [3.74,4.36])for(const z of [-1.74,-.62])b(x,.45,z,.05,.9,.05,'#48574e',M.metal,solid);
   b(4.06,.964,-1.17,.34,.012,.48,'#d9d2ba',0,{label:'INVENTAIRE',labelFace:'top',labelColor:'#405247',castShadow:false});
-  b(4.455,1.8,-1.18,1.25,.58,.024,'#2d473c',0,{ry:Math.PI/2,label:'STOCKS\nE : GÉRER LA RÉSERVE',labelColor:'#f2e9cf',castShadow:false});
+  b(4.455,1.8,-1.18,1.25,.58,.024,'#2d473c',0,{ry:Math.PI/2,label:'STOCKS\nGÉRER LA RÉSERVE',labelColor:'#f2e9cf',castShadow:false});
   c(3.9,.3,-2.53,.6,.6,.6,'#637f75',M.metal,solid);
   c(3.9,.614,-2.53,.62,.026,.62,'#9bad9d',M.metal);
   b(3.9,.78,-2.53,.1,.3,.1,'#6c8174',M.metal);
   b(3.9,.93,-2.53,.48,.05,.1,'#879b89',M.metal);
-  b(6,3.13,9.98,12,.55,.2,'#a69d8d',M.plaster,noShadow);
+  b(6,3.13,9.98,12,.55,.2,wall.plaster,M.plaster,noShadow);
   for(const x of [.12,4.25,7.75,11.88])b(x,1.6,9.96,.18,3.2,.2,'#273a38',M.metal,{...solid,...noShadow});
   for(const x of [2.16,9.84]){
-   b(x,.35,9.97,4,.7,.2,'#31443c',M.wood,solid);
+   b(x,.35,9.97,4,.7,.2,wall.panel,M.wood,solid);
    b(x,.73,9.86,4.12,.07,.32,'#5d5141',M.wood);
    b(x,2.77,9.94,4.02,.07,.12,'#283c3b',M.metal,noShadow);
    b(x,1.75,9.94,.05,2.0,.12,'#283c3b',M.metal,noShadow);
@@ -307,10 +378,11 @@ const BarScene=(()=>{
   for(const x of [5.84,6.16])c(x,1.18,9.82,.026,.38,.026,'#b79d62',M.metal);
   b(6,.006,9.06,2.3,.013,1.15,'#383e36',M.fabric,noShadow);
   // Street beyond the windows, deliberately simple and outside the playable room.
-  b(6,-.08,11.1,20,.14,2.1,'#92928a',M.tile,noShadow);
-  b(6,-.18,14.3,25,.13,4.2,'#424c50',0,noShadow);
-  b(6,-.08,16.8,25,.14,1.5,'#94968f',M.tile,noShadow);
-  for(let x=-3;x<17;x+=3.4){
+  const streetExtra=building.width-12;
+  b(6+streetExtra/2,-.08,11.1,20+streetExtra,.14,2.1,'#92928a',M.tile,noShadow);
+  b(6+streetExtra/2,-.18,14.3,25+streetExtra,.13,4.2,'#424c50',0,noShadow);
+  b(6+streetExtra/2,-.08,16.8,25+streetExtra,.14,1.5,'#94968f',M.tile,noShadow);
+  for(let x=-3;x<17+streetExtra;x+=3.4){
    b(x,4.2,18,3.35,8.4,.4,['#77665b','#637073','#827869'][Math.abs(Math.round(x*10))%3],M.brick,noShadow);
    for(let y=1.2;y<8;y+=2.15){
     b(x,y,17.72,1.7,1.5,.14,'#272f32',M.metal,noShadow);
@@ -324,7 +396,7 @@ const BarScene=(()=>{
    b(x,.47,.52,2.72,.94,.82,'#443e32',M.wood,solid);
    b(x,.97,.54,2.83,.08,.94,'#a59d87',M.tile);
    for(const dx of [-.65,.65]){
-    b(x+dx,.47,.944,1.23,.79,.035,'#586052',M.wood);
+    b(x+dx,.47,.944,1.23,.79,.035,chairColors.back,M.wood);
     b(x+dx,.77,.975,.23,.026,.035,'#b9a576',M.metal);
    }
    b(x,2.0,.23,2.74,1.95,.12,'#25342f',M.wood);
@@ -409,7 +481,7 @@ const BarScene=(()=>{
   b(2.65,1.26,3.0,.42,.035,.29,'#33433b',M.metal);
   b(2.65,1.405,3.0,.10,.30,.09,'#38433e',M.metal);
   b(2.65,1.59,2.97,.68,.43,.055,'#1c302b',M.paint,{rx:.22});
-  b(2.65,1.597,2.938,.595,.335,.009,'#234d3c',M.paint,{rx:.22,label:'CAISSE\nE : ENCAISSER',labelFace:'front',labelColor:'#edf4df',castShadow:false});
+  b(2.65,1.597,2.938,.595,.335,.009,'#234d3c',M.paint,{rx:.22,label:'CAISSE\nENCAISSER',labelFace:'front',labelColor:'#edf4df',castShadow:false});
   // The cordless terminal rests beside the till until the player picks it up.
   b(3.25,1.12,2.65,.185,.035,.27,'#273532',M.metal);
   for(const dx of [-.082,.082])c(3.25+dx,1.12,2.65,.023,.035,.27,'#273532',M.metal);
@@ -431,49 +503,49 @@ const BarScene=(()=>{
   function chair(x,z,angle=0){
    const sin=Math.sin(angle),cos=Math.cos(angle);
    const p=(dx,dz)=>[x+dx*cos+dz*sin,z-dx*sin+dz*cos];
-   let [xx,zz]=p(0,0);b(xx,.48,zz,.48,.075,.47,'#6e4b3e',M.fabric,{solid:true,ry:angle});
-   [xx,zz]=p(0,.21);b(xx,.78,zz,.47,.48,.055,'#586052',M.wood,{solid:true,ry:angle});
+   let [xx,zz]=p(0,0);b(xx,.48,zz,.48,.075,.47,chairColors.seat,seatMaterial,{solid:true,ry:angle});
+   [xx,zz]=p(0,.21);b(xx,.78,zz,.47,.48,.055,chairColors.back,M.wood,{solid:true,ry:angle});
    // Local +Z is the back: its uprights meet the outer face of the backrest,
    // continuing down to the rear feet without protruding into the seat.
-   for(const dx of [-.19,.19])for(const [dz,h] of [[-.18,.46],[.24,.99]]){[xx,zz]=p(dx,dz);b(xx,h/2,zz,.038,h,.038,'#343b33',M.metal,{ry:angle})}
+   for(const dx of [-.19,.19])for(const [dz,h] of [[-.18,.46],[.24,.99]]){[xx,zz]=p(dx,dz);b(xx,h/2,zz,.038,h,.038,chairColors.frame,M.metal,{ry:angle})}
   }
-  for(const {id,x,z} of tableLocations){
-   c(x,.75,z,1.05,.065,1.05,'#826c4d',M.wood,{solid:true});
-   c(x,.38,z,.075,.72,.075,'#333c35',M.metal);
-   c(x,.04,z,.53,.05,.53,'#303a33',M.metal);
+  for(const {id,x,z} of activeTables){
+   c(x,.75,z,1.05,.065,1.05,table.top,tableMaterial,{solid:true,sideColor:table.edge,decorCategory:'tables'});
+   c(x,.38,z,.075,.72,.075,table.base,M.metal);
+   c(x,.04,z,.53,.05,.53,table.base,M.metal);
    chair(x-.78,z,-Math.PI/2);chair(x+.78,z,Math.PI/2);
    c(x,.818,z,.09,.07,.09,'#b2a890');c(x,.9,z,.025,.16,.025,'#72804b');
    for(let leaf=0;leaf<5;leaf++){const a=leaf*2.4;s(x+Math.sin(a)*.046,.91+leaf*.018,z+Math.cos(a)*.04,.078,.012,.036,['#6a7c51','#4d6843','#7b8a5c'][leaf%3],M.paint,{ry:a,rz:.32*Math.sin(a)});}
    b(x-.2,.787,z+.18,.2,.008,.14,'#d7cdb4');
    const inward=x<6?1:-1,signAngle=-inward*Math.PI/2;
    b(x+inward*.26,.794,z-.18,.24,.015,.07,'#867854',M.metal,{ry:signAngle});
-   b(x+inward*.26,.85,z-.18,.23,.10,.018,'#203e30',M.paint,{ry:signAngle,label:'TABLE '+id,labelColor:'#f2e8c9',castShadow:false});
+   b(x+inward*.26,.85,z-.18,.23,.10,.018,'#203e30',M.paint,{ry:signAngle,label:'TABLE '+id,labelColor:'#f2e8c9',labelPixels:256,castShadow:false});
   }
   // All six stools exist from the start. Progression only changes which seats
   // guests use; the backrests face the room and leave the serving aisle clear.
   for(const {x,z} of counterLocations){
    c(x,.735,z,.43,.035,.43,'#4b4031',M.wood);
-   c(x,.795,z,.47,.09,.47,'#785242',M.fabric,{solid:true});
+   c(x,.795,z,.47,.09,.47,chairColors.seat,seatMaterial,{solid:true});
    c(x,.764,z,.474,.009,.474,'#ad8964',M.fabric);
    for(const dx of [-.175,.175])for(const dz of [-.175,.175]){
-    c(x+dx,.36,z+dz,.033,.72,.033,'#354139',M.metal,{solid:true,topRadius:1.2});
+    c(x+dx,.36,z+dz,.033,.72,.033,chairColors.frame,M.metal,{solid:true,topRadius:1.2});
     c(x+dx,.012,z+dz,.043,.024,.043,'#27302a',M.paint);
    }
    // The rear uprights meet the outer face, never protruding into the cushion.
    for(const dx of [-.185,.185]){
-    c(x+dx,.94,z+.258,.026,.43,.026,'#354139',M.metal);
-    b(x+dx,.742,z+.211,.027,.025,.12,'#354139',M.metal);
+    c(x+dx,.94,z+.258,.026,.43,.026,chairColors.frame,M.metal);
+    b(x+dx,.742,z+.211,.027,.025,.12,chairColors.frame,M.metal);
     b(x+dx,.3225,z-.265,.025,.024,.17,'#a78c54',M.metal);
    }
-   b(x,1.045,z+.22,.44,.21,.05,'#586052',M.wood);
-   b(x,1.048,z+.191,.40,.155,.018,'#785242',M.fabric);
+   b(x,1.045,z+.22,.44,.21,.05,chairColors.back,M.wood);
+   b(x,1.048,z+.191,.40,.155,.018,chairColors.seat,seatMaterial);
    c(x,.3225,z-.35,.024,.40,.024,'#a78c54',M.metal,{rz:Math.PI/2});
-   c(x,.3225,z+.175,.023,.35,.023,'#354139',M.metal,{rz:Math.PI/2});
+   c(x,.3225,z+.175,.023,.35,.023,chairColors.frame,M.metal,{rz:Math.PI/2});
   }
   // Framed menu, wall art, clocks and pendant lamps.
   b(.24,2.1,4.35,.055,1.25,1.5,'#473f31',M.wood);
   b(.28,2.1,4.35,1.35,1.1,.025,'#263b32',0,{ry:-Math.PI/2,label:'LA CARTE\nPression  5 €\nVin rouge  6 €\nEspresso  3 €\nMojito  10 €'});
-  for(const [z,word] of [[4.75,'CAFÉ\nDE QUARTIER'],[7.6,'LES BELLES\nSOIRÉES']]){
+  for(const [z,word] of [[building.level?3.75:4.75,'CAFÉ\nDE QUARTIER'],[7.6,'LES BELLES\nSOIRÉES']]){
    b(11.84,2.03,z,.055,1.0,.77,'#4b4436',M.wood);
    b(11.8,2.03,z,.63,.87,.02,'#a79266',0,{ry:Math.PI/2,label:word,labelColor:'#263b34'});
   }

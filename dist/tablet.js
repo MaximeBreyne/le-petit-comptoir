@@ -1,12 +1,12 @@
 'use strict';
 // A single catalogue and management screen; adding recipes never needs a new key.
 window.BarTablet=(()=>{
- const sections={service:['Service','La salle et les commandes'],orders:['À préparer','Les boissons commandées'],register:['Caisse','Encaissements & terminal'],reserve:['Réserve','Stocks & fournisseur'],building:['Bâtiment','Votre établissement'],licenses:['Licences','Développer la carte'],team:['Équipe','Les personnes derrière le bar']};
+ const sections={service:['Service','La salle et les commandes'],orders:['À préparer','Les boissons commandées'],register:['Caisse','Encaissements & terminal'],reserve:['Réserve','Stocks & fournisseur'],building:['Bâtiment','Votre établissement'],decor:['Décoration','Le style de votre bar'],licenses:['Licences','Développer la carte'],team:['Équipe','Les personnes derrière le bar']};
  let current='orders',upgradesSignature='',lastRefresh=0;
  const stockRows=new Map(),upgradeCards=new Map();
  const make=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node};
  const number=value=>Number(value||0).toLocaleString('fr-BE',{maximumFractionDigits:1});
- const iconPaths={service:'M3 11h18M5 11v10m14-10v10M8 3h8v5H8zM2 5v4m20-4v4',register:'M4 13h16v8H4zM6 13l2-6h9l2 6M9 2h9v5H9zM7 17h10M10 10h1m3 0h1',orders:'M6 2h12l-1 10a5 5 0 0 1-10 0L6 2zm6 15v5m-4 0h8',reserve:'M3 7l9-5 9 5v12l-9 4-9-4V7zm0 0 9 5 9-5m-9 5v11',building:'M3 22V7l9-5 9 5v15M8 22v-7h8v7M7 8h2m6 0h2M7 11h2m6 0h2',licenses:'M6 2h12v15l-6-3-6 3V2zm3 5h6M9 10h6M7 17v5l5-3 5 3v-5',team:'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8-7a3 3 0 0 1 0 6M1 22v-3a6 6 0 0 1 12 0v3m3-7a5 5 0 0 1 6 5v2'};
+ const iconPaths={decor:'M4 3h14v8H4zM18 5h3v8H11v5M8 18h6v4H8z',service:'M3 11h18M5 11v10m14-10v10M8 3h8v5H8zM2 5v4m20-4v4',register:'M4 13h16v8H4zM6 13l2-6h9l2 6M9 2h9v5H9zM7 17h10M10 10h1m3 0h1',orders:'M6 2h12l-1 10a5 5 0 0 1-10 0L6 2zm6 15v5m-4 0h8',reserve:'M3 7l9-5 9 5v12l-9 4-9-4V7zm0 0 9 5 9-5m-9 5v11',building:'M3 22V7l9-5 9 5v15M8 22v-7h8v7M7 8h2m6 0h2M7 11h2m6 0h2',licenses:'M6 2h12v15l-6-3-6 3V2zm3 5h6M9 10h6M7 17v5l5-3 5 3v-5',team:'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8-7a3 3 0 0 1 0 6M1 22v-3a6 6 0 0 1 12 0v3m3-7a5 5 0 0 1 6 5v2'};
  function icon(name){const node=document.createElementNS('http://www.w3.org/2000/svg','svg');node.setAttribute('viewBox','0 0 24 24');node.setAttribute('aria-hidden','true');node.innerHTML=`<path d="${iconPaths[name]||iconPaths.orders}"/>`;return node}
  function button(text,action,className=''){const node=make('button',className,text);node.type='button';if(action)node.dataset.tabletAction=action;return node}
  const dialog=make('dialog','tablet-device');dialog.id='tabletModal';dialog.setAttribute('aria-labelledby','tabletTitle');
@@ -15,7 +15,7 @@ window.BarTablet=(()=>{
  const brand=make('div','tablet-brand');const logo=make('img');logo.src='assets/brand/logo-128.png';logo.alt='';logo.width=36;logo.height=36;
  const identity=make('div');identity.append(make('strong',null,'LE PETIT COMPTOIR'),make('span',null,'TABLETTE DE GESTION'));brand.append(logo,identity);
  const status=make('div','tablet-live');const serviceStatus=make('span','tablet-service-state');const cash=make('strong','tablet-cash');status.append(serviceStatus,cash);
- const closeButton=button('Ranger · Tab','close','tablet-close');closeButton.setAttribute('aria-label','Ranger la tablette et reprendre la caméra');
+ const closeButton=button('Ranger','close','tablet-close');closeButton.setAttribute('aria-label','Ranger la tablette et reprendre la caméra');
  top.append(brand,status,closeButton);screen.append(top);
  const layout=make('div','tablet-layout'),nav=make('nav','tablet-nav'),main=make('main','tablet-main');nav.setAttribute('aria-label','Applications de la tablette');
  const navButtons=new Map();
@@ -54,18 +54,20 @@ window.BarTablet=(()=>{
  function orderPlace(order){return order.tableId?'Table '+order.tableId:'Comptoir '+((order.slot??0)+1)}
  function reachOrder(order){return !!game.canReachOrder?.(order.id,camera)}
  function refreshService(s){
-  const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo();
-  serviceNote.textContent='Approchez-vous d’un client pour noter sa commande ici. Choisissez ensuite sa boisson au rangement des verres derrière le bar. Le service et les paiements se font directement auprès du client avec E.';
+  const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo(),activeTables=new Set(game.activeTables().map(table=>table.id));
+  serviceNote.textContent='Approchez-vous d’un client pour noter sa commande ici. Choisissez ensuite sa boisson au rangement des verres derrière le bar. Pour servir ou encaisser, regardez le client et utilisez la commande Interagir.';
   roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
   roomSummary.textContent=`${count} / ${crowd.capacity} clients · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalWithWaiter?'avec le serveur':payments.terminalCarried?'avec vous':'au comptoir'}`;
   crowdTitle.textContent=`Fréquentation · ${crowd.counterSeatsUnlocked} / ${BarEngine.counterSeats.length} places au comptoir`;
-  crowdDetail.textContent=crowd.nextThreshold===null?'Toutes les places sont débloquées. Votre bar peut accueillir jusqu’à '+crowd.capacity+' clients à la fois.':`${crowd.totalSold} / ${crowd.nextThreshold} clients encaissés · Une place supplémentaire au prochain palier. Le déblocage est automatique.`;
+  crowdDetail.textContent=(crowd.nextThreshold===null?'Toutes les places au comptoir sont débloquées.':`${crowd.totalSold} / ${crowd.nextThreshold} clients encaissés · Une place au comptoir supplémentaire au prochain palier.`)+` ${activeTables.size} tables installées · Jusqu’à ${crowd.capacity} clients. Achetez des tables dans Bâtiment pour agrandir la salle.`;
   crowdProgress.hidden=crowd.nextThreshold===null;crowdProgress.max=Math.max(1,(crowd.nextThreshold??crowd.currentThreshold)-crowd.currentThreshold);crowdProgress.value=crowd.totalSold-crowd.currentThreshold;
   crowdProgress.setAttribute('aria-valuetext',crowd.nextThreshold===null?'Toutes les places sont débloquées':`${crowd.totalSold} clients encaissés sur ${crowd.nextThreshold}`);
   const counterOrders=orders.filter(order=>!order.tableId);
   for(const [key,entry]of seats){
    const [kind,index]=key.split(':'),order=kind==='table'?orders.find(order=>order.tableId===Number(index)):counterOrders.find((order,i)=>(order.slot??i)===Number(index));
+   entry.card.hidden=kind==='table'&&!activeTables.has(Number(index));
+   if(entry.card.hidden){delete entry.card.dataset.serviceOrder;for(const item of Object.values(entry.buttons)){item.hidden=true;item.disabled=true;delete item.dataset.orderId;}continue;}
    const locked=kind==='counter'&&!order&&Number(index)>=crowd.counterSeatsUnlocked;
    entry.card.dataset.serviceLocked=String(locked);
    entry.card.classList.toggle('tablet-seat-empty',!order);entry.card.classList.toggle('tablet-order-selected',!!order&&order.id===selectedOrderId);
@@ -97,9 +99,9 @@ window.BarTablet=(()=>{
    if(phase==='preparing'&&!beingServed){
     const ticket=game.preparationQueue().find(ticket=>ticket.orderId===order.id);
     entry.detail.textContent=recipe.name+' · '+({todo:'À préparer',preparing:'En préparation',ready:ticket?.prepId?'Prête au poste':'Prête sur le plateau',serving:'En service'}[ticket?.status]||'À préparer');
-    entry.proximity.textContent=ticket?.status==='ready'?'Prenez la boisson et regardez le client avec E pour servir.':'Choisissez la boisson au rangement des verres, derrière le bar.';
+    entry.proximity.textContent=ticket?.status==='ready'?'Prenez la boisson, regardez le client et utilisez Interagir pour servir.':'Choisissez la boisson au rangement des verres, derrière le bar.';
    }
-   if(phase==='payment'||phase==='cash-collected'||phase==='change-ready')entry.proximity.textContent='Regardez le client avec E pour le règlement ; la monnaie se prépare à la caisse derrière le bar.';
+   if(phase==='payment'||phase==='cash-collected'||phase==='change-ready')entry.proximity.textContent='Regardez le client et utilisez Interagir pour le règlement ; la monnaie se prépare à la caisse derrière le bar.';
    const paymentStatus=game.waiterPaymentStatus?.(order.id);
    if(game.paymentHandledByWaiter?.(order.id)){
     entry.badge.textContent=paymentStatus?.blocked?'Serveur en attente':'Encaissement par le serveur';
@@ -155,7 +157,7 @@ window.BarTablet=(()=>{
 
  // Order tickets replace the old recipe-launch catalogue.
  const orders=pages.get('orders');
- orders.append(make('p','tablet-order-note','Les commandes prises apparaissent ici et dans votre vue du bar. Au rangement des verres, appuyez sur E pour choisir la boisson et son récipient. Posez-le au poste indiqué ; vous pouvez laisser plusieurs préparations en cours.'));
+ orders.append(make('p','tablet-order-note','Les commandes prises apparaissent ici et dans votre vue du bar. Au rangement des verres, utilisez Interagir pour choisir la boisson et son récipient. Posez-le au poste indiqué ; vous pouvez laisser plusieurs préparations en cours.'));
  const orderList=make('div');orderList.id='tabletOrderQueue';orders.append(orderList);BarOrders.mount(orderList);
 
  // Deliveries go to the physical storeroom. Only a player in that room can refill the bar.
@@ -173,19 +175,56 @@ window.BarTablet=(()=>{
  reserve.append(stockTable,make('p','tablet-section-note','Les commandes arrivent dans la réserve après 10 secondes de jeu. Rejoignez la pièce derrière le bar pour apporter les ingrédients au comptoir.'));
 
  const building=pages.get('building');
- const summary=make('div','tablet-building-summary');summary.append(make('span','tablet-eyebrow','VOTRE ADRESSE'),make('h3',null,'Un bar de quartier à faire grandir.'),make('p',null,'Une salle ouverte aux clients, un comptoir équipé et une réserve séparée pour organiser le service.'));building.append(summary);
+ const summary=make('div','tablet-building-summary'),buildingTitle=make('h3'),buildingMetrics=make('div','tablet-building-metrics'),buildingValues={};
+ for(const [key,label]of [['area','Surface hors réserve'],['tables','Tables installées'],['capacity','Clients accueillis à la fois']]){const item=make('div'),value=make('strong');value.dataset.buildingMetric=key;item.append(value,make('span',null,label));buildingMetrics.append(item);buildingValues[key]=value;}
+ summary.append(make('span','tablet-eyebrow','VOTRE ADRESSE'),buildingTitle,buildingMetrics,make('p',null,'Agrandissez les locaux, puis équipez chaque salon avec ses tables. Chaque table achetée accueille un client supplémentaire ; les nouvelles arrivées restent progressives.'));building.append(summary);
+ const buildingWorks=make('p','tablet-building-works');buildingWorks.dataset.buildingStatus='';building.append(buildingWorks);
+ const decor=pages.get('decor'),decorCards=new Map(),decorGroups=new Map(),decorNotice=make('p','tablet-building-works');decorNotice.dataset.decorStatus='';
+ decor.append(make('p','tablet-decor-intro','Choisissez les finitions des tables, des sièges et des surfaces de toutes vos salles. Chaque finition est achetée une seule fois ; vous pouvez ensuite la réappliquer gratuitement. Les changements se font entre deux services.'),decorNotice);
+ const decorLinks=make('div','tablet-decor-links');decorLinks.setAttribute('aria-label','Surfaces à décorer');decor.append(decorLinks);
+ const materialNames={wood:'Bois',stone:'Pierre',fabric:'Tissu',leather:'Cuir',plaster:'Enduit',floor:'Parquet',tile:'Carrelage'};
+ for(const [category,catalog]of Object.entries(BarEngine.decorCatalog)){
+  const link=button(catalog.name,null,'tablet-button tablet-button-subtle');link.dataset.decorJump=category;decorLinks.append(link);
+  const group=make('section','tablet-decor-group'),heading=make('h3','tablet-building-group-title',catalog.name),grid=make('div','tablet-decor-grid');heading.tabIndex=-1;group.dataset.decorCategory=category;group.append(heading,grid);decor.append(group);decorGroups.set(category,heading);
+  for(const option of catalog.options){
+   const card=make('article','tablet-decor-card');card.dataset.decorOption=category+':'+option.id;
+   const swatch=make('div','tablet-decor-swatch');swatch.dataset.material=option.material;swatch.setAttribute('aria-hidden','true');
+   for(const color of Object.values(option.colors)){const stripe=make('span');stripe.style.backgroundColor=color;swatch.append(stripe)}
+   const heading=make('div','tablet-decor-heading'),name=make('h4',null,option.name),badge=make('span','tablet-owned');heading.append(name,badge);
+   const material=make('p','tablet-decor-material',materialNames[option.material]||option.material),status=make('p','tablet-decor-status');
+   const purchase=button('',null,'tablet-button');purchase.dataset.decorCategory=category;purchase.dataset.decorFinish=option.id;purchase.setAttribute('aria-label',catalog.name+' : '+option.name);
+   card.append(swatch,heading,material,status,purchase);grid.append(card);decorCards.set(category+':'+option.id,{category,id:option.id,card,badge,status,purchase});
+  }
+ }
+ function refreshDecor(s){
+  const blocked=s.open||s.closing||s.orders.length>0;decorNotice.dataset.blocked=String(blocked);
+  decorNotice.textContent=blocked?'Fermez le bar et terminez les commandes et paiements avant de changer la décoration.':'Le bar est fermé : les finitions choisies s’appliquent immédiatement à la salle et aux extensions.';
+  for(const entry of decorCards.values()){
+   const info=game.decorInfo(entry.category,entry.id);entry.card.dataset.selected=String(info.selected);entry.card.dataset.locked=String(!info.unlocked);
+   entry.badge.textContent=info.selected?'En place':info.owned?'Acquis':!info.unlocked?'À débloquer':'';entry.badge.hidden=!entry.badge.textContent;
+   entry.status.textContent=info.selected?'Finition actuellement appliquée':!info.unlocked?`${s.totalSold} / ${info.requiredSales} clients encaissés pour débloquer`:info.blockedReason||(!info.affordable?`Il manque ${money(info.price-s.cash)}`:info.owned?'Réapplication gratuite':'Achat conservé dans votre sauvegarde');
+   entry.purchase.disabled=!info.purchasable;entry.purchase.title=info.blockedReason||'';
+   entry.purchase.textContent=info.selected?'Déjà appliqué':info.owned?'Appliquer gratuitement':`Acheter et appliquer · ${money(info.cost)}`;
+  }
+ }
  const licenses=pages.get('licenses'),team=pages.get('team');
  const licenseIntro=make('div','tablet-management-intro');licenseIntro.append(icon('licenses'),make('div',null));licenseIntro.lastChild.append(make('h3',null,'Une carte qui grandit avec votre réputation.'),make('p',null,'La carte de base est incluse. Servez des clients pour débloquer les licences suivantes, puis achetez-les ici.'));licenses.append(licenseIntro);
  const teamIntro=make('div','tablet-management-intro');teamIntro.append(icon('team'),make('div',null));teamIntro.lastChild.append(make('h3',null,'Un coup de main pendant le service.'),make('p',null,'Confiez les stocks et la préparation à votre équipe. Le serveur prend les commandes, apporte les boissons et encaisse les espèces comme les cartes. Il partage le terminal avec vous.'));team.append(teamIntro);
  const upgradeLists=new Map();for(const key of ['building','licenses','team']){const list=make('div','tablet-upgrade-list');pages.get(key).append(list);upgradeLists.set(key,list)}
- for(const key of ['building','licenses','team'])pages.get(key).append(make('p','tablet-section-note','Les déblocages dépendent du nombre total de clients servis. Les achats et recrutements sont conservés dans votre sauvegarde.'));
+ for(const key of ['building','licenses','team'])pages.get(key).append(make('p','tablet-section-note','Les déblocages dépendent du nombre total de clients encaissés. Les achats et recrutements sont conservés dans votre sauvegarde.'));
  const newBarNotice=make('div','tablet-service-notice'),newBarAction=button('Nouveau bar','new-bar','tablet-button tablet-button-subtle');
  newBarNotice.append(make('p',null,'Recommencez avec un nouveau bar. Une confirmation protège la partie actuelle ; vos sauvegardes manuelles restent disponibles.'),newBarAction);building.append(newBarNotice);
  function syncUpgrades(){
   const catalog=BarEngine.managementUpgrades||{},signature=JSON.stringify(catalog);if(signature===upgradesSignature)return;upgradesSignature=signature;
   for(const list of upgradeLists.values())list.replaceChildren();upgradeCards.clear();
-  for(const [id,offer]of Object.entries(catalog)){
-   const list=upgradeLists.get(offer.category);if(!list)continue;
+  const buildingGroups=new Map();
+  for(const [key,label]of [['salon','Premier salon'],['grandSalon','Grand salon'],['equipment','Équipement du comptoir']]){const group=make('section','tablet-building-group'),list=make('div','tablet-upgrade-list');group.dataset.buildingGroup=key;group.append(make('h3','tablet-building-group-title',label),list);upgradeLists.get('building').append(group);buildingGroups.set(key,list);}
+  const buildingOrder=['expansion1','table5','table6','expansion2','table7','table8','tray','counter'];
+  const rank=id=>{const index=buildingOrder.indexOf(id);return index<0?buildingOrder.length:index;};
+  const offers=Object.entries(catalog).sort(([a],[b])=>rank(a)-rank(b));
+  for(const [id,offer]of offers){
+   const group=['expansion1','table5','table6'].includes(id)?'salon':['expansion2','table7','table8'].includes(id)?'grandSalon':'equipment';
+   const list=offer.category==='building'?buildingGroups.get(group):upgradeLists.get(offer.category);if(!list)continue;
    const card=make('article','tablet-upgrade-card');card.dataset.upgrade=id;
    const copy=make('div','tablet-upgrade-copy'),topLine=make('div','tablet-upgrade-top'),name=make('h3'),owned=make('span','tablet-owned');topLine.append(name,owned);copy.append(topLine);
    const description=make('p'),statusText=make('p','tablet-upgrade-status');const progress=make('progress','tablet-unlock-progress');progress.setAttribute('aria-label','Clients servis pour débloquer cette amélioration');copy.append(description);
@@ -199,16 +238,21 @@ window.BarTablet=(()=>{
  function refresh(force=false){
   if(!dialog.open&&!force)return;const now=performance.now();if(!force&&now-lastRefresh<200)return;lastRefresh=now;
   const s=game.s,inReserve=!!BarScene.inStockroom?.(camera);syncUpgrades();BarOrders.refresh();cash.textContent=money(s.cash);serviceStatus.textContent=s.gameOver?'Partie terminée':s.closing?'Dernière tournée':s.open?'Service ouvert':'Service fermé';serviceStatus.dataset.open=String(s.open&&!s.closing);
+  closeButton.textContent='Ranger · '+(window.BarControls?.label('tablet')||preferences.bindings.tablet?.label||'Tab');refreshDecor(s);
+  const premises=game.buildingInfo();buildingTitle.textContent=['Un bar de quartier à faire grandir.','Le bar et son premier salon.','Le bar et son grand salon.'][premises.level];
+  buildingValues.area.textContent=number(premises.area)+' m²';buildingValues.tables.textContent=premises.tableCount+' / '+premises.maxTables;buildingValues.capacity.textContent=String(premises.capacity);
+  const worksBlocked=s.open||s.closing||s.orders.length>0;buildingWorks.dataset.blocked=String(worksBlocked);
+  buildingWorks.textContent=worksBlocked?'Travaux indisponibles pendant le service. Fermez le bar et attendez le départ du dernier client pour agrandir ou installer des tables.':'Le bar est fermé : vous pouvez réaliser les travaux débloqués et installer de nouvelles tables avant le prochain service.';
   refreshService(s);refreshRegister(s);
   location.textContent=inReserve?'Dans la réserve':game.canWork(camera)?'Derrière le bar':'Dans la salle';location.dataset.reserve=String(inReserve);
   roomServiceAction.hidden=false;roomServiceAction.disabled=s.closing||s.gameOver;roomServiceAction.textContent=s.open?'Dernière tournée':'Ouvrir le bar';
   newBarAction.disabled=!GameMenu.hasSession()||GameMenu.getMode()!=='play'||paused;
-  reserveNote.textContent=inReserve?'Vous êtes dans la réserve. Réapprovisionnez le comptoir avec les ingrédients disponibles.':'Pour réapprovisionner le comptoir, rejoignez la réserve derrière le bar puis appuyez sur E.';reserveNote.classList.toggle('tablet-reserve-present',inReserve);
+  reserveNote.textContent=inReserve?'Vous êtes dans la réserve. Réapprovisionnez le comptoir avec les ingrédients disponibles.':'Pour réapprovisionner le comptoir, rejoignez la réserve derrière le bar puis utilisez Interagir.';reserveNote.classList.toggle('tablet-reserve-present',inReserve);
   for(const [key,row]of stockRows){const ingredient=ingredients[key],stored=s.reserve?.[key]||0,limit=game.serviceCapacity(key);row.serviceAmount.textContent=`${number(s.stock[key])} ${ingredient.unit}`;row.capacity.textContent=`Capacité : ${number(limit)} ${ingredient.unit}`;row.reserveAmount.textContent=`${number(stored)} ${ingredient.unit}`;const deliveries=s.deliveries.filter(d=>d.key===key);row.delivery.textContent=deliveries.length?`${deliveries.length} lot${deliveries.length>1?'s':''} en route · ${Math.ceil(Math.min(...deliveries.map(d=>d.remaining)))} s`:'Aucune livraison en cours';row.refill.disabled=!inReserve||s.gameOver||stored<=0||s.stock[key]>=limit;row.refill.title=!inReserve?'Rejoignez la réserve pour transférer les ingrédients.':'';const licensed=game.canBuy(key);row.buy.disabled=s.gameOver||s.cash<ingredient.cost||!licensed;row.licenseNote.hidden=licensed;row.licenseNote.textContent=licensed?'':`${BarEngine.managementUpgrades[ingredient.license]?.name||'Licence'} requise`;row.buy.title=licensed?'':row.licenseNote.textContent;}
   for(const [id,entry]of upgradeCards){
    const offer=game.upgradeInfo(id);entry.name.textContent=offer.name;entry.description.textContent=offer.description;entry.owned.hidden=!offer.owned;entry.owned.textContent=offer.category==='team'?'Recruté':'Acquis';entry.card.classList.toggle('tablet-upgrade-owned',offer.owned);entry.progress.hidden=offer.owned||s.totalSold>=offer.requiredSales;entry.progress.max=Math.max(1,offer.requiredSales);entry.progress.value=Math.min(offer.requiredSales,s.totalSold);
-   const requirements=[];if(s.totalSold<offer.requiredSales)requirements.push(`${s.totalSold} / ${offer.requiredSales} clients servis pour débloquer`);if(offer.unmetPrerequisites?.length)requirements.push('À acheter d’abord : '+offer.unmetPrerequisites.map(key=>BarEngine.managementUpgrades[key].name).join(', '));
-   entry.statusText.textContent=offer.owned?(offer.category==='team'?`${s.open?'En poste':'Prêt pour le prochain service'} · ${money(offer.salary||0)} de salaire par soir`:'Disponible pour tous les prochains services'):requirements.length?requirements.join(' · '):(s.cash<offer.cost?`Débloqué · Il manque ${money(offer.cost-s.cash)}`:'Débloqué · Achat disponible');entry.purchase.disabled=offer.owned||!offer.unlocked||s.cash<offer.cost||s.gameOver;entry.purchase.textContent=offer.owned?(offer.category==='team'?'Dans votre équipe':'Déjà acquis'):`${offer.category==='team'?'Recruter':'Acheter'} · ${money(offer.cost)}`;
+   const requirements=[];if(s.totalSold<offer.requiredSales)requirements.push(`${s.totalSold} / ${offer.requiredSales} clients encaissés pour débloquer`);if(offer.unmetPrerequisites?.length)requirements.push('À acheter d’abord : '+offer.unmetPrerequisites.map(key=>BarEngine.managementUpgrades[key].name).join(', '));if(offer.blockedReason)requirements.push(offer.blockedReason);
+   entry.statusText.textContent=offer.owned?(offer.category==='team'?`${s.open?'En poste':'Prêt pour le prochain service'} · ${money(offer.salary||0)} de salaire par soir`:'Disponible pour tous les prochains services'):requirements.length?requirements.join(' · '):(s.cash<offer.cost?`Débloqué · Il manque ${money(offer.cost-s.cash)}`:'Débloqué · Achat disponible');entry.purchase.disabled=!offer.purchasable;entry.purchase.title=offer.owned?'Déjà acquis':offer.blockedReason||'';entry.purchase.textContent=offer.owned?(offer.category==='team'?'Dans votre équipe':'Déjà acquis'):`${offer.category==='team'?'Recruter':'Acheter'} · ${money(offer.cost)}`;
   }
   for(const id of ['bartender','waiter']){const job=s.staff?.[id],entry=upgradeCards.get(id);if(!job||!entry)continue;const order=s.orders.find(order=>order.id===job.orderId);entry.statusText.textContent=`${id==='bartender'?'Prépare '+(recipes[job.recipe]?.name||'une boisson'):job.task==='take-order'?'Prend une commande':job.task==='serve'?'Apporte une boisson':waiterPaymentMessage(game.waiterPaymentStatus?.())}${order?' · '+orderPlace(order):''} · ${Math.ceil(job.remaining)} s`;}
   if(s.management.waiter&&!s.staff.waiter){const waiting=game.waiterPaymentStatus?.();if(waiting)upgradeCards.get('waiter').statusText.textContent=waiterPaymentMessage(waiting);}
@@ -218,7 +262,7 @@ window.BarTablet=(()=>{
   if(!window.GameMenu?.hasSession()||GameMenu.getMode()!=='play'||paused||$('modal').open||$('settingsModal').open)return false;
   keys={};game.setPour(false);window.BarInput?.suspend();selectedOrderId=Number.isSafeInteger(orderId)?orderId:null;setTab(tab);
   if(!dialog.open)dialog.showModal();document.body.dataset.tabletOpen='true';refresh(true);
-  navButtons.get(current)?.focus({preventScroll:true});if(selectedOrderId!==null)focusOrder(selectedOrderId);return true;
+  navButtons.get(current)?.focus({preventScroll:true});main.scrollTop=0;if(selectedOrderId!==null)focusOrder(selectedOrderId);return true;
  }
  function close({resumeLook=true,suspend=false}={}){
   if(!dialog.open)return false;dialog.close();document.body.dataset.tabletOpen='false';keys={};game.setPour(false);
@@ -235,6 +279,8 @@ window.BarTablet=(()=>{
   if(target.dataset.tabletTab){setTab(target.dataset.tabletTab);return}
   if(target.dataset.tabletLicense){const id=target.dataset.tabletLicense;setTab('licenses');const entry=upgradeCards.get(id);if(entry){entry.card.tabIndex=-1;entry.card.focus({preventScroll:true});entry.card.scrollIntoView({block:'center'});}return;}
   const actAndRefresh=fn=>{let message;act(()=>{message=fn();return message});feedback.textContent=message||'';refresh(true);};
+  if(target.dataset.decorJump){const heading=decorGroups.get(target.dataset.decorJump);heading?.focus({preventScroll:true});heading?.scrollIntoView({block:'start'});return;}
+  if(target.dataset.decorFinish){actAndRefresh(()=>game.purchaseDecor(target.dataset.decorCategory,target.dataset.decorFinish));return;}
   if(target.dataset.tabletOrderAction){
    const id=Number(target.dataset.orderId),order=game.s.orders.find(order=>order.id===id);if(!order){feedback.textContent='Ce client a quitté sa place.';refresh(true);return;}
    selectedOrderId=id;

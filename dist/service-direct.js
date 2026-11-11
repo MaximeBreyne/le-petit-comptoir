@@ -21,17 +21,17 @@ window.BarService=(()=>{
  function customerLabel(order){
   const phase=game.orderPhase(order),location=place(order);
   if(game.paymentHandledByWaiter?.(order.id))return waiterPaymentMessage(game.waiterPaymentStatus(order.id))+' · '+location;
-  if(phase==='awaiting-order')return `E : noter la commande sur la tablette · ${location}`;
+  if(phase==='awaiting-order')return `Noter la commande sur la tablette · ${location}`;
   if(phase==='preparing'){
    if(game.s.staff.waiter?.task==='serve'&&game.s.staff.waiter.orderId===order.id)return `Serveur en route · ${location}`;
-   return game.trayDrinkIndex(order)>=0?`E : servir ${recipes[order.recipe].name} · ${location}`:`${location} : ${recipes[order.recipe].name} à préparer au bar`;
+   return game.trayDrinkIndex(order)>=0?`Servir ${recipes[order.recipe].name} · ${location}`:`${location} : ${recipes[order.recipe].name} à préparer au bar`;
   }
   if(phase==='drinking')return `${location} : le client déguste sa boisson`;
   if(phase==='cash-collected')return `Monnaie à préparer à la caisse · ${location}`;
-  if(phase==='change-ready')return `E : remettre ${(order.change||0)>0?'la monnaie et le ticket':'le ticket'} · ${location}`;
+  if(phase==='change-ready')return `Remettre ${(order.change||0)>0?'la monnaie et le ticket':'le ticket'} · ${location}`;
   if(phase==='card-processing')return `Paiement par carte en cours · ${location}`;
-  if(phase==='payment'&&order.paymentMethod==='cash')return `E : prendre ${money(order.tender)} en espèces · ${location}`;
-  if(phase==='payment')return game.s.payments.terminalCarried?`E : présenter le terminal · ${location}`:`Paiement par carte · prenez le terminal au comptoir`;
+  if(phase==='payment'&&order.paymentMethod==='cash')return `Prendre ${money(order.tender)} en espèces · ${location}`;
+  if(phase==='payment')return game.s.payments.terminalCarried?`Présenter le terminal · ${location}`:`Paiement par carte · prenez le terminal au comptoir`;
   return location;
  }
  function target(position=camera){
@@ -39,8 +39,8 @@ window.BarService=(()=>{
   const candidates=[];
   if(atRegister(position)){
    for(const [kind,point,radius,label]of [
-    ['register',{x:2.65,y:1.59,z:2.94},.30,'E : ouvrir la caisse'],
-    ['terminal',{x:3.25,y:1.2,z:2.65},.16,game.s.payments.terminalWithWaiter?'Terminal utilisé par le serveur':game.s.staff.waiter?.task==='pickup-terminal'?'Le serveur vient chercher le terminal':game.s.payments.terminalCarried?'E : reposer le terminal sur son socle':'E : prendre le terminal sans fil'],
+    ['register',{x:2.65,y:1.59,z:2.94},.30,'Ouvrir la caisse'],
+    ['terminal',{x:3.25,y:1.2,z:2.65},.16,game.s.payments.terminalWithWaiter?'Terminal utilisé par le serveur':game.s.staff.waiter?.task==='pickup-terminal'?'Le serveur vient chercher le terminal':game.s.payments.terminalCarried?'Reposer le terminal sur son socle':'Prendre le terminal sans fil'],
    ]){const hit=aim(position,point,radius,1.8);if(hit)candidates.push({action:'direct-service',kind,label,...hit});}
   }
   for(const order of game.s.orders){

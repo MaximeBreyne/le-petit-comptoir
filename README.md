@@ -108,6 +108,24 @@ licence. Ils sont rangés sur l’étagère latérale de la réserve.
 Les anciennes sauvegardes conservent leur stock au comptoir et commencent
 avec une réserve vide : aucun ingrédient existant n’est perdu.
 
+AGRANDIR LE BAR
+Dans Tab > Bâtiment, achetez deux extensions successives de 27 m², puis
+les tables à installer dans chaque salle. Les travaux se font entre deux
+services : fermez le bar et terminez les commandes et encaissements en cours.
+Premier agrandissement : 20 clients encaissés et 450 euros.
+Table 5 : 20 clients et 130 euros, après le premier agrandissement.
+Table 6 : 30 clients et 160 euros, après l’achat de la table 5.
+Deuxième agrandissement : 55 clients et 900 euros, après la table 6.
+Table 7 : 55 clients et 180 euros, après le deuxième agrandissement.
+Table 8 : 75 clients et 220 euros, après l’achat de la table 7.
+Les nouvelles portes donnent accès à des salles meublées au fil des achats.
+Chaque table achetée ajoute une place client : quatre tables au départ,
+huit au maximum, soit jusqu’à quatorze clients avec les six places du comptoir.
+La fréquentation initiale reste inchangée. Un agrandissement vide ne crée
+aucune place supplémentaire et aucun achat ne fait apparaître de clients.
+Les clients et le serveur utilisent les nouvelles salles pour les commandes,
+le service et les paiements. Achats, clients et position sont sauvegardés.
+
 PROGRESSION SUR LA TABLETTE
 Plateau de 4 boissons : 5 clients servis et 100 euros.
 Licence cocktails : 8 clients servis et 120 euros, pour débloquer le mojito.
@@ -144,6 +162,32 @@ Les anciennes sauvegardes gardent l’accès aux cocktails.
 Elles conservent aussi leur argent, stocks, employés, commandes et préparations.
 Les trois nouvelles licences restent à acheter et les quatre nouveaux stocks
 commencent à zéro : charger une ancienne partie ne donne aucun lot gratuit.
+
+DÉCORATION DU BAR
+Dans Tab > Décoration, personnalisez les tables, les chaises et tabourets,
+les murs, le plafond et le sol. Les finitions proposent différents matériaux
+et couleurs. Le prix et la progression nécessaire figurent sur chaque carte.
+Une finition est payée une seule fois ; réappliquer une finition possédée
+est gratuit. Les changements se font bar fermé, après le départ des clients.
+Le décor s’applique aussi aux salles agrandies et se conserve dans la sauvegarde.
+Les anciennes parties retrouvent leur décoration classique gratuitement.
+
+MANETTE ET COMMANDES PERSONNALISÉES
+Branchez une manette compatible avec la disposition standard Windows
+(Xbox ou équivalente), puis appuyez sur un bouton.
+Le stick gauche déplace le personnage et le droit tourne la caméra.
+Par défaut : A pour interagir, Y pour la tablette, X pour gérer une préparation,
+RT maintenu pour verser, clic du stick gauche pour courir et Menu pour la pause.
+Dans les menus, A valide et B revient en arrière ; la croix directionnelle
+ou le stick gauche choisit les éléments, les épaules passent d’un élément
+au suivant et le stick droit fait défiler les longues pages.
+Les champs de caisse et les réglages peuvent aussi être modifiés à la manette.
+Réglages permet de réassigner les boutons de jeu et les touches clavier,
+y compris Interagir, Tablette et Gérer. Échap et F11 restent réservés.
+La sensibilité, la zone morte et l’inversion verticale des sticks se règlent
+séparément de la souris. Les réglages sont conservés entre les sessions.
+Les raccourcis indiqués plus haut correspondent aux valeurs par défaut.
+La déconnexion d’une manette utilisée arrête les actions et met le jeu en pause.
 
 MENU DE PAUSE
 Échap range d’abord la tablette si elle est ouverte. Une fois la tablette

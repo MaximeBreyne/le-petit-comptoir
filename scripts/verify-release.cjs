@@ -42,8 +42,8 @@ function verifyRelease(directory, expectedPackage) {
   const archive = path.join(resources, 'app.asar');
   const packed = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   assert.equal(packed.version, metadata.version, 'La version installée diffère du manifeste.');
-  for (const file of ['dist/orders.js', 'dist/orders.css', 'dist/preparation.css']) {
-    assert.ok(asar.extractFile(archive, file).equals(fs.readFileSync(path.resolve(__dirname, '..', file))), `Interface des préparations embarquée incorrecte : ${file}.`);
+  for (const file of ['dist/orders.js', 'dist/orders.css', 'dist/preparation.css', 'dist/gamepad.js', 'dist/gamepad.css']) {
+    assert.ok(asar.extractFile(archive, file).equals(fs.readFileSync(path.resolve(__dirname, '..', file))), `Interface embarquée incorrecte : ${file}.`);
   }
   const iconPath = path.resolve(__dirname, '..', expectedPackage.build.win.icon);
   verifyAppIcon(path.join(root, 'win-unpacked', `${expectedPackage.build.productName}.exe`), iconPath);
