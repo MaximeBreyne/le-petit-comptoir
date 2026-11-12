@@ -462,8 +462,10 @@ Cette préparation des tests ne change pas les matériaux de boisson du jeu.
 
 En cas d’échec de `-VerifyUI`, les messages détaillés sont affichés dans le terminal
 et écrits dans `failures.txt`, à côté de `index.json` dans le dossier du rapport indiqué.
-Le script crée aussi `diagnostics.zip` dans ce dossier : il contient ces deux fichiers
-et les captures produites pendant cette exécution, sans reprendre les anciennes images.
+Le script crée aussi `diagnostics.zip` dans ce dossier : il contient ces deux fichiers,
+le journal Unreal complet du test et les captures produites pendant cette exécution,
+sans reprendre les anciennes images. Le journal brut est conservé à côté du dossier
+du rapport, avec le même identifiant et le suffixe `-Unreal.log`.
 Si la compression échoue, le journal indique où trouver les fichiers séparés.
 Le test portable `python3 unreal/LePetitComptoir/Tests/font_generation_test.py`, lancé
 depuis la racine du dépôt, contrôle la couverture des textes de la scène, la réparation
@@ -471,9 +473,12 @@ d’une ancienne police, sa sauvegarde et la gestion d’un échec de réimporta
 une API simulée. Il ne remplace pas la compilation C++ ni l’import et le rendu sous Unreal.
 
 Les captures soumettent désormais les shaders manquants après l’installation des
-objets dans la scène, attendent aussi la préparation des textures et vérifient que
-chaque ensemble de shaders est complet. Une simple ressource non nulle ne suffisait
-pas à garantir cela. Les mises à jour de visibilité et de géométrie sont envoyées
+objets dans la scène, attendent aussi la préparation des textures et la fin du
+chargement du cache de shaders. Ils contrôlent la validité du matériau pour le rendu
+avec `HasValidGameThreadShaderMap`. L’indicateur de complétude reste affiché à titre
+de diagnostic : la compilation à la demande peut utiliser des ensembles partiels.
+Une simple ressource non nulle ne garantit pas non plus sa validité pour le rendu.
+Les mises à jour de visibilité et de géométrie sont envoyées
 au rendu avant chaque capture. Ces attentes sont limitées aux tests de l’éditeur.
 
 Si le test de bière échoue encore, `Beer-4-LiquidOnly.bmp` et `Beer-8-LiquidOnly.bmp`
@@ -483,6 +488,8 @@ matériaux. Pour le texte 3D, `World-Empty.bmp` contrôle que l’ancienne image
 effacée. En cas d’échec, `World-Euro-Reverse.bmp` et `World-DefaultFont.bmp` aident à
 distinguer un problème d’orientation, de police personnalisée ou de capture.
 Ces diagnostics ne modifient pas les matériaux du jeu et n’assouplissent pas les seuils.
+Une erreur de shader reste un échec du test, mais n’interrompt plus la production des
+captures : le rapport conserve ainsi une image du défaut et les images de contrôle.
 
 ## Prétest Windows hors de l’éditeur
 

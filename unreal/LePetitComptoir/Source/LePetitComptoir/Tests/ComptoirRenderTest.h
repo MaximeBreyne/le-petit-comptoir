@@ -39,11 +39,23 @@ inline bool CheckMaterial(FAutomationTestBase& Test,UMaterial* Material)
     const FString Name=Material->GetPathName();
     FMaterialResource* Resource=Material->GetMaterialResource(GMaxRHIShaderPlatform);
     if(!Test.TestNotNull(Name+TEXT(" resource"),Resource))return false;
+    // Loading a shader map from the DDC is a separate pending stage. Complete
+    // that stage before waiting for the jobs associated with this resource.
+    if(Resource->IsCachingShaders()&&!Resource->FinishCacheShaders())
+        Test.AddError(Name+TEXT(": shader cache loading failed"));
+    Resource->FinishCompilation();
+    FlushRenderingCommands();
     for(const FString& Error:Resource->GetCompileErrors())Test.AddError(Name+TEXT(": ")+Error);
     const bool Complete=Resource->GetGameThreadShaderMap()!=nullptr&&Resource->IsGameThreadShaderMapComplete();
-    Test.AddInfo(FString::Printf(TEXT("%s: complete shader map=%s, compile errors=%d"),
-        *Name,Complete?TEXT("yes"):TEXT("no"),Resource->GetCompileErrors().Num()));
-    return Test.TestTrue(Name+TEXT(" has a complete shader map"),Complete)&&Resource->GetCompileErrors().IsEmpty();
+    // ODSC can render with a partial map. Completeness is diagnostic, not proof
+    // of a rendering failure. Use the engine's renderability check, retain all
+    // compiler errors, then let the required pixel checks judge the image.
+    const bool Renderable=Resource->HasValidGameThreadShaderMap();
+    Test.AddInfo(FString::Printf(TEXT("%s: renderable=%s, complete=%s, caching=%s, compilation finished=%s, compile errors=%d"),
+        *Name,Renderable?TEXT("yes"):TEXT("no"),Complete?TEXT("yes"):TEXT("no"),
+        Resource->IsCachingShaders()?TEXT("yes"):TEXT("no"),
+        Resource->IsCompilationFinished()?TEXT("yes"):TEXT("no"),Resource->GetCompileErrors().Num()));
+    return Test.TestTrue(Name+TEXT(" has a renderable shader map"),Renderable)&&Resource->GetCompileErrors().IsEmpty();
 }
 
 inline void Capture(FPreviewScene& Preview,USceneCaptureComponent2D* Camera)

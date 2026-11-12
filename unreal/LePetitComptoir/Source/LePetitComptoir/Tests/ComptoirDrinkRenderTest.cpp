@@ -63,9 +63,10 @@ bool FComptoirDrinkRenderTest::RunTest(const FString&)
     {
         if(!TestTrue(TEXT("Load beer model"),Glass->UseModel(FString::Printf(TEXT("drink_beer_%d"),Level))))break;
         ComptoirRenderTest::PrepareScene(Preview,Materials);
-        bool Ready=ComptoirRenderTest::CheckMaterial(*this,Materials[0]);
-        if(Level>0)Ready=ComptoirRenderTest::CheckMaterial(*this,Materials[1])&&Ready;
-        if(!Ready)break;
+        // Preserve shader errors but still capture the failing image and its
+        // liquid-only diagnostic. Otherwise the report has no image to inspect.
+        ComptoirRenderTest::CheckMaterial(*this,Materials[0]);
+        if(Level>0)ComptoirRenderTest::CheckMaterial(*this,Materials[1]);
         TestTrue(TEXT("Glass uses the translucent material"),Mesh->GetMaterial(11)==Materials[0]&&Materials[0]->GetBlendMode()==BLEND_Translucent);
         if(Level>0)
         {

@@ -46,13 +46,16 @@ if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
     Write-Host 'Verification du rendu reel, des materiaux et interfaces (GPU requis)...'
     $TestFilter = if ($VerifyUI -or ($VerifyTablet -and $VerifyGraphics)) { 'LePetitComptoir' } elseif ($VerifyGraphics) { 'LePetitComptoir.Graphics.MaterialsAndViews' } else { 'LePetitComptoir.Tablet.RenderedText' }
     $ReportDirectory = Join-Path $ProjectDirectory ('Saved\Tests\RenderReport-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path (Split-Path -Parent $ReportDirectory) -Force | Out-Null
+    # Keep the live log outside the folder that the automation exporter owns.
+    $RenderLog = $ReportDirectory + '-Unreal.log'
     $RenderStartedUtc = [DateTime]::UtcNow
     & $Commandlet $Project '-unattended' '-nop4' '-nosound' '-RenderOffscreen' '-UTF8Output' `
         "-ExecCmds=Automation RunTests $TestFilter" `
-        '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$ReportDirectory"
+        '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$ReportDirectory" "-abslog=$RenderLog"
     $RenderExitCode = $LASTEXITCODE
     $ReportFile = Join-Path $ReportDirectory 'index.json'
-    if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent (code Unreal $RenderExitCode) : $ReportFile. Consultez Saved\Logs." }
+    if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent (code Unreal $RenderExitCode) : $ReportFile. Journal : $RenderLog" }
     $Report = Get-Content -LiteralPath $ReportFile -Raw | ConvertFrom-Json
     $Failures = @($Report.tests | Where-Object { $_.state -ne 'Success' })
     if ($Failures.Count -gt 0) {
@@ -71,6 +74,7 @@ if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
         # Keep this run's images with its report; never attach stale captures.
         try {
             $DiagnosticFiles = @($ReportFile, $SummaryFile)
+            if (Test-Path -LiteralPath $RenderLog) { $DiagnosticFiles += $RenderLog }
             foreach ($CaptureFolder in @('Tablet', 'WorldText', 'Drinks', 'Graphics')) {
                 $CaptureDirectory = Join-Path $ProjectDirectory ('Saved\Tests\' + $CaptureFolder)
                 if (Test-Path -LiteralPath $CaptureDirectory) {
@@ -87,7 +91,7 @@ if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
         }
         throw "Tests de rendu en echec. Details : $SummaryFile. Rapport complet : $ReportFile"
     }
-    if ($RenderExitCode -ne 0) { throw "Unreal s'est termine en erreur (code $RenderExitCode). Rapport : $ReportFile. Consultez Saved\Logs." }
+    if ($RenderExitCode -ne 0) { throw "Unreal s'est termine en erreur (code $RenderExitCode). Rapport : $ReportFile. Journal : $RenderLog" }
     $ExpectedTests = @()
     if ($VerifyTablet -or $VerifyUI) { $ExpectedTests += 'LePetitComptoir.Tablet.RenderedText' }
     if ($VerifyGraphics -or $VerifyUI) { $ExpectedTests += 'LePetitComptoir.Graphics.MaterialsAndViews' }

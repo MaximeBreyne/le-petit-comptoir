@@ -86,7 +86,9 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     Capture->PostProcessSettings.AutoExposureBias=0;
     Preview.AddComponent(Capture,FTransform(FRotator(0,180,0),FVector(250,0,0)));
     ComptoirRenderTest::PrepareScene(Preview,{Material});
-    if(ComptoirRenderTest::CheckMaterial(*this,Material))
+    ComptoirRenderTest::CheckMaterial(*this,Material);
+    // Shader errors remain failures; do not let them suppress the diagnostic
+    // images of the custom font, its reverse side and the engine font control.
     {
         TestTrue(TEXT("Label uses the generated font and matching material"),Label->Font.Get()==Font&&Label->GetMaterial(0)==Material);
         AddInfo(FString::Printf(TEXT("World text: font=%s, material=%s, local size=%s"),
