@@ -10,9 +10,10 @@ $Build = Join-Path $EngineRoot 'Engine\Build\BatchFiles\Build.bat'
 $Editor = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
 $Commandlet = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $Bootstrap = Join-Path $PSScriptRoot 'bootstrap.py'
+$SceneData = Join-Path $ProjectDirectory 'Content\OriginalData\scene.json'
 $VersionFile = Join-Path $EngineRoot 'Engine\Build\Build.version'
 
-foreach ($Path in @($Project, $Build, $Editor, $Commandlet, $VersionFile)) {
+foreach ($Path in @($Project, $Build, $Editor, $Commandlet, $VersionFile, $SceneData)) {
     if (-not (Test-Path -LiteralPath $Path)) {
         throw "Fichier introuvable : $Path. Precisez -EngineRoot avec votre dossier UE_5.8."
     }
@@ -32,12 +33,12 @@ if ($LASTEXITCODE -ne 0) { throw "Compilation Unreal echouee (code $LASTEXITCODE
 Write-Host '2/3 Creation des assets manquants (aucun asset existant ne sera remplace)...'
 & $Commandlet $Project '-run=pythonscript' "-script=$Bootstrap" '-unattended' '-nop4' '-NullRHI' '-UTF8Output'
 if ($LASTEXITCODE -ne 0) { throw "Creation des assets echouee (code $LASTEXITCODE). Consultez Saved\Logs." }
-foreach ($Relative in @('Content\Maps\Bar.umap', 'Content\Materials\M_Bar.uasset')) {
+foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\Materials\M_Original_00.uasset', 'Content\Original\UI\T_ComptoirLogo.uasset')) {
     if (-not (Test-Path -LiteralPath (Join-Path $ProjectDirectory $Relative))) {
         throw "Asset manquant : $Relative. Consultez Saved\Logs."
     }
 }
 
-Write-Host '3/3 Projet pret. Ouvrez LePetitComptoir.uproject puis Play dans Maps/Bar.'
-Write-Host 'Les deux assets generes doivent ensuite etre ajoutes a Git avec Git LFS actif.'
+Write-Host '3/3 Projet pret. Ouvrez LePetitComptoir.uproject puis Play dans Maps/ComptoirOriginal.'
+Write-Host 'Les assets generes doivent ensuite etre ajoutes a Git avec Git LFS actif.'
 if ($OpenEditor) { Start-Process -FilePath $Editor -ArgumentList ('"' + $Project + '"') }

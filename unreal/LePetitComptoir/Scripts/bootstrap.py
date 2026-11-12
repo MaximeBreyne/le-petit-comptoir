@@ -1,10 +1,13 @@
 """Run through UnrealEditor-Cmd -run=pythonscript, after compiling the Editor target.
 
 Create only missing assets. Existing maps/materials are never overwritten.
-The scene is built by the native game mode when Play starts.
+The original scene is present in the new map before Play starts.
 """
 from pathlib import Path
+import sys
 import unreal
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from original_assets import create_original_assets
 
 
 def create_material():
@@ -32,28 +35,37 @@ def create_material():
 
 
 def create_map():
-    asset_path = "/Game/Maps/Bar"
+    asset_path = "/Game/Maps/ComptoirOriginal"
     if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
         return
     unreal.EditorAssetLibrary.make_directory("/Game/Maps")
     editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     if not editor.new_level(asset_path):
-        raise RuntimeError("Creation de la carte Bar impossible")
+        raise RuntimeError("Creation de la carte ComptoirOriginal impossible")
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     start = actors.spawn_actor_from_class(
-        unreal.PlayerStart, unreal.Vector(0, -350, 100), unreal.Rotator(pitch=0, yaw=90, roll=0)
+        unreal.PlayerStart, unreal.Vector(600, 155, 100), unreal.Rotator(pitch=-3.44, yaw=90, roll=0)
     )
     if start is None:
         raise RuntimeError("Creation du PlayerStart impossible")
     start.set_actor_label("Depart derriere le comptoir")
+    scene_class = unreal.load_class(None, "/Script/LePetitComptoir.ComptoirScene")
+    if scene_class is None:
+        raise RuntimeError("Classe ComptoirScene absente : recompiler le projet")
+    venue = actors.spawn_actor_from_class(scene_class, unreal.Vector(0, 0, 0))
+    if venue is None or not venue.build("world", True):
+        raise RuntimeError("Import de la scene originale echoue")
+    venue.set_actor_label("Decor original - Le Petit Comptoir")
+    venue.set_editor_property("tags", [unreal.Name("OriginalVenue")])
     if not editor.save_current_level():
-        raise RuntimeError("Sauvegarde de Bar impossible")
+        raise RuntimeError("Sauvegarde de ComptoirOriginal impossible")
 
 
 create_material()
+create_original_assets()
 create_map()
 content = Path(unreal.Paths.project_content_dir())
-for relative in ("Maps/Bar.umap", "Materials/M_Bar.uasset"):
+for relative in ("Maps/ComptoirOriginal.umap", "Original/Materials/M_Original_00.uasset", "Original/UI/T_ComptoirLogo.uasset"):
     if not (content / relative).is_file():
         raise RuntimeError(f"Asset manquant apres creation : {relative}")
-unreal.log("Le Petit Comptoir : carte et materiau prets. Ouvrir Maps/Bar et appuyer sur Play.")
+unreal.log("Le Petit Comptoir : decor original pret. Ouvrir Maps/ComptoirOriginal et appuyer sur Play.")

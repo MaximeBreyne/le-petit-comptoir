@@ -5,6 +5,7 @@
   "Description": "Le Petit Comptoir - premier jalon du portage natif Unreal",
   "Modules": [{"Name": "LePetitComptoir", "Type": "Runtime", "LoadingPhase": "Default"}],
   "Plugins": [
+    {"Name": "ProceduralMeshComponent", "Enabled": true},
     {"Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": ["Editor"]},
     {"Name": "EditorScriptingUtilities", "Enabled": true, "TargetAllowList": ["Editor"]}
   ]

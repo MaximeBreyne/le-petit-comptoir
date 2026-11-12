@@ -6,6 +6,8 @@
 #include "ComptoirProp.h"
 #include "ComptoirGameMode.generated.h"
 
+class AComptoirScene;
+
 UCLASS()
 class LEPETITCOMPTOIR_API AComptoirGameMode : public AGameModeBase
 {
@@ -26,8 +28,12 @@ public:
     FString Prompt(EComptoirTarget Target) const;
 private:
     UPROPERTY() TObjectPtr<AComptoirProp> Customer;
-    UPROPERTY() TObjectPtr<AComptoirProp> CustomerHead;
     UPROPERTY() TObjectPtr<AComptoirProp> BeerVisual;
+    UPROPERTY() TObjectPtr<AComptoirProp> ServiceSign;
+    UPROPERTY() TObjectPtr<AComptoirScene> CustomerSeated;
+    UPROPERTY() TObjectPtr<AComptoirScene> CustomerStanding;
+    UPROPERTY() TObjectPtr<AComptoirScene> EmptyGlass;
+    UPROPERTY() TObjectPtr<AComptoirScene> FullGlass;
     float AutosaveRemaining = 5;
     bool bReadyToSave = false;
     AComptoirProp* Make(const FVector& Position, const FVector& Size, const FLinearColor& Color,

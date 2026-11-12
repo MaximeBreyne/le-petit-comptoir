@@ -9,4 +9,7 @@ class LEPETITCOMPTOIR_API AComptoirHUD : public AHUD
     GENERATED_BODY()
 public:
     virtual void DrawHUD() override;
+    virtual void NotifyHitBoxClick(FName BoxName) override;
+private:
+    UPROPERTY() TObjectPtr<class UTexture2D> BrandLogo;
 };

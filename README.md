@@ -1,7 +1,7 @@
 LE PETIT COMPTOIR — BAR · Prototype
 
 UNREAL ENGINE
-Sur la branche migration/unreal, le premier jalon C++ se trouve dans
+Sur la branche migration/unreal, le portage C++ et le décor original se trouvent dans
 [unreal/LePetitComptoir](unreal/LePetitComptoir/README.md).
 Ce dossier contient les instructions de compilation pour Unreal 5.8.4 et de
 synchronisation entre deux PC. La compilation et le rendu Unreal restent à valider.

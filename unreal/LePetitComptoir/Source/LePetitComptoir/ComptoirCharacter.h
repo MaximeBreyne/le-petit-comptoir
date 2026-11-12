@@ -16,9 +16,12 @@ public:
     virtual void SetupPlayerInputComponent(UInputComponent* Input) override;
     virtual void Tick(float DeltaSeconds) override;
     AComptoirProp* FocusedProp() const;
+    bool IsTabletOpen() const { return bTabletOpen; }
+    void ToggleTablet();
     UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> Camera;
 private:
     bool bPouring = false;
+    bool bTabletOpen = false;
     void Forward(float Value);
     void Right(float Value);
     void Turn(float Value);
