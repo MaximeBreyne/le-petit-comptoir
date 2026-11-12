@@ -3,6 +3,8 @@
 #include "ComptoirHUD.h"
 #include "ComptoirSave.h"
 #include "ComptoirScene.h"
+#include "ComptoirStreetLife.h"
+#include "WorldLayout.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
 #include "Components/PointLightComponent.h"
@@ -62,7 +64,7 @@ void AComptoirGameMode::BuildRoom()
     for (TActorIterator<AComptoirScene> It(GetWorld()); It; ++It)
         if (It->ActorHasTag(TEXT("OriginalVenue")))
         {
-            HasVenue = It->GetGeometryRevision() >= 3 || It->Build(TEXT("world"), true);
+            HasVenue = It->GetGeometryRevision() >= 4 || It->Build(TEXT("world"), true);
             break;
         }
     if (!HasVenue)
@@ -88,11 +90,12 @@ void AComptoirGameMode::BuildRoom()
     Target(FVector(85, 700, 130), FVector(45, 125, 65), EComptoirTarget::GlassRack);
     Target(FVector(288, 265, 144), FVector(50, 70, 65), EComptoirTarget::Till);
     Target(FVector(-350, 230, 130), FVector(70, 350, 180), EComptoirTarget::Stock);
-    ServiceSign = Make(FVector(976, 678, 191), FVector(1.2, 102, 48),
+    Target(FVector(1002,600,140),FVector(65,280,240),EComptoirTarget::Door);
+    ServiceSign = Make(FVector(976, 920, 191), FVector(1.2, 102, 48),
         FLinearColor(.08f,.12f,.09f), EComptoirTarget::Sign);
     if (ServiceSign)
     {
-        ServiceSign->Label->SetWorldLocation(FVector(974, 678, 191));
+        ServiceSign->Label->SetWorldLocation(FVector(974, 920, 191));
         ServiceSign->Label->SetWorldSize(11);
         ServiceSign->Label->SetWorldRotation(FRotator(0, 180, 0));
     }
@@ -107,6 +110,11 @@ void AComptoirGameMode::BuildRoom()
     CustomerStanding = Model(TEXT("customerStanding"));
     EmptyGlass = Model(TEXT("glass"));
     FullGlass = Model(TEXT("beer"));
+    DoorLeft=GetWorld()->SpawnActor<AComptoirScene>();
+    DoorRight=GetWorld()->SpawnActor<AComptoirScene>();
+    if(DoorLeft) { if(!DoorLeft->Build(TEXT("doorLeft"),true))Notify(TEXT("Porte absente : relancez Setup-Unreal.ps1."));DoorLeft->SetActorLocation(FVector(1002,455,0)); }
+    if(DoorRight) { if(!DoorRight->Build(TEXT("doorRight"),true))Notify(TEXT("Porte absente : relancez Setup-Unreal.ps1."));DoorRight->SetActorLocation(FVector(1002,745,0)); }
+    GetWorld()->SpawnActor<AComptoirStreetLife>();
     if (EmptyGlass) EmptyGlass->SetActorLocation(FVector(272, 415, 113.3));
     if (FullGlass) FullGlass->SetActorLocation(FVector(285, 498, 113.3));
     BeerVisual = Make(FVector(272, 415, 115), FVector(13, 13, 1), FLinearColor(.69f,.38f,.07f));
@@ -120,6 +128,19 @@ void AComptoirGameMode::BuildRoom()
 void AComptoirGameMode::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    const APawn* Player=UGameplayStatics::GetPlayerPawn(this,0);
+    if(!bDoorOpen&&DoorAngle>0&&Player)
+    {
+        const FVector P=Player->GetActorLocation();
+        if(ComptoirWorld::BlocksDoorClosing(P.X,P.Y))bDoorOpen=true;
+    }
+    const float PreviousAngle=DoorAngle;
+    DoorAngle=FMath::FInterpConstantTo(DoorAngle,bDoorOpen?90.f:0.f,DeltaSeconds,105.f);
+    if(DoorAngle!=PreviousAngle)
+    {
+        if(DoorLeft)DoorLeft->SetActorRotation(FRotator(0,-DoorAngle,0));
+        if(DoorRight)DoorRight->SetActorRotation(FRotator(0,DoorAngle,0));
+    }
     const int PreviousSold = Simulation.Sold;
     const int PreviousDay = Simulation.Day;
     Simulation.Tick(DeltaSeconds);
@@ -181,6 +202,15 @@ void AComptoirGameMode::Interact(EComptoirTarget Target)
     bool Changed = false;
     switch (Target)
     {
+        case EComptoirTarget::Door:
+        {
+            const APawn* Player=UGameplayStatics::GetPlayerPawn(this,0);
+            if(bDoorOpen&&Player&&ComptoirWorld::BlocksDoorClosing(Player->GetActorLocation().X,Player->GetActorLocation().Y))
+            { Notify(TEXT("Eloignez-vous du passage pour fermer la porte.")); return; }
+            bDoorOpen=!bDoorOpen;
+            Notify(bDoorOpen?TEXT("Porte ouverte : vous pouvez sortir dans la rue."):TEXT("Porte fermee."));
+            return;
+        }
         case EComptoirTarget::Sign: Changed = Simulation.ToggleService(); break;
         case EComptoirTarget::GlassRack: Changed = Simulation.TakeGlass(); break;
         case EComptoirTarget::Tap: Changed = Simulation.TakeBeer(); break;
@@ -203,6 +233,7 @@ void AComptoirGameMode::Pour(float DeltaSeconds)
 
 FString AComptoirGameMode::Prompt(EComptoirTarget Target) const
 {
+    if(Target==EComptoirTarget::Door)return bDoorOpen?TEXT("E - Fermer la porte"):TEXT("E - Ouvrir la porte et sortir");
     if (Simulation.Bankrupt()) return TEXT("Tresorerie negative : partie terminee.");
     switch (Target)
     {
@@ -225,9 +256,7 @@ FString AComptoirGameMode::Prompt(EComptoirTarget Target) const
             if (Simulation.Phase == Comptoir::Customer::Processing) return TEXT("Paiement carte en cours...");
             return TEXT("Aucun client pret a payer.");
         case EComptoirTarget::Stock:
-            if (Simulation.Reserve > 0) return Simulation.Beer < 1000 ? TEXT("E - Transferer la biere vers le comptoir") : TEXT("Comptoir plein (1000 cl).");
-            if (Simulation.DeliveryRemaining > 0) return TEXT("Commande en route : livraison en reserve sous 10 secondes.");
-            return TEXT("E - Commander 500 cl pour 16 EUR (fonds necessaires)");
+            return TEXT("E / Tab - Ouvrir la gestion de la reserve");
         default: return FString();
     }
 }
@@ -277,10 +306,7 @@ void AComptoirGameMode::Load(bool Feedback)
             P = FVector(P.Y, P.X, P.Z);
             Rotation.Yaw = FRotator::NormalizeAxis(90 - Rotation.Yaw);
         }
-        const bool InRoom = P.X > 30 && P.X < 960 && P.Y > 30 && P.Y < 1170;
-        const bool InReserve = P.X > -390 && P.X < 0 && P.Y > 30 && P.Y < 430;
-        if (!P.ContainsNaN() && !Rotation.ContainsNaN() &&
-            (InRoom || InReserve) && P.Z > 70 && P.Z < 180)
+        if (!Rotation.ContainsNaN() && ComptoirWorld::CanRestorePosition(P.X,P.Y,P.Z))
             Player->TeleportTo(P, Rotation, false, false);
         if (AController* Controller = Player->GetController())
             if (!Rotation.ContainsNaN()) Controller->SetControlRotation(Rotation);

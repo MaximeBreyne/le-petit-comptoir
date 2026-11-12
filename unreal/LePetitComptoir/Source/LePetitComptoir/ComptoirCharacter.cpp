@@ -1,6 +1,8 @@
 #include "ComptoirCharacter.h"
 #include "ComptoirGameMode.h"
+#include "ComptoirHUD.h"
 #include "ComptoirProp.h"
+#include "WorldLayout.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -66,8 +68,27 @@ AComptoirProp* AComptoirCharacter::FocusedProp() const
 void AComptoirCharacter::Interact()
 {
     if (bTabletOpen) return;
+    if (IsInReserve()) { OpenTablet(3); return; }
     if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())
-        if (const AComptoirProp* Prop = FocusedProp()) Game->Interact(Prop->Target);
+        if (const AComptoirProp* Prop = FocusedProp())
+        {
+            if (Prop->Target==EComptoirTarget::Stock) OpenTablet(3);
+            else Game->Interact(Prop->Target);
+        }
+}
+
+bool AComptoirCharacter::IsInReserve() const
+{
+    const FVector P=GetActorLocation();
+    return ComptoirWorld::InReserve(P.X,P.Y,P.Z);
+}
+
+void AComptoirCharacter::OpenTablet(int32 Page)
+{
+    if (UGameplayStatics::IsGamePaused(this)) return;
+    if (!bTabletOpen) ToggleTablet();
+    if (APlayerController* PC=Cast<APlayerController>(GetController()))
+        if (AComptoirHUD* HUD=Cast<AComptoirHUD>(PC->GetHUD())) HUD->SelectTabletPage(Page);
 }
 
 void AComptoirCharacter::Tick(float DeltaSeconds)
@@ -105,6 +126,8 @@ void AComptoirCharacter::ToggleTablet()
         Player->bEnableClickEvents = bTabletOpen;
         if (bTabletOpen)
         {
+            if (IsInReserve())
+                if (AComptoirHUD* HUD=Cast<AComptoirHUD>(Player->GetHUD())) HUD->SelectTabletPage(3);
             FInputModeGameAndUI Mode;
             Mode.SetHideCursorDuringCapture(false);
             Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);

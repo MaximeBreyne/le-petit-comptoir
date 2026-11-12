@@ -12,4 +12,6 @@
 *.glb filter=lfs diff=lfs merge=lfs -text
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
+# Small source logo already present in Git; generated textures still use LFS.
+SourceArt/Brand/logo-128.png -filter -diff -merge -text
 *.tga filter=lfs diff=lfs merge=lfs -text

@@ -18,6 +18,8 @@ public:
     AComptoirProp* FocusedProp() const;
     bool IsTabletOpen() const { return bTabletOpen; }
     void ToggleTablet();
+    void OpenTablet(int32 Page);
+    bool IsInReserve() const;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> Camera;
 private:
     bool bPouring = false;

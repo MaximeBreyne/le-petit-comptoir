@@ -1,7 +1,0 @@
-/* Preparation and service use the objects under the player's gaze. */
-.tablet-launch{width:100%;text-align:left;margin:14px 0;padding:12px 14px;color:#e8c98e;border-color:#c5b17d66;background:#d4b57b10;font-size:12px}
-body[data-interaction="cursor"] #workbench{border-color:#d4b57b9c}
-#aimDot{position:fixed;left:50%;top:50%;width:4px;height:4px;transform:translate(-50%,-50%);background:#fff5dfcc;border-radius:50%;box-shadow:0 0 2px #10211f;pointer-events:none}
-#interactionPrompt{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);max-width:calc(100vw - 40px);padding:10px 17px;border:1px solid #c5b17d66;border-radius:6px;background:#14221fed;color:#f0dfb9;text-align:center;font-size:13px;pointer-events:none}
-#aimDot[hidden],#interactionPrompt[hidden]{display:none}
-.prep-held{color:#e8c98e}.prep-instruction{color:#f0e8d8}

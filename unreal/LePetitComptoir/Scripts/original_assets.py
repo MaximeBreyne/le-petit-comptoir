@@ -1,9 +1,11 @@
 """Native material equivalents for the original procedural WebGL scene."""
 from pathlib import Path
 import unreal
+from original_fonts import create_world_font
 
 
 def create_original_assets():
+    create_world_font()
     editing = unreal.MaterialEditingLibrary
     tools = unreal.AssetToolsHelpers.get_asset_tools()
     folder = "/Game/Original/Materials"
@@ -90,7 +92,7 @@ def create_original_assets():
 
     logo_path = "/Game/Original/UI/T_ComptoirLogo"
     if not unreal.EditorAssetLibrary.does_asset_exist(logo_path):
-        source = Path(__file__).resolve().parents[3] / "dist/assets/brand/logo-128.png"
+        source = Path(__file__).resolve().parents[1] / "SourceArt/Brand/logo-128.png"
         if not source.is_file():
             raise RuntimeError(f"Logo original introuvable : {source}")
         task = unreal.AssetImportTask()

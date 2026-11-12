@@ -1,10 +1,10 @@
 # Le Petit Comptoir — portage Unreal
 
-Projet natif C++ pour **Unreal Engine 5.8.4 sur Windows**. Le prototype JavaScript
-original reste à la racine du dépôt, dans `dist/`.
+Projet natif C++ pour **Unreal Engine 5.8.4 sur Windows**. Les seules sources JavaScript conservées sont les générateurs du décor et leur
+référence de géométrie, dans `SourceArt/Scene/`. Le jeu fonctionne nativement sous Unreal.
 
 Le décor du premier pilote était une approximation trop simplifiée. Cette version
-reprend les **5 230 éléments de la scène originale d'une nouvelle partie** : salle,
+reprend les **5 228 éléments de la scène originale d'une nouvelle partie** : salle,
 comptoir, réserve, vitrines, rue, mobilier, bouteilles, équipements et enseignes.
 Les clients et les verres reprennent également leur géométrie d'origine. Le logo,
 la palette et la disposition compacte de l'interface sont repris du prototype.
@@ -40,9 +40,10 @@ powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-
 Arrêter si une commande échoue. Le script recompile le module, crée les nouveaux
 matériaux, importe le logo existant et crée la carte **Content/Maps/ComptoirOriginal**.
 Ouvrir cette carte puis cliquer sur **Play**. Le décor est aussi présent dans l'éditeur
-avant Play. Le script corrige aussi les axes du décor `ComptoirOriginal` déjà créé
-et les coordonnées utilisées par ses matériaux. Avant cette correction, une copie
-de la carte est conservée dans `Saved/Backups/BeforeAxisFix/`. Les autres acteurs de
+avant Play. Le script met à jour le décor `ComptoirOriginal` déjà créé : porte, sols de la rue,
+réfrigérateur et police des panneaux, avec les accents et le symbole €. Avant la
+migration, une copie de la carte est conservée dans `Saved/Backups/BeforeStreetUpdate/`.
+La correction des anciens axes n’est rejouée que pour les cartes qui en ont besoin. Les autres acteurs de
 la carte et l'ancienne carte `Bar` sont conservés. Les matériaux peuvent demander
 une compilation de shaders. Il n'est pas nécessaire de supprimer la carte.
 
@@ -79,7 +80,7 @@ le fonctionnement habituel du script reste identique.
    ```
 
 3. Fermer Unreal, puis lancer le script présenté ci-dessus depuis le dossier contenant
-   `package.json` et `unreal`. Pour un moteur installé ailleurs, ajouter par exemple
+   `README.md` et `unreal`. Pour un moteur installé ailleurs, ajouter par exemple
    `-EngineRoot 'D:\Epic Games\UE_5.8'`.
 4. Ouvrir **Content/Maps/ComptoirOriginal** puis **Play**. Cliquer dans la vue pour capturer
    la souris. Les ouvertures suivantes se font avec `LePetitComptoir.uproject`.
@@ -100,7 +101,7 @@ se trouve à droite, comme dans le jeu original.
 1. **ZQSD / WASD** : marcher. **Souris** : regarder. **Maj** : courir.
 2. **Tab** : ouvrir la tablette. Cliquer sur **Ouvrir le bar**, puis revenir au bar avec
    **Tab** ou **Ranger**. Les onglets changent de page ; la prise de commande et
-   l'encaissement restent limités à la proximité du client/de la caisse. Le panneau suspendu dans la porte vitrée fonctionne
+   l'encaissement restent limités à la proximité du client/de la caisse. Le panneau placé dans la vitrine à côté de la porte fonctionne
    aussi avec **E**. Le service continue pendant l'utilisation de la tablette.
 3. Regarder le client au comptoir puis **E** pour prendre sa commande.
 4. **E** sur le rangement des verres pour prendre une pinte.
@@ -110,10 +111,16 @@ se trouve à droite, comme dans le jeu original.
 7. **E** sur la caisse : les **5 €** sont crédités après trois secondes.
 8. Dans la tablette, transférer la bière de réserve vers le comptoir. Une réserve vide
    permet de commander **500 cl pour 16 €**, livrés après dix secondes. La réserve
-   physique permet également cette interaction avec **E**.
+   physique ouvre directement cet onglet avec **E** ou **Tab**, où que vous regardiez
+   dans cette pièce. Les transferts et achats se font ensuite avec les boutons de la tablette.
 9. Le panneau ou la tablette lance la dernière tournée. La fermeture attend le client,
    prélève **35 €** et prépare le soir suivant. Le service va de 17 h à 4 h, une minute
    de jeu toutes les deux secondes réelles.
+
+**E sur la porte vitrée** : ouvrir/fermer les deux battants et sortir dans la rue.
+La fermeture est bloquée si vous êtes dans le passage. Six passants marchent sur
+les trottoirs ; deux voitures parcourent la chaussée et s’arrêtent devant le joueur.
+La promenade reste limitée au pâté de maisons devant le bar.
 
 **P** : pause/reprise. **R** en visant la tireuse : ranger/jeter le verre sans remboursement.
 **X** en visant un client non encore servi : refuser la commande. **F5** : sauvegarder.
@@ -122,7 +129,7 @@ se trouve à droite, comme dans le jeu original.
 ## Ce qui est repris visuellement
 
 - Les dimensions, positions, orientations, cylindres effilés et ellipsoïdes des fichiers
-  `dist/scene.js` et `dist/venue.js`, avec les catalogues et couleurs de `dist/engine.js`.
+  `SourceArt/Scene/scene.js` et `venue.js`, avec les catalogues et couleurs de `engine.js`.
 - La réserve, la rue, les enseignes, les tables rondes, les chaises, les six tabourets,
   la tireuse, la machine à café, les bouteilles, le terminal et la verrerie.
 - Les modèles originaux du client assis/debout et de la pinte vide/pleine.
@@ -149,7 +156,7 @@ principales. Les anciennes sauvegardes du pilote conservent leur argent, stock e
 leur position est replacée au départ du décor original. Les sauvegardes du décor
 inversé (révision 2) sont converties vers le nouveau repère (révision 3) : position et
 orientation sont conservées par rapport au mobilier. Les nouvelles sauvegardes
-mémorisent la position dans la salle ou la réserve.
+mémorisent la position dans la salle, la réserve ou la portion de rue accessible.
 
 `Saved/SaveGames/` n'est pas envoyé à GitHub : les deux PC partagent le projet,
 pas automatiquement la partie en cours. En cas de sauvegarde invalide, les écritures
@@ -179,8 +186,11 @@ node unreal/LePetitComptoir/Scripts/export-original-scene.cjs
 
 Il contient les empreintes SHA-256 des trois sources originales. Cet export est committé :
 Node n'est pas nécessaire pour ouvrir le projet Unreal. Les matériaux et le logo sont
-créés par `Scripts/original_assets.py`. La migration des axes ne modifie que la
-conversion de coordonnées dans les shaders générés et le décor procédural identifié.
+créés par `Scripts/original_assets.py`. `Scripts/original_fonts.py` génère une police
+Arial en atlas distance field avec le symbole € et son matériau associé. Elle utilise
+la police installée avec Windows. Seul le décor procédural identifié est reconstruit.
+Le JSON de scène est lu une fois et partagé entre les modèles ; les passants animent
+leurs membres sans reconstruire leurs maillages à chaque image (mise à jour à 30 Hz).
 
 Depuis la racine du dépôt, avec Node et GCC/Clang :
 
@@ -190,23 +200,34 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/bar_
 /tmp/comptoir-test
 g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/tablet_layout_test.cpp -o /tmp/comptoir-tablet-test
 /tmp/comptoir-tablet-test
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/world_layout_test.cpp -o /tmp/comptoir-world-test
+/tmp/comptoir-world-test
 ```
 
-Le premier test compare **446 676 positions et normales** de 5 422 formes (décor,
-clients et verres) à la sortie réelle du renderer JavaScript. Il vérifie la fraîcheur
-de l'export, le sol de la réserve et les collisions des objets solides. La projection
+Le premier test compare **562 344 positions et normales** de 5 662 formes (décor,
+clients, verres, portes et animation de rue) à la sortie réelle du renderer JavaScript. Il vérifie la fraîcheur
+de l'export, les sols, le passage de la porte, le dégagement du réfrigérateur
+et les collisions des objets solides. La projection
 à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
 Le second teste service, stock, paiement unique, fermeture et sauvegardes. Le troisième
 contrôle 140 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
 disponibilité des actions, conversion des coordonnées des clics, taille de texte
 minimale dans le repère de la tablette et contraste texte/fond d'au moins 4,5:1.
+Le quatrième vérifie les zones de réserve, les positions de sauvegarde dans la rue,
+la sécurité de fermeture des portes et l’arrêt des voitures dans les deux sens.
 Le boîtier et les quatre pages sont inspectables via
 les commandes de dessin partagées avec Unreal ; ce contrôle ne remplace pas Play.
 Le test natif `LePetitComptoir.Tablet.RenderedText` complète ces contrôles par un
 rendu Slate réel. Il est disponible dans l'éditeur ou via `-VerifyTablet` ci-dessus,
 et ne peut pas être exécuté avec `-NullRHI`.
 
-À vérifier dans Unreal : compilation UHT/C++, compilation des matériaux, absence de
+Le test natif `LePetitComptoir.World.FontGlyphs` vérifie les glyphes € et accentués
+dans la police générée et leur présence sur la page d’atlas utilisée par le matériau.
+Il est disponible dans **Outils → Débogage → Session Frontend → Automation**.
+
+À vérifier dans Unreal : ouverture/fermeture de porte depuis les deux côtés, sortie
+et retour au bar, voitures, passants, réfrigérateur, symbole € sur la carte, **E/Tab**
+dans la réserve, sauvegarde/reprise depuis la rue, puis compilation UHT/C++, compilation des matériaux, absence de
 surfaces noires, visibilité du logo et des enseignes, passage vers la réserve, service
 complet, netteté des textes, tablette/retour souris, sauvegarde/reprise et comportement sur le deuxième PC.
 Ces points nécessitent une exécution du moteur et ne sont pas couverts par les tests hors moteur.

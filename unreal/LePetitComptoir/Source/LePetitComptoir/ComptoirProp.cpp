@@ -2,6 +2,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/Font.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -27,6 +28,10 @@ AComptoirProp::AComptoirProp()
 void AComptoirProp::Configure(const FVector& Size, const FLinearColor& Color, EComptoirTarget InTarget, const FString& Caption)
 {
     Target = InTarget;
+    if(UFont* Font=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld")))
+        Label->SetFont(Font);
+    if(UMaterialInterface* Text=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Original/Materials/M_ComptoirText.M_ComptoirText")))
+        Label->SetTextMaterial(Text);
     Mesh->SetWorldScale3D(Size / 100.0);
     if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_Bar.M_Bar")))
     {

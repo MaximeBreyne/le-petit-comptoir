@@ -1,7 +1,7 @@
 #pragma once
 
 // Engine-independent pilot model. Monetary values are integer euro cents.
-// Reference: dist/engine.js at 726b07c2ee378e488dda6bf67e6f4f6ae6afdbe0.
+// Reference: SourceArt/Scene/engine.js at 726b07c2ee378e488dda6bf67e6f4f6ae6afdbe0.
 #include <algorithm>
 #include <cmath>
 #include <iomanip>

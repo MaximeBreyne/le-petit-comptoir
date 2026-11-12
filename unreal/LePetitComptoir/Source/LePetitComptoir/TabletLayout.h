@@ -1,6 +1,6 @@
 #pragma once
 
-// Native tablet layout, based on dist/tablet.css. Kept independent of Unreal so
+// Native tablet layout, based on the historical web tablet styling. Kept independent of Unreal so
 // the same drawing commands and hit regions can be inspected outside the engine.
 #include <algorithm>
 #include <cmath>

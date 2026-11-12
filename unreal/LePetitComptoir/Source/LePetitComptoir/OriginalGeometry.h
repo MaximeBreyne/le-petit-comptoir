@@ -1,6 +1,6 @@
 #pragma once
 
-// Same primitive topology, Euler order and inverse-scale normals as dist/renderer.js.
+// Same primitive topology, Euler order and inverse-scale normals as SourceArt/Scene/renderer.js.
 // This header is engine independent so conversion can be checked without Unreal.
 #include <cmath>
 #include <algorithm>

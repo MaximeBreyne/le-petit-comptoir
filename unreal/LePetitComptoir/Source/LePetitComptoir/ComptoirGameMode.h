@@ -35,6 +35,10 @@ private:
     UPROPERTY() TObjectPtr<AComptoirScene> CustomerStanding;
     UPROPERTY() TObjectPtr<AComptoirScene> EmptyGlass;
     UPROPERTY() TObjectPtr<AComptoirScene> FullGlass;
+    UPROPERTY() TObjectPtr<AComptoirScene> DoorLeft;
+    UPROPERTY() TObjectPtr<AComptoirScene> DoorRight;
+    bool bDoorOpen=false;
+    float DoorAngle=0;
     float AutosaveRemaining = 5;
     bool bReadyToSave = false;
     AComptoirProp* Make(const FVector& Position, const FVector& Size, const FLinearColor& Color,

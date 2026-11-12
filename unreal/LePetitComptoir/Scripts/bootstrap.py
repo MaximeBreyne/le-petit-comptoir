@@ -1,6 +1,6 @@
 """Run through UnrealEditor-Cmd -run=pythonscript, after compiling the Editor target.
 
-Create missing assets and migrate the generated scene's coordinate convention.
+Create missing assets and upgrade the generated scene without deleting user actors.
 The original scene is present in the new map before Play starts.
 """
 from pathlib import Path
@@ -47,9 +47,10 @@ def create_map():
             raise RuntimeError("Chargement de ComptoirOriginal impossible")
         level_actors = actors.get_all_level_actors()
         old_venues = [actor for actor in level_actors
-                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 3]
+                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 4]
+        fix_axes = any(actor.get_geometry_revision() < 3 for actor in old_venues)
         if old_venues:
-            backup = Path(unreal.Paths.project_saved_dir()) / "Backups" / "BeforeAxisFix"
+            backup = Path(unreal.Paths.project_saved_dir()) / "Backups" / "BeforeStreetUpdate"
             backup.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
             shutil.copy2(Path(unreal.Paths.project_content_dir()) / "Maps/ComptoirOriginal.umap",
@@ -58,9 +59,9 @@ def create_map():
         for actor in level_actors:
             if actor in old_venues:
                 if not actor.build("world", True):
-                    raise RuntimeError("Correction des axes du decor impossible")
+                    raise RuntimeError("Mise a jour du decor et de la rue impossible")
                 changed = True
-            if old_venues and actor.get_actor_label() == "Depart derriere le comptoir":
+            if fix_axes and actor.get_actor_label() == "Depart derriere le comptoir":
                 actor.set_actor_location(unreal.Vector(155, 600, 100), False, False)
                 actor.set_actor_rotation(unreal.Rotator(pitch=-3.44, yaw=0, roll=0), False)
                 changed = True
@@ -91,7 +92,9 @@ create_material()
 create_original_assets()
 create_map()
 content = Path(unreal.Paths.project_content_dir())
-for relative in ("Maps/ComptoirOriginal.umap", "Original/Materials/M_Original_00.uasset", "Original/UI/T_ComptoirLogo.uasset"):
+for relative in ("Maps/ComptoirOriginal.umap", "Original/Materials/M_Original_00.uasset",
+                 "Original/UI/T_ComptoirLogo.uasset", "Original/Fonts/F_ComptoirWorld.uasset",
+                 "Original/Materials/M_ComptoirText.uasset"):
     if not (content / relative).is_file():
         raise RuntimeError(f"Asset manquant apres creation : {relative}")
 unreal.log("Le Petit Comptoir : decor original pret. Ouvrir Maps/ComptoirOriginal et appuyer sur Play.")

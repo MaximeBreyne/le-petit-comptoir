@@ -11,7 +11,9 @@ public:
     virtual void DrawHUD() override;
     virtual void NotifyHitBoxClick(FName BoxName) override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    void SelectTabletPage(int32 Page) { TabletPage=FMath::Clamp(Page,0,3); }
 private:
+    UPROPERTY() TObjectPtr<class UFont> WorldFont;
     void UpdateTablet(const class AComptoirGameMode& Game);
     void HideTablet();
     void RemoveTablet();

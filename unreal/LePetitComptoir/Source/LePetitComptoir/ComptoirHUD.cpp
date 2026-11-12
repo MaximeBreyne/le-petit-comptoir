@@ -3,6 +3,8 @@
 #include "ComptoirGameMode.h"
 #include "ComptoirProp.h"
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
+#include "Engine/Font.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -20,10 +22,13 @@ void AComptoirHUD::DrawHUD()
     const float W = Canvas->SizeX / Scale, H = Canvas->SizeY / Scale;
     const FLinearColor Cream(.97f,.95f,.91f), Gold(.90f,.74f,.47f), Muted(.70f,.77f,.71f);
     const FLinearColor Panel(.075f,.13f,.12f,.94f), Border(.65f,.70f,.60f,.28f);
+    if(!WorldFont)WorldFont=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld"));
+    const UFont* SmallFont=GEngine?GEngine->GetSmallFont():nullptr;
+    const float FontScale=WorldFont&&SmallFont?SmallFont->GetMaxCharHeight()/FMath::Max(1.f,WorldFont->GetMaxCharHeight()):1.f;
     const auto Rect = [&](float X,float Y,float Width,float Height,FLinearColor Color)
         { DrawRect(Color,X*Scale,Y*Scale,Width*Scale,Height*Scale); };
     const auto Text = [&](const FString& Value,float X,float Y,float Size,FLinearColor Color)
-        { DrawText(Value,Color,X*Scale,Y*Scale,nullptr,Size*Scale); };
+        { DrawText(Value,Color,X*Scale,Y*Scale,WorldFont.Get(),Size*Scale*FontScale); };
     const auto Card = [&](float X,float Y,float Width,float Height)
     {
         Rect(X,Y,Width,Height,Panel);Rect(X,Y,Width,1,Border);Rect(X,Y+Height-1,Width,1,Border);
@@ -101,6 +106,8 @@ void AComptoirHUD::DrawHUD()
         }
     }
     Text(TEXT("ZQSD / WASD  Deplacer     Souris  Regarder     E  Interagir     Tab  Tablette     P  Pause"),23,H-25,.75f,Cream);
+    if (Player->IsInReserve())
+        Text(TEXT("RESERVE : E ou Tab pour ouvrir la gestion des stocks"),23,H-118,1.f,Gold);
     Text(TEXT("Sauvegarde automatique · 17 h — 4 h · Frais : 35 € / soir"),W-425,H-25,.7f,Muted);
     if (Game->MessageRemaining>0)
     {

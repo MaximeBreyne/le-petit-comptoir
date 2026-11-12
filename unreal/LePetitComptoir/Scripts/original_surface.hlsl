@@ -1,4 +1,4 @@
-// Coordinates and palette follow dist/renderer.js. World arrives in Unreal cm.
+// Coordinates and palette follow SourceArt/Scene/renderer.js. World arrives in Unreal cm.
 // Keep the original wood grain, brick courses, tiling and plank proportions.
 struct ComptoirNoise
 {

@@ -31,10 +31,10 @@ Write-Host '1/3 Compilation C++ (Visual Studio avec Developpement de jeux en C++
 & $Build 'LePetitComptoirEditor' 'Win64' 'Development' "-Project=$Project" '-WaitMutex' '-NoHotReloadFromIDE'
 if ($LASTEXITCODE -ne 0) { throw "Compilation Unreal echouee (code $LASTEXITCODE). Consultez le journal ci-dessus." }
 
-Write-Host '2/3 Preparation des assets et correction des axes du decor genere...'
+Write-Host '2/3 Preparation des assets, polices et mise a jour du decor...'
 & $Commandlet $Project '-run=pythonscript' "-script=$Bootstrap" '-unattended' '-nop4' '-NullRHI' '-UTF8Output'
 if ($LASTEXITCODE -ne 0) { throw "Creation des assets echouee (code $LASTEXITCODE). Consultez Saved\Logs." }
-foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\Materials\M_Original_00.uasset', 'Content\Original\UI\T_ComptoirLogo.uasset')) {
+foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\Materials\M_Original_00.uasset', 'Content\Original\UI\T_ComptoirLogo.uasset', 'Content\Original\Fonts\F_ComptoirWorld.uasset', 'Content\Original\Materials\M_ComptoirText.uasset')) {
     if (-not (Test-Path -LiteralPath (Join-Path $ProjectDirectory $Relative))) {
         throw "Asset manquant : $Relative. Consultez Saved\Logs."
     }

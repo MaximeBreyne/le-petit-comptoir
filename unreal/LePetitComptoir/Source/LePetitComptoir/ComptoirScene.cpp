@@ -13,6 +13,8 @@
 #include "Misc/Paths.h"
 #include "Materials/MaterialInterface.h"
 #include "Math/RotationMatrix.h"
+#include "Engine/Font.h"
+#include "HAL/FileManager.h"
 
 namespace ComptoirSceneData
 {
@@ -29,6 +31,23 @@ namespace ComptoirSceneData
         TArray<int32> Triangles;
         TArray<FLinearColor> Colors;
     };
+    TSharedPtr<FJsonObject> LoadDocument()
+    {
+        // All customers, moving limbs and vehicles share one parsed source document.
+        static TSharedPtr<FJsonObject> Cached;
+        static FString CachedPath;
+        static FDateTime CachedTime;
+        const FString Path=FPaths::ProjectContentDir()/TEXT("OriginalData/scene.json");
+        const FDateTime Modified=IFileManager::Get().GetTimeStamp(*Path);
+        if(!Cached.IsValid()||Path!=CachedPath||Modified!=CachedTime)
+        {
+            FString Text;TSharedPtr<FJsonObject> Document;
+            if(!FFileHelper::LoadFileToString(Text,*Path)||
+               !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Document))return nullptr;
+            Cached=Document;CachedPath=Path;CachedTime=Modified;
+        }
+        return Cached;
+    }
 }
 
 AComptoirScene::AComptoirScene()
@@ -42,10 +61,8 @@ AComptoirScene::AComptoirScene()
 bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
 {
     using namespace ComptoirSceneData;
-    FString Text;
-    if(!FFileHelper::LoadFileToString(Text,*(FPaths::ProjectContentDir()/TEXT("OriginalData/scene.json"))))return false;
-    TSharedPtr<FJsonObject> Document;
-    if(!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Document)||!Document.IsValid())return false;
+    const TSharedPtr<FJsonObject> Document=LoadDocument();
+    if(!Document.IsValid())return false;
     const TSharedPtr<FJsonObject>* Collections=nullptr;
     if(!Document->TryGetObjectField(TEXT("collections"),Collections))return false;
     const TArray<TSharedPtr<FJsonValue>>* Items=nullptr;
@@ -61,6 +78,8 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
     Geometry->ClearAllMeshSections();
     GeometryRevision=0;
     TArray<Section> Sections;Sections.SetNum(16);
+    UFont* WorldFont=nullptr;
+    UMaterialInterface* TextMaterial=nullptr;
     for(const auto& Item:*Items)
     {
         const auto O=Item->AsObject();if(!O.IsValid())continue;
@@ -95,6 +114,16 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         const FString Caption=String(O,TEXT("label"));
         if(!Caption.IsEmpty())
         {
+            if(!WorldFont)
+            {
+                WorldFont=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld"));
+                TextMaterial=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Original/Materials/M_ComptoirText.M_ComptoirText"));
+                const int32 Euro=WorldFont?int32(WorldFont->RemapChar(TCHAR(0x20ac))):-1;
+                if(!WorldFont||!TextMaterial||Euro==UFont::NULLCHARACTER||
+                   !WorldFont->Characters.IsValidIndex(Euro)||WorldFont->Characters[Euro].USize<=0||
+                   WorldFont->Characters[Euro].VSize<=0||WorldFont->Characters[Euro].TextureIndex!=0)
+                {UE_LOG(LogTemp,Error,TEXT("World font with euro glyph missing. Run Setup-Unreal.ps1."));return false;}
+            }
             const FString Face=String(O,TEXT("labelFace"),TEXT("front"));
             ComptoirGeometry::Vec Offset{0,0,-1},Normal{0,0,-1},Up{0,1,0};
             double Width=S.Size.X,Height=S.Size.Y;
@@ -107,6 +136,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
             const FVector U=Vector(ComptoirGeometry::Direction(ComptoirGeometry::Rotate(Up,S.Rotation)));
             UTextRenderComponent* Label=NewObject<UTextRenderComponent>(this);
             AddInstanceComponent(Label);Label->SetupAttachment(Geometry);
+            Label->SetFont(WorldFont);Label->SetTextMaterial(TextMaterial);
             Label->SetText(FText::FromString(Caption));Label->SetHorizontalAlignment(EHTA_Center);
             Label->SetVerticalAlignment(EVRTA_TextCenter);
             TArray<FString> Lines;Caption.ParseIntoArrayLines(Lines);int32 Longest=1;
@@ -131,6 +161,17 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
     }
     if(Collection==TEXT("world"))
     {
+        // Bound the playable block, leaving the extended street as distant scenery.
+        const auto Boundary=[&](FVector Center,FVector Extent)
+        {
+            UBoxComponent* Box=NewObject<UBoxComponent>(this);
+            AddInstanceComponent(Box);Box->SetupAttachment(Geometry);
+            Box->SetRelativeLocation(Center);Box->SetBoxExtent(Extent);
+            Box->SetCollisionProfileName(TEXT("BlockAll"));Box->RegisterComponent();
+        };
+        Boundary(FVector(1430,-2500,150),FVector(460,10,200));
+        Boundary(FVector(1430,3500,150),FVector(460,10,200));
+        Boundary(FVector(1880,500,150),FVector(10,3010,200));
         const auto Lamp=[&](FVector Location,float Intensity,bool Shadows)
         {
             UPointLightComponent* Light=NewObject<UPointLightComponent>(this);
@@ -154,6 +195,12 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         Daylight->SetMobility(EComponentMobility::Movable);Daylight->SetRelativeRotation(FRotator(-55,-128,0));
         Daylight->SetLightColor(FLinearColor(.83f,.89f,1.f));Daylight->SetIntensity(2.5f);Daylight->RegisterComponent();
     }
-    GeometryRevision=3;
+    GeometryRevision=4;
     return true;
+}
+
+void AComptoirScene::SetAmbientModel()
+{
+    // The street contains only a few moving meshes; avoid per-limb shadow passes.
+    Geometry->SetCastShadow(false);
 }

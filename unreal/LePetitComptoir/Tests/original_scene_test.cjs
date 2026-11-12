@@ -3,12 +3,36 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const vm=require('node:vm'),os=require('node:os'),cp=require('node:child_process');
 const {exportScene}=require('../Scripts/export-original-scene.cjs');
-const root=path.resolve(__dirname,'../../..');
+const sourceRoot=path.resolve(__dirname,'../SourceArt/Scene');
 const data=JSON.parse(fs.readFileSync(path.join(__dirname,'../Content/OriginalData/scene.json'),'utf8'));
 assert.deepEqual(data,JSON.parse(JSON.stringify(exportScene())),'Scene export must match the original source');
 const shapes=Object.values(data.collections).flat();
+// Passage stays clear after removing the movable leaves from the static room.
+for(let z=9.3;z<=12.1;z+=.1) {
+  const blockers=data.collections.world.filter(s=>s.collision &&
+    Math.abs(s.x-6)<s.w/2+.30 && Math.abs(s.z-z)<s.d/2+.30 &&
+    s.y+s.h/2>.46 && s.y-s.h/2<1.8);
+  assert.deepEqual(blockers,[],`Exit blocked at z=${z}`);
+}
+for(const name of ['doorLeft','doorRight']) {
+  assert.ok(data.collections[name].some(s=>s.collision),'Door must block when closed');
+  assert.ok(data.collections[name].every(s=>Math.abs(s.x)<=1.46),'Leaf fits half doorway');
+}
+const streetFloors=data.collections.world.filter(s=>s.streetFloor);
+assert.equal(streetFloors.length,4);
+assert.ok(streetFloors.every(s=>s.collision),'Street and pavements must support the player');
+const fridge=data.collections.world.filter(s=>s.assembly==='fridge');
+assert.ok(fridge.length>20);
+for(const s of fridge) {
+  assert.ok(s.x-s.w/2>10.415,'Fridge must clear the adjacent cabinet');
+  assert.ok(s.z+s.d/2<1.13,'Fridge shelves and handle must not protrude into the aisle');
+}
+assert.ok(data.collections.world.some(s=>s.label?.includes('5 €')),'Menu must retain euro characters');
+for(let i=0;i<3;i++)for(const part of ['body','legLeft','legRight','armLeft','armRight'])
+  assert.ok(data.collections[`ped${i}_${part}`].length>0,`Missing pedestrian ${i} ${part}`);
+for(let i=0;i<2;i++)assert.ok(data.collections[`traffic${i}`].some(s=>s.collision));
 const context=vm.createContext({});
-vm.runInContext(fs.readFileSync(path.join(root,'dist/renderer.js'),'utf8'),context);
+vm.runInContext(fs.readFileSync(path.join(sourceRoot,'renderer.js'),'utf8'),context);
 const Renderer=vm.runInContext('BarRenderer',context),renderer=Object.create(Renderer.prototype);
 renderer.colors=new Map();renderer.scratch=new Float32Array(1);renderer.label=()=>null;
 const reference=renderer.mesh(shapes);
