@@ -1,4 +1,5 @@
 #include "ComptoirCharacter.h"
+#include "ComptoirExposure.h"
 #include "ComptoirGameMode.h"
 #include "ComptoirHUD.h"
 #include "ComptoirProp.h"
@@ -19,6 +20,7 @@ AComptoirCharacter::AComptoirCharacter()
     Camera->SetupAttachment(GetCapsuleComponent());
     Camera->SetRelativeLocation(FVector(0, 0, 78));
     Camera->bUsePawnControlRotation = true;
+    ComptoirExposure::Apply(Camera->PostProcessSettings);
     // The browser used a 75 degree vertical FOV; Unreal's camera uses horizontal FOV.
     Camera->SetFieldOfView(107.51f);
     bUseControllerRotationYaw = true;
@@ -95,8 +97,7 @@ void AComptoirCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     const auto* Settings=GetWorld()->GetAuthGameMode<AComptoirGameMode>();
-    Camera->PostProcessSettings.bOverride_AutoExposureBias=true;
-    Camera->PostProcessSettings.AutoExposureBias=Settings?FMath::Log2(Settings->Brightness/100.f):0;
+    ComptoirExposure::Apply(Camera->PostProcessSettings,Settings?Settings->Brightness:100.f);
     if (const APlayerController* Player = Cast<APlayerController>(GetController()))
     {
         int32 Width = 0, Height = 0;

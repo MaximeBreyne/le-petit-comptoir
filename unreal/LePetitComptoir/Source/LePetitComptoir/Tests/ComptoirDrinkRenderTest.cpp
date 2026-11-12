@@ -52,9 +52,8 @@ bool FComptoirDrinkRenderTest::RunTest(const FString&)
     Capture->bAlwaysPersistRenderingState=true;Capture->PostProcessBlendWeight=1;
     Capture->CaptureSource=ESceneCaptureSource::SCS_FinalColorLDR;Capture->FOVAngle=40;
     Capture->ShowFlags.SetAtmosphere(false);Capture->ShowFlags.SetFog(false);Capture->ShowFlags.SetMotionBlur(false);
-    // A controlled exposure lets the test distinguish gold from black, even in a dark bar.
-    // Match the venue's fixed exposure. Min/max brightness alone is ambiguous
-    // when the project uses an extended EV100 range or physical camera exposure.
+    // This isolated material fixture uses its own light and neutral exposure.
+    // Venue lighting and player exposure are checked by MaterialsAndViews.
     Capture->PostProcessSettings.bOverride_AutoExposureMethod=true;
     Capture->PostProcessSettings.AutoExposureMethod=AEM_Manual;
     Capture->PostProcessSettings.bOverride_AutoExposureApplyPhysicalCameraExposure=true;

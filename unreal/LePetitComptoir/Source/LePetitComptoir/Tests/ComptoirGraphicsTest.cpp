@@ -1,6 +1,9 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 #include "../ComptoirScene.h"
+#include "../ComptoirCharacter.h"
 #include "ComptoirRenderTest.h"
+#include "Camera/CameraComponent.h"
+#include "Components/PostProcessComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
@@ -38,6 +41,19 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
     if(!TestNotNull(TEXT("Venue"),Venue))return false;
     if(!TestTrue(TEXT("Build refined venue"),Venue->Build(TEXT("world")))){Venue->Destroy();return false;}
     Venue->SetVenueName(TEXT("Le Petit Comptoir"));
+    // Exercise the actual player camera: a level-only capture misses exposure
+    // overrides written by Character::Tick after the level's postprocess blend.
+    AComptoirCharacter* Player=Preview.GetWorld()->SpawnActor<AComptoirCharacter>();
+    if(!TestNotNull(TEXT("Player camera owner"),Player))return false;
+    Player->SetActorHiddenInGame(true);
+    Player->Camera->PostProcessSettings.AutoExposureBias=0;
+    Player->Tick(0.f);
+    const auto* VenuePost=Venue->FindComponentByClass<UPostProcessComponent>();
+    if(!TestNotNull(TEXT("Venue exposure"),VenuePost))return false;
+    TestTrue(TEXT("Player tick preserves the venue exposure baseline"),
+        Player->Camera->PostProcessSettings.bOverride_AutoExposureBias&&
+        FMath::IsNearlyEqual(Player->Camera->PostProcessSettings.AutoExposureBias,VenuePost->Settings.AutoExposureBias)&&
+        Player->Camera->PostProcessSettings.AutoExposureBias<0);
     Scene->Prepare(Materials);
     constexpr int32 Width=1280,Height=720;
     auto* Target=Scene->Target.Get();
@@ -46,19 +62,23 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
     Scene->Camera=Capture;
     Capture->TextureTarget=Target;Capture->bCaptureEveryFrame=false;Capture->bCaptureOnMovement=false;
     Capture->bAlwaysPersistRenderingState=true;Capture->CaptureSource=ESceneCaptureSource::SCS_FinalColorLDR;Capture->FOVAngle=75;
+    Capture->PostProcessBlendWeight=1;
+    Capture->PostProcessSettings=Player->Camera->PostProcessSettings;
     Preview.AddComponent(Capture,FTransform::Identity);
     const FString Output=FPaths::ProjectSavedDir()/TEXT("Tests/Graphics");IFileManager::Get().MakeDirectory(*Output,true);
-    struct View {const TCHAR* Name;FVector Eye,Focus;};
+    struct View {const TCHAR* Name;FVector Eye,Focus;float FieldOfView=75.f;};
     const View Views[]={{TEXT("Bar"),{810,1040,168},{290,600,140}},
         {TEXT("Service"),{145,600,168},{285,420,135}},
         {TEXT("Street"),{1530,1100,180},{980,600,210}},
-        {TEXT("Reserve"),{-80,100,168},{-370,240,145}}};
+        {TEXT("Reserve"),{-80,100,168},{-370,240,145}},
+        {TEXT("BehindBar"),{155,600,170},{1155,600,110},107.51f}};
     bool bFirstView=true;
     for(const View& V:Views)
     {
         Scene->Then([Capture,V]
         {
             Capture->SetWorldLocation(V.Eye);Capture->SetWorldRotation((V.Focus-V.Eye).Rotation());
+            Capture->FOVAngle=V.FieldOfView;
         });
         Scene->WarmUp();
         if(bFirstView)
@@ -73,15 +93,21 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
         {
             TArray<FColor> Pixels;
             if(!TestTrue(TEXT("Read view"),Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels)&&Pixels.Num()==Width*Height))return;
-            int32 Visible=0,Clipped=0;double Mean=0,Square=0;
+            int32 Visible=0,Clipped=0,NearWhite=0;double Mean=0,Square=0;
             for(const FColor& P:Pixels)
             {
                 const double L=(P.R*.2126+P.G*.7152+P.B*.0722);Mean+=L;Square+=L*L;
-                if(L>12)++Visible;if(P.R>250&&P.G>250&&P.B>250)++Clipped;
+                if(L>12)++Visible;if(L>245)++NearWhite;
+                if(P.R>250&&P.G>250&&P.B>250)++Clipped;
             }
             Mean/=Pixels.Num();Square/=Pixels.Num();
-            TestTrue(FString(V.Name)+TEXT(" is not black or featureless"),Visible>Pixels.Num()/10&&Square-Mean*Mean>50);
-            TestTrue(FString(V.Name)+TEXT(" is not overexposed"),Clipped<Pixels.Num()/2);
+            AddInfo(FString::Printf(TEXT("%s: mean luminance %.1f/255, visible %.2f%%, near-white %.2f%%, clipped %.2f%%"),
+                V.Name,Mean,100.*Visible/Pixels.Num(),100.*NearWhite/Pixels.Num(),100.*Clipped/Pixels.Num()));
+            TestTrue(FString(V.Name)+TEXT(" is not black or featureless"),Visible>Pixels.Num()*.35&&Mean>35&&Square-Mean*Mean>50);
+            // Allow small lamp/specular highlights, not washed-out walls or a
+            // white countertop. Requiring all RGB channels to clip missed those.
+            TestTrue(FString(V.Name)+TEXT(" retains highlight detail"),NearWhite<Pixels.Num()/10);
+            TestTrue(FString(V.Name)+TEXT(" is not overexposed"),Clipped<Pixels.Num()/50);
             TestTrue(TEXT("Save view for inspection"),FFileHelper::CreateBitmap(*(Output/(FString(V.Name)+TEXT(".bmp"))),Width,Height,Pixels.GetData()));
         });
     }

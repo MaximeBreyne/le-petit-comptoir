@@ -47,7 +47,7 @@ def create_map():
             raise RuntimeError("Chargement de ComptoirOriginal impossible")
         level_actors = actors.get_all_level_actors()
         old_venues = [actor for actor in level_actors
-                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 8]
+                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 9]
         fix_axes = any(actor.get_geometry_revision() < 3 for actor in old_venues)
         if old_venues:
             backup = Path(unreal.Paths.project_saved_dir()) / "Backups" / "BeforeVisualUpgrade"

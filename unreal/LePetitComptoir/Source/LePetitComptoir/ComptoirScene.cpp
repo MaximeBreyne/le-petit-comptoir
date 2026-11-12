@@ -184,7 +184,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         Boundary(FVector(1880,500,150),FVector(10,3010,200));
         ComptoirLighting::Build(this,Geometry);
     }
-    GeometryRevision=8;
+    GeometryRevision=9;
     CurrentCollection=Collection;
     return true;
 }
