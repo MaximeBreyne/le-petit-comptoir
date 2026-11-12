@@ -46,6 +46,7 @@ if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
     Write-Host 'Verification du rendu reel, des materiaux et interfaces (GPU requis)...'
     $TestFilter = if ($VerifyUI -or ($VerifyTablet -and $VerifyGraphics)) { 'LePetitComptoir' } elseif ($VerifyGraphics) { 'LePetitComptoir.Graphics.MaterialsAndViews' } else { 'LePetitComptoir.Tablet.RenderedText' }
     $ReportDirectory = Join-Path $ProjectDirectory ('Saved\Tests\RenderReport-' + [Guid]::NewGuid().ToString('N'))
+    $RenderStartedUtc = [DateTime]::UtcNow
     & $Commandlet $Project '-unattended' '-nop4' '-nosound' '-RenderOffscreen' '-UTF8Output' `
         "-ExecCmds=Automation RunTests $TestFilter" `
         '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$ReportDirectory"
@@ -67,6 +68,23 @@ if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
         $SummaryFile = Join-Path $ReportDirectory 'failures.txt'
         $Details | Set-Content -LiteralPath $SummaryFile -Encoding UTF8
         $Details | ForEach-Object { Write-Host $_ }
+        # Keep this run's images with its report; never attach stale captures.
+        try {
+            $DiagnosticFiles = @($ReportFile, $SummaryFile)
+            foreach ($CaptureFolder in @('Tablet', 'WorldText', 'Drinks', 'Graphics')) {
+                $CaptureDirectory = Join-Path $ProjectDirectory ('Saved\Tests\' + $CaptureFolder)
+                if (Test-Path -LiteralPath $CaptureDirectory) {
+                    $DiagnosticFiles += @(Get-ChildItem -LiteralPath $CaptureDirectory -File -Recurse |
+                        Where-Object { $_.Extension -in @('.bmp', '.png') -and $_.LastWriteTimeUtc -ge $RenderStartedUtc } |
+                        ForEach-Object { $_.FullName })
+                }
+            }
+            $DiagnosticArchive = Join-Path $ReportDirectory 'diagnostics.zip'
+            Compress-Archive -LiteralPath $DiagnosticFiles -DestinationPath $DiagnosticArchive -CompressionLevel Optimal
+            Write-Host "Rapport et captures de cette execution : $DiagnosticArchive"
+        } catch {
+            Write-Warning "Archive de diagnostic non creee : $($_.Exception.Message). Les fichiers restent disponibles dans Saved\Tests."
+        }
         throw "Tests de rendu en echec. Details : $SummaryFile. Rapport complet : $ReportFile"
     }
     if ($RenderExitCode -ne 0) { throw "Unreal s'est termine en erreur (code $RenderExitCode). Rapport : $ReportFile. Consultez Saved\Logs." }

@@ -462,10 +462,27 @@ Cette préparation des tests ne change pas les matériaux de boisson du jeu.
 
 En cas d’échec de `-VerifyUI`, les messages détaillés sont affichés dans le terminal
 et écrits dans `failures.txt`, à côté de `index.json` dans le dossier du rapport indiqué.
+Le script crée aussi `diagnostics.zip` dans ce dossier : il contient ces deux fichiers
+et les captures produites pendant cette exécution, sans reprendre les anciennes images.
+Si la compression échoue, le journal indique où trouver les fichiers séparés.
 Le test portable `python3 unreal/LePetitComptoir/Tests/font_generation_test.py`, lancé
 depuis la racine du dépôt, contrôle la couverture des textes de la scène, la réparation
 d’une ancienne police, sa sauvegarde et la gestion d’un échec de réimportation avec
 une API simulée. Il ne remplace pas la compilation C++ ni l’import et le rendu sous Unreal.
+
+Les captures soumettent désormais les shaders manquants après l’installation des
+objets dans la scène, attendent aussi la préparation des textures et vérifient que
+chaque ensemble de shaders est complet. Une simple ressource non nulle ne suffisait
+pas à garantir cela. Les mises à jour de visibilité et de géométrie sont envoyées
+au rendu avant chaque capture. Ces attentes sont limitées aux tests de l’éditeur.
+
+Si le test de bière échoue encore, `Beer-4-LiquidOnly.bmp` et `Beer-8-LiquidOnly.bmp`
+montrent le liquide sans la paroi du verre ; le résultat obligatoire reste celui du
+verre complet. Le journal vérifie aussi la présence du liquide, ses couleurs et ses
+matériaux. Pour le texte 3D, `World-Empty.bmp` contrôle que l’ancienne image du HUD est
+effacée. En cas d’échec, `World-Euro-Reverse.bmp` et `World-DefaultFont.bmp` aident à
+distinguer un problème d’orientation, de police personnalisée ou de capture.
+Ces diagnostics ne modifient pas les matériaux du jeu et n’assouplissent pas les seuils.
 
 ## Prétest Windows hors de l’éditeur
 

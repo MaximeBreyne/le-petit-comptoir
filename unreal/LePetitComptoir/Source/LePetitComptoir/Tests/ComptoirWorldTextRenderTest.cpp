@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 #include "../ComptoirText.h"
+#include "ComptoirRenderTest.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/Canvas.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -28,11 +29,6 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     if(!TestNotNull(TEXT("Usable generated offline font"),Font))return false;
     UMaterial* Material=LoadObject<UMaterial>(nullptr,TEXT("/Game/Original/Materials/M_ComptoirText.M_ComptoirText"));
     if(!TestNotNull(TEXT("World text material"),Material))return false;
-    FMaterialResource* Resource=Material->GetMaterialResource(GMaxRHIShaderPlatform);
-    if(!TestNotNull(TEXT("World text material resource"),Resource))return false;
-    Resource->FinishCompilation();
-    for(const FString& Error:Resource->GetCompileErrors())AddError(Error);
-    if(!TestTrue(TEXT("World text shaders compiled"),Resource->GetGameThreadShaderMap()!=nullptr)||HasAnyErrors())return false;
     FPreviewScene Preview{FPreviewScene::ConstructionValues()};
     constexpr int32 Width=1024,Height=256;
     TStrongObjectPtr<UTextureRenderTarget2D> Target(NewObject<UTextureRenderTarget2D>());
@@ -41,16 +37,20 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     Target->UpdateResourceImmediate(true);
     const FString Output=FPaths::ProjectSavedDir()/TEXT("Tests/WorldText");
     IFileManager::Get().MakeDirectory(*Output,true);
-    const auto CheckPixels=[&](const TCHAR* Name)
+    const auto ReadVisiblePixels=[&](const TCHAR* Name)
     {
         FlushRenderingCommands();TArray<FColor> Pixels;
         if(!Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels)||Pixels.Num()!=Width*Height)
-        {AddError(TEXT("Cannot read text render target."));return false;}
-        int32 Lit=0;
-        for(const FColor& Pixel:Pixels)if(Pixel.R>80||Pixel.G>80||Pixel.B>80)++Lit;
-        TestTrue(FString(Name)+TEXT(" has visible text pixels"),Lit>100);
-        FFileHelper::CreateBitmap(*(Output/(FString(Name)+TEXT(".bmp"))),Width,Height,Pixels.GetData());
-        return Lit>100;
+        {AddError(TEXT("Cannot read text render target."));return -1;}
+        int32 Lit=0,Peak=0;
+        for(const FColor& Pixel:Pixels)
+        {
+            const int32 Brightness=FMath::Max3(int32(Pixel.R),int32(Pixel.G),int32(Pixel.B));
+            if(Brightness>80)++Lit;Peak=FMath::Max(Peak,Brightness);
+        }
+        AddInfo(FString::Printf(TEXT("%s: visible pixels=%d, peak channel=%d"),Name,Lit,Peak));
+        TestTrue(TEXT("Save text capture"),FFileHelper::CreateBitmap(*(Output/(FString(Name)+TEXT(".bmp"))),Width,Height,Pixels.GetData()));
+        return Lit;
     };
     // Exercise the same Canvas font route as the in-game HUD, using only € so
     // ordinary Latin letters cannot hide a missing currency glyph.
@@ -58,7 +58,8 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(Preview.GetWorld(),Target.Get(),Canvas,Size,Context);
     if(Canvas){Canvas->SetDrawColor(FColor::White);Canvas->DrawText(Font,TEXT("€"),40,40,2,2);}
     UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(Preview.GetWorld(),Context);
-    TestNotNull(TEXT("Canvas for HUD font"),Canvas);CheckPixels(TEXT("HUD-Euro"));
+    TestNotNull(TEXT("Canvas for HUD font"),Canvas);
+    TestTrue(TEXT("HUD-Euro has visible text pixels"),ReadVisiblePixels(TEXT("HUD-Euro"))>100);
 
     UTextRenderComponent* Label=NewObject<UTextRenderComponent>();
     ComptoirText::Configure(Label,FString::ChrN(32,TCHAR('W')));
@@ -72,9 +73,11 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     USceneCaptureComponent2D* Capture=NewObject<USceneCaptureComponent2D>();
     Capture->TextureTarget=Target.Get();Capture->bCaptureEveryFrame=false;Capture->bCaptureOnMovement=false;
     Capture->bAlwaysPersistRenderingState=true;
+    Capture->PostProcessBlendWeight=1;
     Capture->CaptureSource=ESceneCaptureSource::SCS_FinalColorLDR;Capture->FOVAngle=60;
     Capture->ShowFlags.SetAtmosphere(false);Capture->ShowFlags.SetFog(false);
     Capture->ShowFlags.SetMotionBlur(false);
+    Capture->ShowFlags.SetTextRender(true);
     Capture->PostProcessSettings.bOverride_AutoExposureMethod=true;
     Capture->PostProcessSettings.AutoExposureMethod=AEM_Manual;
     Capture->PostProcessSettings.bOverride_AutoExposureApplyPhysicalCameraExposure=true;
@@ -82,9 +85,35 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     Capture->PostProcessSettings.bOverride_AutoExposureBias=true;
     Capture->PostProcessSettings.AutoExposureBias=0;
     Preview.AddComponent(Capture,FTransform(FRotator(0,180,0),FVector(250,0,0)));
-    for(int Frame=0;Frame<24;++Frame)
-    {Preview.GetWorld()->Tick(LEVELTICK_All,1.f/30);Capture->CaptureScene();FlushRenderingCommands();}
-    CheckPixels(TEXT("World-Euro"));
+    ComptoirRenderTest::PrepareScene(Preview,{Material});
+    if(ComptoirRenderTest::CheckMaterial(*this,Material))
+    {
+        TestTrue(TEXT("Label uses the generated font and matching material"),Label->Font.Get()==Font&&Label->GetMaterial(0)==Material);
+        AddInfo(FString::Printf(TEXT("World text: font=%s, material=%s, local size=%s"),
+            *Font->GetPathName(),*Material->GetPathName(),*Label->GetTextLocalSize().ToString()));
+        // Prove that SceneCapture replaces the earlier Canvas image: the hidden
+        // label must not leave behind the HUD euro or a previous capture.
+        Label->SetVisibility(false);
+        ComptoirRenderTest::Capture(Preview,Capture);
+        const int32 Empty=ReadVisiblePixels(TEXT("World-Empty"));
+        TestTrue(TEXT("Hidden text leaves a black capture"),Empty>=0&&Empty<100);
+        Label->SetVisibility(true);
+        ComptoirRenderTest::Capture(Preview,Capture);
+        if(!TestTrue(TEXT("World-Euro has visible text pixels"),ReadVisiblePixels(TEXT("World-Euro"))>100))
+        {
+            // Keep the required front-facing test failed. These images locate
+            // culling/orientation vs custom-font/material problems on the GPU.
+            Capture->SetWorldLocation(FVector(-250,0,0));Capture->SetWorldRotation(FRotator::ZeroRotator);
+            ComptoirRenderTest::Capture(Preview,Capture);ReadVisiblePixels(TEXT("World-Euro-Reverse"));
+            Capture->SetWorldLocation(FVector(250,0,0));Capture->SetWorldRotation(FRotator(0,180,0));
+            const UTextRenderComponent* Defaults=GetDefault<UTextRenderComponent>();
+            Label->SetFont(Defaults->Font.Get());Label->SetTextMaterial(Defaults->TextMaterial.Get());
+            Label->SetText(FText::FromString(TEXT("A")));
+            ComptoirRenderTest::PrepareScene(Preview,{Defaults->TextMaterial->GetMaterial()});
+            ComptoirRenderTest::Capture(Preview,Capture);
+            TestTrue(TEXT("Engine default font control is visible"),ReadVisiblePixels(TEXT("World-DefaultFont"))>100);
+        }
+    }
     Preview.RemoveComponent(Capture);Preview.RemoveComponent(Label);
     return !HasAnyErrors();
 }

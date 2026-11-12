@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 #include "../ComptoirScene.h"
+#include "ComptoirRenderTest.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
@@ -21,18 +22,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FComptoirGraphicsTest,"LePetitComptoir.Graphics
 bool FComptoirGraphicsTest::RunTest(const FString&)
 {
     if(!FApp::CanEverRender()){AddError(TEXT("Graphics validation requires a GPU, without -NullRHI."));return false;}
-    // Reject the default/checkerboard fallback even if it produces visible pixels.
+    TArray<UMaterial*> Materials;
     for(int32 I=0;I<17;++I)
     {
         const FString Path=FString::Printf(TEXT("/Game/Original/Materials/M_Original_%02d.M_Original_%02d"),I,I);
         UMaterial* Material=LoadObject<UMaterial>(nullptr,*Path);
         if(!TestNotNull(Path,Material))continue;
-        // UE 5.8 selects material resources by shader platform, not feature level.
-        FMaterialResource* Resource=Material->GetMaterialResource(GMaxRHIShaderPlatform);
-        if(!TestNotNull(TEXT("Material resource"),Resource))continue;
-        Resource->FinishCompilation();
-        for(const FString& Error:Resource->GetCompileErrors())AddError(Path+TEXT(": ")+Error);
-        TestTrue(Path+TEXT(" has compiled shaders"),Resource->GetGameThreadShaderMap()!=nullptr);
+        Materials.Add(Material);
     }
     if(HasAnyErrors())return false;
     FPreviewScene Preview{FPreviewScene::ConstructionValues().SetCreateDefaultLighting(false)};
@@ -40,6 +36,11 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
     if(!TestNotNull(TEXT("Venue"),Venue))return false;
     if(!TestTrue(TEXT("Build refined venue"),Venue->Build(TEXT("world")))){Venue->Destroy();return false;}
     Venue->SetVenueName(TEXT("Le Petit Comptoir"));
+    // Reject incomplete shader maps as well as compiler errors. A non-null map
+    // alone does not prove that a dynamically bound material can render yet.
+    ComptoirRenderTest::PrepareScene(Preview,Materials);
+    for(UMaterial* Material:Materials)ComptoirRenderTest::CheckMaterial(*this,Material);
+    if(HasAnyErrors()){Venue->Destroy();return false;}
     constexpr int32 Width=1280,Height=720;
     TStrongObjectPtr<UTextureRenderTarget2D> Target(NewObject<UTextureRenderTarget2D>());
     Target->ClearColor=FLinearColor::Black;Target->InitCustomFormat(Width,Height,PF_B8G8R8A8,false);Target->UpdateResourceImmediate(true);
@@ -57,8 +58,7 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
     {
         Capture->SetWorldLocation(V.Eye);Capture->SetWorldRotation((V.Focus-V.Eye).Rotation());
         // Warm up temporal reflections and the time-sliced sky capture.
-        for(int Frame=0;Frame<24;++Frame)
-        {Preview.GetWorld()->Tick(LEVELTICK_All,1.f/30);Capture->CaptureScene();FlushRenderingCommands();}
+        ComptoirRenderTest::Capture(Preview,Capture);
         TArray<FColor> Pixels;
         if(!TestTrue(TEXT("Read view"),Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels)&&Pixels.Num()==Width*Height))continue;
         int32 Visible=0,Clipped=0;double Mean=0,Square=0;
