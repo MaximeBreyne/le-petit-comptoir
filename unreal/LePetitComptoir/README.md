@@ -11,9 +11,10 @@ la palette et la disposition compacte de l'interface sont repris du prototype.
 La tablette retrouve son boîtier paysage arrondi, son écran clair et sa navigation
 latérale : Service, À préparer, Caisse et Réserve sont utilisables. Les rubriques
 Bâtiment, Décoration, Licences et Équipe sont visibles mais désactivées.
-Les caractères sont rasterisés à leur taille d'affichage avec une police Slate,
-sans agrandir une police bitmap. Les textes secondaires sont agrandis et assombris,
-et les boutons disposent de davantage de hauteur pour faciliter la lecture.
+Les textes utilisent la police de jeu standard du HUD, avec une position alignée
+sur les pixels. Le rendu avec la police Slate introduit précédemment a été retiré
+après un affichage sans aucun caractère dans Unreal. Les tailles agrandies,
+les contrastes renforcés et les boutons plus hauts sont conservés.
 
 **La migration fonctionnelle reste partielle** : une bière, un client à la fois,
 paiement par carte, stocks, fermeture et sauvegarde. Les autres recettes, employés,

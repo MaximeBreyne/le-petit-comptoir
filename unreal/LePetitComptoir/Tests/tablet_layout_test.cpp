@@ -49,7 +49,7 @@ void Preview(const Layout& L,const std::string& File)
         else if(C.Type==Kind::Line)
             Out<<"<path d='M "<<C.X<<' '<<C.Y<<" L "<<C.W<<' '<<C.H<<"' fill='none' stroke='"<<Color.str()<<"' stroke-width='1.5'/>";
         else if(C.Type==Kind::Text)
-            Out<<"<text x='"<<C.X<<"' y='"<<C.Y+C.Font*.83f<<"' font-family='DejaVu Sans,sans-serif' font-weight='"<<(C.Font>=22?"bold":"normal")<<"' font-size='"<<C.Font<<"' fill='"<<Color.str()<<"'>"<<Escape(C.Value)<<"</text>";
+            Out<<"<text x='"<<C.X<<"' y='"<<C.Y+C.Font*.83f<<"' font-family='DejaVu Sans,sans-serif' font-size='"<<C.Font<<"' fill='"<<Color.str()<<"'>"<<Escape(C.Value)<<"</text>";
         else if(C.Type==Kind::Logo)
             Out<<"<circle cx='"<<C.X+C.W/2<<"' cy='"<<C.Y+C.H/2<<"' r='"<<C.W/2<<"' fill='#e9c27c'/>";
     }
