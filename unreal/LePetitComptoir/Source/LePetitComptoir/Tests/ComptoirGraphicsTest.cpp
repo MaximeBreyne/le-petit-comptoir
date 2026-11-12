@@ -12,6 +12,7 @@
 #include "HAL/FileManager.h"
 #include "PreviewScene.h"
 #include "RenderingThread.h"
+#include "RHIShaderPlatform.h"
 #include "TextureResource.h"
 #include "UObject/StrongObjectPtr.h"
 
@@ -26,7 +27,8 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
         const FString Path=FString::Printf(TEXT("/Game/Original/Materials/M_Original_%02d.M_Original_%02d"),I,I);
         UMaterial* Material=LoadObject<UMaterial>(nullptr,*Path);
         if(!TestNotNull(Path,Material))continue;
-        FMaterialResource* Resource=Material->GetMaterialResource(GMaxRHIFeatureLevel);
+        // UE 5.8 selects material resources by shader platform, not feature level.
+        FMaterialResource* Resource=Material->GetMaterialResource(GMaxRHIShaderPlatform);
         if(!TestNotNull(TEXT("Material resource"),Resource))continue;
         Resource->FinishCompilation();
         for(const FString& Error:Resource->GetCompileErrors())AddError(Path+TEXT(": ")+Error);
