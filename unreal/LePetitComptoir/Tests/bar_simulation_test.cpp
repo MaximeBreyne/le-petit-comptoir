@@ -2,157 +2,124 @@
 #include <cassert>
 #include <iostream>
 #include <limits>
-
+#include <random>
 using namespace Comptoir;
-
-static void Prepare(Game& G)
+static void Prepare(Game& G,Recipe R)
 {
-    assert(G.TakeGlass());
-    assert(G.Pour(2));
-    assert(G.Beer == 950);
-    assert(!G.TakeBeer());
-    assert(G.Pour(2));
-    assert(G.Beer == 950); // No second stock deduction.
-    assert(G.Amount == 50);
-    assert(G.TakeBeer());
+    const int I=static_cast<int>(R),Before=G.Stock[I];
+    assert(G.TakeGlass(R));assert(G.Pour(R,1));
+    assert(G.Stock[I]==Before-Drink(R).Use);
+    assert(!G.FinishDrink(R));
+    Game Loaded;assert(Loaded.Restore(G.Serialize()));G=Loaded;
+    assert(G.Pour(R,100)&&G.Stock[I]==Before-Drink(R).Use);
+    assert(G.FinishDrink(R)&&G.Held==Glass::None);
+    assert(!G.FinishDrink(R));
 }
-
 int main()
 {
-    // Full service: the money is received only after card confirmation.
-    Game G;
-    assert(G.Cash == 26000 && G.Reserve == 500 && G.Day == 1);
-    assert(!G.PayCard());
-    G.Tick(20);
-    assert(G.Phase == Customer::None);
-    assert(G.ToggleService());
-    G.Tick(1);
-    assert(G.Phase == Customer::Order);
-    assert(G.InteractCustomer());
-    Prepare(G);
-    assert(G.InteractCustomer());
-    assert(G.Cash == 26000);
-    G.Tick(8);
-    assert(G.Phase == Customer::Walking && !G.PayCard());
-    G.Tick(3);
-    assert(G.Phase == Customer::Payment);
-    assert(G.PayCard() && !G.PayCard());
-    G.Tick(2);
-    assert(G.Cash == 26000 && G.Sold == 0);
-    const auto Pending = G.Serialize();
-    Game Restored;
-    assert(Restored.Restore(Pending));
-    assert(Restored.Serialize() == Pending);
-    Restored.Tick(1);
-    assert(Restored.Cash == 26500 && Restored.Sold == 1);
-    Restored.Tick(1);
-    assert(Restored.Cash == 26500 && !Restored.PayCard());
+    Game G;assert(!G.PayCard());G.Tick(20);assert(G.CustomerCount()==0);
+    assert(G.ToggleService());G.Tick(1);G.Tick(16);G.Tick(16);
+    assert(G.CustomerCount()==3);G.Tick(100);assert(G.CustomerCount()==3&&G.NextCustomerId==4);
+    for(int I=0;I<3;++I){assert(G.Guests[I].Phase==Customer::Order);assert(G.InteractCustomer(I));}
+    assert(!G.InteractCustomer(-1)&&!G.InteractCustomer(3));
+    // Three orders can coexist; all recipes can also be made without an order.
+    Prepare(G,Recipe::Beer);Prepare(G,Recipe::Wine);Prepare(G,Recipe::Coffee);Prepare(G,Recipe::Beer);
+    assert(G.TrayCount()==4&&!G.TakeGlass(Recipe::Coffee));
+    assert(G.InteractCustomer(2)); // Serve out of arrival order, leaving all other drinks.
+    assert(G.TrayCount()==3&&G.ReadyCount(Recipe::Beer)==2&&G.Guests[0].Phase==Customer::Drink);
+    assert(G.InteractCustomer(1)&&G.InteractCustomer(0));
+    assert(G.TrayCount()==1&&!G.InteractCustomer(0)&&G.Cash==26000);
+    assert(G.ToggleService()&&G.Closing); // Closing must drain every customer.
+    G.Tick(8);for(const auto& C:G.Guests)assert(C.Phase==Customer::Walking);
+    G.Tick(3);assert(G.PaymentSlot()==0&&G.PayCard()&&!G.PayCard());
+    G.Tick(2);assert(G.Cash==26000&&G.Sold==0);
+    Game Loaded;assert(Loaded.Restore(G.Serialize())&&Loaded.Serialize()==G.Serialize());G=Loaded;
+    G.Tick(1);assert(G.Cash==26500&&G.Sold==1&&G.Open&&G.Closing);
+    assert(G.PaymentSlot()==1&&G.PayCard());G.Tick(3);assert(G.Cash==27100&&G.Open&&G.Sold==2);
+    assert(G.PaymentSlot()==2&&G.PayCard());G.Tick(100);
+    assert(G.Cash==23900&&G.Sold==3&&!G.Open&&G.Day==2); // 500+600+300 minus 3500 once.
+    G.Tick(100);assert(G.Cash==23900&&!G.PayCard());
+    assert(G.TrayCount()==1&&G.DiscardTray(3)&&!G.DiscardTray(3));
 
-    // Closing drains an active client, and charges exactly once.
-    assert(G.ToggleService() && G.Closing);
-    assert(!G.ToggleService());
-    G.Tick(1);
-    assert(!G.Open && !G.Closing && G.Cash == 23000 && G.Day == 2 && G.Sold == 1);
-    G.Tick(100);
-    assert(G.Cash == 23000);
-    assert(G.ToggleService() && G.Time == 1020);
+    Game Wrong;Prepare(Wrong,Recipe::Wine);assert(Wrong.ToggleService());Wrong.Tick(1);assert(Wrong.InteractCustomer(0));
+    const auto Unserved=Wrong.Serialize();assert(!Wrong.InteractCustomer(0)&&Wrong.Serialize()==Unserved);
+    assert(Wrong.TakeGlass(Recipe::Coffee));const auto Stock=Wrong.Stock;
+    assert(!Wrong.Pour(Recipe::Beer,2)&&Wrong.Stock==Stock); // Wrong glass cannot drink the wrong stock.
+    assert(Wrong.TakeGlass(Recipe::Beer)); // Freely replace an empty vessel, without stock use.
+    assert(Wrong.Pour(Recipe::Beer,1)&&!Wrong.TakeGlass(Recipe::Wine));
+    assert(Wrong.Discard()&&Wrong.Stock[0]==950); // Already poured stock is not refunded.
+    Wrong.Stock[0]=49;assert(Wrong.TakeGlass(Recipe::Beer)&&!Wrong.Pour(Recipe::Beer,1));
+    assert(Wrong.Discard());
 
-    // Supplies move between locations; a paid pack arrives once, not immediately.
-    Game Stock;
-    Stock.Reserve = 0;
-    Stock.Beer = 200;
-    assert(Stock.Supply());
-    assert(Stock.Cash == 24400 && Stock.Reserve == 0);
-    assert(!Stock.Supply());
-    Stock.Tick(9);
-    assert(Stock.Reserve == 0);
-    Stock.Tick(1);
-    assert(Stock.Reserve == 500);
-    Stock.Tick(20);
-    assert(Stock.Reserve == 500);
-    assert(Stock.Supply() && Stock.Beer == 700 && Stock.Reserve == 0);
-    Stock.Cash = 1599;
-    assert(!Stock.Supply());
-    Stock.Beer = 990; Stock.Reserve = 500;
-    assert(Stock.Supply() && Stock.Beer == 1000 && Stock.Reserve == 490);
-
-    // Saving partway through preparation must not debit the ingredients twice.
-    Game Pouring;
-    assert(Pouring.TakeGlass() && Pouring.Pour(1));
-    Game Loaded;
-    assert(Loaded.Restore(Pouring.Serialize()));
-    assert(Loaded.Pour(3) && Loaded.Beer == 950 && Loaded.Amount == 50);
-    assert(Loaded.TakeBeer() && !Loaded.TakeBeer());
-    assert(Loaded.Discard() && Loaded.Beer == 950 && !Loaded.Discard());
-    Loaded.Beer = 49;
-    assert(Loaded.TakeGlass() && !Loaded.Pour(1) && Loaded.Beer == 49);
-
-    // Bad snapshots never modify the live game; invalid deltas have no effect.
-    const auto Good = Restored.Serialize();
-    for (const std::string& Bad : {std::string(""), std::string("garbage"), Good + " trailing", std::string("2")})
+    for(int I=0;I<3;++I)
     {
-        assert(!Restored.Restore(Bad));
-        assert(Restored.Serialize() == Good);
+        const auto R=static_cast<Recipe>(I);Game Supply;Supply.Reserve[I]=0;Supply.Stock[I]=0;
+        assert(Supply.Supply(R)&&Supply.Cash==26000-Drinks[I].PackCost&&!Supply.Supply(R));
+        Supply.Tick(9);assert(Supply.Reserve[I]==0);Supply.Tick(1);assert(Supply.Reserve[I]==Drinks[I].Pack);
+        Supply.Tick(20);assert(Supply.Reserve[I]==Drinks[I].Pack);
+        assert(Supply.Supply(R)&&Supply.Stock[I]==Drinks[I].Pack&&Supply.Reserve[I]==0);
+        Supply.Cash=Drinks[I].PackCost-1;assert(!Supply.Supply(R));
+        Supply.Stock[I]=Drinks[I].Capacity-1;Supply.Reserve[I]=Drinks[I].Pack;
+        assert(Supply.Supply(R)&&Supply.Stock[I]==Drinks[I].Capacity&&Supply.Reserve[I]==Drinks[I].Pack-1);
     }
-    for (double Dt : {-1.0, 0.0, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()})
-    {
-        Restored.Tick(Dt);
-        assert(!Restored.Pour(Dt));
-        assert(Restored.Serialize() == Good);
-    }
-    Game Invalid;
-    Invalid.Amount = 50; // Cannot have liquid with no glass.
-    assert(!Restored.Restore(Invalid.Serialize()));
-    Invalid = Game(); Invalid.Phase = Customer::Order; // Closed bar with active client.
-    assert(!Restored.Restore(Invalid.Serialize()));
+    Game Parallel;for(int I=0;I<3;++I){Parallel.Reserve[I]=0;assert(Parallel.Supply(static_cast<Recipe>(I)));}
+    assert(Parallel.Cash==23200);Parallel.Tick(10);assert((Parallel.Reserve==std::array<int,3>{{500,75,20}}));
 
-    // End of night, refusal, insolvency and long frames.
-    Game Night;
-    assert(Night.ToggleService());
-    Night.Tick(1320);
-    assert(!Night.Open && Night.Cash == 22500 && Night.Day == 2);
-    Night.Cash = 100;
-    assert(Night.ToggleService()); Night.Tick(1);
-    assert(Night.ToggleService() && Night.Closing);
-    assert(Night.Dismiss());
-    assert(Night.Bankrupt() && !Night.Open && !Night.ToggleService());
-    Game Overshoot;
-    assert(Overshoot.ToggleService()); Overshoot.Tick(1);
-    assert(Overshoot.InteractCustomer()); Prepare(Overshoot);
-    assert(Overshoot.InteractCustomer()); Overshoot.Tick(11);
-    assert(Overshoot.Phase == Customer::Payment);
-    assert(Overshoot.PayCard()); Overshoot.Tick(10);
-    assert(Overshoot.Sold == 1 && Overshoot.Cash == 26500);
+    // Migrate old single-customer saves without losing a beer or repeating payment.
+    Game Legacy;
+    assert(Legacy.Restore("1 26000 950 500 1 0 1 0 1020 0 0 0 50 2 3"));
+    assert(Legacy.Guests[1].Phase==Customer::Drink&&Legacy.ReadyCount(Recipe::Beer)==1&&Legacy.Held==Glass::None);
+    assert(Legacy.InteractCustomer(1));
+    assert(Legacy.Restore("2 26000 950 500 1 0 1 1 1020 0 2 0 0 6 0 1 1"));
+    assert(Legacy.Developer&&Legacy.ClockPaused&&Legacy.ProcessingSlot()==1);
+    Legacy.Tick(2);assert(Legacy.Cash==23000&&Legacy.Sold==1&&!Legacy.Open);
+    Legacy.Tick(2);assert(Legacy.Cash==23000);
+    assert(Legacy.Restore("2 26000 950 500 1 0 0 0 1020 1 0 0 14 0 2 0 0"));
+    assert(Legacy.Pour(Recipe::Beer,3)&&Legacy.Stock[0]==950&&Legacy.FinishDrink(Recipe::Beer));
+    const auto Good=Legacy.Serialize();
+    for(const std::string& Bad:{std::string(""),std::string("garbage"),Good+" trailing",std::string("2"),std::string("4 ")+Good})
+    {assert(!Legacy.Restore(Bad)&&Legacy.Serialize()==Good);}
+    for(double Dt:{-1.,0.,std::numeric_limits<double>::infinity(),std::numeric_limits<double>::quiet_NaN()})
+    {Legacy.Tick(Dt);assert(!Legacy.Pour(Recipe::Beer,Dt)&&Legacy.Serialize()==Good);}
+    Game Invalid;Invalid.Amount=1;assert(!Legacy.Restore(Invalid.Serialize()));
+    Invalid=Game();Invalid.Guests[0]={1,Recipe::Beer,Customer::Order,0};Invalid.NextCustomerId=2;
+    assert(!Legacy.Restore(Invalid.Serialize())); // Closed service cannot contain customers.
+    Invalid.Open=true;Invalid.Guests[1]=Invalid.Guests[0];assert(!Legacy.Restore(Invalid.Serialize()));
+    Invalid=Game();Invalid.ClockPaused=true;assert(!Legacy.Restore(Invalid.Serialize()));
+    Invalid=Game();Invalid.Tray[0]=7;assert(!Legacy.Restore(Invalid.Serialize()));
 
-    // Developer changes are opt-in and persisted per save, with bounded inputs.
-    Game Dev;
-    assert(!Dev.AddTestMoney(1000)&&!Dev.AddTestProgress(25)&&!Dev.FillTestStocks());
-    assert(!Dev.ToggleTestClock()&&!Dev.AdvanceTestHour());
-    Dev.SetDeveloper(true);
+    Game Dev;assert(!Dev.AddTestMoney(1000)&&!Dev.AddTestProgress(25)&&!Dev.FillTestStocks());
+    assert(!Dev.ToggleTestClock()&&!Dev.AdvanceTestHour());Dev.SetDeveloper(true);
     assert(Dev.AddTestMoney(1000)&&Dev.Cash==126000&&Dev.Sold==0);
-    assert(!Dev.AddTestMoney(0)&&!Dev.AddTestMoney(-1)&&!Dev.AddTestMoney(1000001));
-    assert(Dev.AddTestProgress(25)&&Dev.Sold==25&&Dev.Cash==126000);
-    assert(!Dev.AddTestProgress(0)&&!Dev.AddTestProgress(1001));
-    Dev.Reserve=0;assert(Dev.Supply());const int PaidCash=Dev.Cash;
-    assert(Dev.FillTestStocks()&&Dev.Beer==1000&&Dev.Reserve==500&&Dev.DeliveryRemaining==0);
-    Dev.Tick(20);assert(Dev.Reserve==500&&Dev.Cash==PaidCash);
-    assert(Dev.ToggleTestClock()&&Dev.ClockPaused);
-    assert(!Dev.AdvanceTestHour());
-    assert(Dev.ToggleService());Dev.Tick(1);
-    assert(Dev.Time==1020&&Dev.Phase==Customer::Order);
-    assert(Dev.AdvanceTestHour()&&Dev.Time==1080);
-    Game DevLoaded;assert(DevLoaded.Restore(Dev.Serialize()));
-    assert(DevLoaded.Developer&&DevLoaded.ClockPaused&&DevLoaded.Sold==25);
-    DevLoaded.SetDeveloper(false);assert(!DevLoaded.ClockPaused);
-    DevLoaded.Tick(2);assert(DevLoaded.Time==1081);
-    // Version-one saves remain loadable; no developer state is inferred.
-    Game Legacy;assert(Legacy.Restore("1 26000 1000 500 1 0 0 0 1020 1 0 0 0 0 0"));
-    assert(!Legacy.Developer&&!Legacy.ClockPaused);
-    Game InvalidDev;InvalidDev.ClockPaused=true;
-    assert(!Legacy.Restore(InvalidDev.Serialize()));
-    Dev.Time=1679;assert(Dev.AdvanceTestHour()&&Dev.Closing&&Dev.Phase==Customer::Order);
-    assert(!Dev.AdvanceTestHour());assert(Dev.Dismiss()&&!Dev.Open&&Dev.Day==2);
-    Dev.Cash=100000000;assert(!Dev.AddTestMoney(1));
-    Dev.Sold=10000000;assert(!Dev.AddTestProgress(1));
-    std::cout << "PASS: service, supplies, save compatibility, developer limits, per-save state and clock control\n";
+    assert(!Dev.AddTestMoney(-1)&&!Dev.AddTestMoney(1000001));
+    assert(Dev.AddTestProgress(25)&&Dev.Sold==25&&!Dev.AddTestProgress(1001));
+    Dev.Reserve[0]=0;assert(Dev.Supply(Recipe::Beer));const int Paid=Dev.Cash;
+    assert(Dev.FillTestStocks());Dev.Tick(20);assert(Dev.Reserve[0]==500&&Dev.Cash==Paid);
+    assert(Dev.ToggleTestClock()&&!Dev.AdvanceTestHour());assert(Dev.ToggleService());Dev.Tick(1);
+    assert(Dev.Time==1020&&Dev.AdvanceTestHour()&&Dev.Time==1080);
+    assert(Loaded.Restore(Dev.Serialize())&&Loaded.Developer&&Loaded.ClockPaused);Loaded.SetDeveloper(false);
+    Loaded.Tick(2);assert(Loaded.Time==1081);
+    Dev.Time=1679;assert(Dev.AdvanceTestHour()&&Dev.Closing&&!Dev.AdvanceTestHour());assert(Dev.Dismiss(0)&&!Dev.Open);
+    Dev.Cash=100000000;assert(!Dev.AddTestMoney(1));Dev.Sold=10000000;assert(!Dev.AddTestProgress(1));
+
+    Game Night;assert(Night.ToggleService());Night.Tick(1320);assert(!Night.Open&&Night.Cash==22500);
+    Night.Cash=100;assert(Night.ToggleService());Night.Tick(1);assert(Night.ToggleService()&&Night.Dismiss(0));
+    assert(Night.Bankrupt()&&!Night.Open&&!Night.ToggleService());
+    // Exercise mixed orders, stocks, tray changes, refusals and saves over many evenings.
+    Game Stress;std::mt19937 Random(93467);Stress.SetDeveloper(true);Stress.ToggleTestClock();
+    for(int Step=0;Step<20000;++Step)
+    {
+        const int I=Random()%3;const auto R=static_cast<Recipe>(I);
+        switch(Random()%12)
+        {
+            case 0:Stress.ToggleService();break;case 1:Stress.Tick(Random()%18+1);break;
+            case 2:Stress.TakeGlass(R);break;case 3:Stress.Pour(R,3);break;
+            case 4:Stress.FinishDrink(R);break;case 5:Stress.InteractCustomer(I);break;
+            case 6:Stress.PayCard();break;case 7:Stress.Supply(R);break;
+            case 8:Stress.Discard();break;case 9:Stress.DiscardTray(Random()%4);break;
+            case 10:Stress.Dismiss(I);break;case 11:Stress.FillTestStocks();Stress.AddTestMoney(100);break;
+        }
+        Game RoundTrip;assert(RoundTrip.Restore(Stress.Serialize())&&RoundTrip.Serialize()==Stress.Serialize());
+    }
+    std::cout<<"PASS: concurrent orders, correct glasses, four-place tray, per-recipe stocks, payment queue, v1/v2 migration and 20000 mixed save round trips\n";
 }

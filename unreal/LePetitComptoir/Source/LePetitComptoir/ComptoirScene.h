@@ -18,10 +18,12 @@ public:
     UFUNCTION(BlueprintPure, Category="Comptoir")
     int32 GetGeometryRevision() const { return GeometryRevision; }
     void SetAmbientModel();
+    bool UseModel(const FString& Collection);
     void SetVenueName(const FString& Name);
     UFUNCTION(BlueprintCallable, Category="Comptoir")
     static bool PrepareWorldFont();
 private:
+    FString CurrentCollection;
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> Geometry;
     UPROPERTY() int32 GeometryRevision = 0;
     UPROPERTY() TArray<TObjectPtr<class UTextRenderComponent>> VenueLabels;

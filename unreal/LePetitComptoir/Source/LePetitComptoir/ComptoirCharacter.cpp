@@ -46,13 +46,13 @@ void AComptoirCharacter::SetupPlayerInputComponent(UInputComponent* Input)
     Input->BindAction(TEXT("Tablet"), IE_Pressed, this, &AComptoirCharacter::ToggleTablet);
 }
 
-void AComptoirCharacter::Forward(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddMovementInput(GetActorForwardVector(), FMath::Clamp(Value, -1.f, 1.f)); }
-void AComptoirCharacter::Right(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddMovementInput(GetActorRightVector(), FMath::Clamp(Value, -1.f, 1.f)); }
-void AComptoirCharacter::Turn(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddControllerYawInput(Value * .7f); }
-void AComptoirCharacter::Look(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddControllerPitchInput(Value * .7f); }
+void AComptoirCharacter::Forward(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddMovementInput(GetActorForwardVector(), FMath::Clamp(Value, -1.f, 1.f)); }
+void AComptoirCharacter::Right(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddMovementInput(GetActorRightVector(), FMath::Clamp(Value, -1.f, 1.f)); }
+void AComptoirCharacter::Turn(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddControllerYawInput(Value * .7f); }
+void AComptoirCharacter::Look(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddControllerPitchInput(Value * .7f); }
 void AComptoirCharacter::StartSprint() { GetCharacterMovement()->MaxWalkSpeed = 400; }
 void AComptoirCharacter::StopSprint() { GetCharacterMovement()->MaxWalkSpeed = 220; }
-void AComptoirCharacter::StartPour() { bPouring = !bMenuBlocked&&!bTabletOpen; }
+void AComptoirCharacter::StartPour() { bPouring = !bMenuBlocked&&!bTabletOpen&&!bGlassPicker; }
 void AComptoirCharacter::StopPour() { bPouring = false; }
 
 AComptoirProp* AComptoirCharacter::FocusedProp() const
@@ -67,13 +67,13 @@ AComptoirProp* AComptoirCharacter::FocusedProp() const
 
 void AComptoirCharacter::Interact()
 {
-    if (bMenuBlocked||bTabletOpen) return;
+    if (bMenuBlocked||bTabletOpen||bGlassPicker) return;
     if (IsInReserve()) { OpenTablet(3); return; }
     if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())
         if (const AComptoirProp* Prop = FocusedProp())
         {
             if (Prop->Target==EComptoirTarget::Stock) OpenTablet(3);
-            else Game->Interact(Prop->Target);
+            else Game->Interact(Prop->Target,Prop->CustomerSlot);
         }
 }
 
@@ -103,8 +103,7 @@ void AComptoirCharacter::Tick(float DeltaSeconds)
     }
     if (!bPouring) return;
     if (const AComptoirProp* Prop = FocusedProp())
-        if (Prop->Target == EComptoirTarget::Tap)
-            if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>()) Game->Pour(DeltaSeconds);
+        if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>()) Game->Pour(Prop->Target,DeltaSeconds);
 }
 
 void AComptoirCharacter::PauseGame()
@@ -113,7 +112,7 @@ void AComptoirCharacter::PauseGame()
 }
 void AComptoirCharacter::SetMenuBlocked(bool Blocked)
 {
-    bMenuBlocked=Blocked;bTabletOpen=false;bPouring=false;StopSprint();
+    bMenuBlocked=Blocked;bTabletOpen=false;bGlassPicker=false;bPouring=false;StopSprint();
     GetCharacterMovement()->StopMovementImmediately();
     if(APlayerController* Player=Cast<APlayerController>(GetController()))
     {
@@ -131,6 +130,7 @@ void AComptoirCharacter::SetMenuBlocked(bool Blocked)
 void AComptoirCharacter::ToggleTablet()
 {
     if (bMenuBlocked||UGameplayStatics::IsGamePaused(this)) return;
+    if(bGlassPicker){SetGlassPicker(false);return;}
     bTabletOpen = !bTabletOpen;
     bPouring = false;
     StopSprint();
@@ -158,23 +158,40 @@ void AComptoirCharacter::SaveGame()
 void AComptoirCharacter::LoadGame()
 {
     if(bMenuBlocked)return;
-    bPouring = false;
+    bPouring = false;SetGlassPicker(false);
     if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>()) Game->Load(true);
 }
 void AComptoirCharacter::Discard()
 {
-    if (bMenuBlocked||bTabletOpen) return;
+    if (bMenuBlocked||bTabletOpen||bGlassPicker) return;
     bPouring = false;
     if (const AComptoirProp* Prop = FocusedProp())
-        if (Prop->Target == EComptoirTarget::Tap)
+        if (Prop->Target==EComptoirTarget::Tap||Prop->Target==EComptoirTarget::Wine||Prop->Target==EComptoirTarget::Coffee||Prop->Target==EComptoirTarget::GlassRack)
             if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())
                 if (Game->Simulation.Discard()) { Game->Notify(TEXT("Verre range ou boisson jetee.")); Game->Save(); }
 }
 void AComptoirCharacter::Dismiss()
 {
-    if (bMenuBlocked||bTabletOpen) return;
+    if (bMenuBlocked||bTabletOpen||bGlassPicker) return;
     if (const AComptoirProp* Prop = FocusedProp())
         if (Prop->Target == EComptoirTarget::Customer)
             if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())
-                if (Game->Simulation.Dismiss()) { Game->Notify(TEXT("Commande refusee. Le client est parti.")); Game->Save(); }
+                if (Game->Simulation.Dismiss(Prop->CustomerSlot)) { Game->Notify(TEXT("Commande refusee. Le client est parti.")); Game->Save(); }
+}
+
+void AComptoirCharacter::SetGlassPicker(bool Open)
+{
+    if(bMenuBlocked)return;
+    bGlassPicker=Open;bTabletOpen=false;bPouring=false;StopSprint();
+    GetCharacterMovement()->StopMovementImmediately();
+    if(APlayerController* Player=Cast<APlayerController>(GetController()))
+    {
+        Player->bShowMouseCursor=Open;Player->bEnableClickEvents=Open;
+        if(Open)
+        {
+            FInputModeGameAndUI Mode;Mode.SetHideCursorDuringCapture(false);
+            Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);Player->SetInputMode(Mode);
+        }
+        else Player->SetInputMode(FInputModeGameOnly());
+    }
 }

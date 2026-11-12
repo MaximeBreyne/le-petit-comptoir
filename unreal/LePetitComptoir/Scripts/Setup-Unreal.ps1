@@ -35,7 +35,7 @@ if ($LASTEXITCODE -ne 0) { throw "Compilation Unreal echouee (code $LASTEXITCODE
 Write-Host '2/3 Preparation des assets, polices et mise a jour du decor...'
 & $Commandlet $Project '-run=pythonscript' "-script=$Bootstrap" '-unattended' '-nop4' '-NullRHI' '-UTF8Output'
 if ($LASTEXITCODE -ne 0) { throw "Creation des assets echouee (code $LASTEXITCODE). Consultez Saved\Logs." }
-foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\Materials\M_Original_00.uasset', 'Content\Original\UI\T_ComptoirLogo.uasset', 'Content\Original\Fonts\F_ComptoirWorld.uasset', 'Content\Original\Materials\M_ComptoirText.uasset')) {
+foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\Materials\M_Original_00.uasset', 'Content\Original\UI\T_ComptoirLogo.uasset', 'Content\Original\Fonts\F_ComptoirWorld.uasset', 'Content\Original\Materials\M_ComptoirText.uasset', 'Content\Original\Materials\M_Original_16.uasset')) {
     if (-not (Test-Path -LiteralPath (Join-Path $ProjectDirectory $Relative))) {
         throw "Asset manquant : $Relative. Consultez Saved\Logs."
     }
@@ -53,14 +53,14 @@ if ($VerifyTablet -or $VerifyUI) {
     if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent : $ReportFile" }
     $Report = Get-Content -LiteralPath $ReportFile -Raw | ConvertFrom-Json
     $ExpectedTests = @('LePetitComptoir.Tablet.RenderedText')
-    if ($VerifyUI) { $ExpectedTests += @('LePetitComptoir.World.FontGlyphs', 'LePetitComptoir.World.RenderedText', 'LePetitComptoir.Session.SaveMetadata') }
+    if ($VerifyUI) { $ExpectedTests += @('LePetitComptoir.World.FontGlyphs', 'LePetitComptoir.World.RenderedText', 'LePetitComptoir.Session.SaveMetadata', 'LePetitComptoir.Drinks.GoldenBeer') }
     foreach ($Expected in $ExpectedTests) {
         $Result = @($Report.tests | Where-Object { $_.fullTestPath -eq $Expected })
         if ($Result.Count -ne 1 -or $Result[0].state -ne 'Success') {
             throw "Le test $Expected n'a pas reussi. Rapport : $ReportFile"
         }
     }
-    Write-Host 'Textes verifies. Captures : Saved\Tests\Tablet et Saved\Tests\WorldText.'
+    Write-Host 'Textes verifies. Captures : Saved\Tests\Tablet, Saved\Tests\WorldText et Saved\Tests\Drinks.'
 }
 
 Write-Host '3/3 Projet pret. Ouvrez LePetitComptoir.uproject puis Play dans Maps/ComptoirOriginal.'

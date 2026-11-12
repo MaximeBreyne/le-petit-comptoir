@@ -16,7 +16,7 @@ void AComptoirHUD::DrawHUD()
     const AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>();
     const AComptoirCharacter* Player = Cast<AComptoirCharacter>(GetOwningPawn());
     if (!Canvas || !Game || !Player) { HideTablet(); return; }
-    if (Game->Session.MenuVisible()||Player->IsTabletOpen()) { UpdateTablet(*Game); return; }
+    if (Game->Session.MenuVisible()||Player->IsTabletOpen()||Player->IsGlassPickerOpen()) { UpdateTablet(*Game); return; }
     HideTablet();
     const auto& S = Game->Simulation;
     const float Scale = FMath::Clamp(Canvas->SizeX / 1440.f, .65f, 1.2f);
@@ -65,16 +65,16 @@ void AComptoirHUD::DrawHUD()
     Text(FString::Printf(TEXT("%d h %02d avant 4 h"),Left/60,Left%60),177,101,.75f,Cream);
     Rect(38,133,254,3,FLinearColor(1,1,1,.12f));
     Rect(38,133,254*static_cast<float>((S.Time-1020)/660),3,Gold);
-    const TCHAR* Order = S.Phase==Comptoir::Customer::Order?TEXT("Prendre la commande [E]"):
-        S.Phase==Comptoir::Customer::Drink?TEXT("Une biere pression · 50 cl"):
-        S.Phase==Comptoir::Customer::Drinking?TEXT("Le client deguste sa biere"):
-        S.Phase==Comptoir::Customer::Walking?TEXT("Le client rejoint la caisse"):
-        S.Phase==Comptoir::Customer::Processing?TEXT("Paiement par carte en cours"):
-        TEXT("A encaisser a la caisse : 5 €");
-    if (S.Phase!=Comptoir::Customer::None)
+    for(int I=0;I<Comptoir::Game::MaxCustomers;++I)
     {
-        Card(23,169,284,83);Text(TEXT("SERVICE AU COMPTOIR"),38,183,.8f,Gold);
-        Text(Order,38,211,.95f,Cream);
+        const auto& Guest=S.Guests[I];if(Guest.Phase==Comptoir::Customer::None)continue;
+        const float Y=169+I*83.f;
+        Card(23,Y,284,76);Text(FString::Printf(TEXT("CLIENT #%d"),Guest.Id),38,Y+12,.8f,Gold);
+        const FString Detail=Guest.Phase==Comptoir::Customer::Order?TEXT("Prendre la commande [E]"):
+            Guest.Phase==Comptoir::Customer::Drink?UTF8_TO_TCHAR(Comptoir::Drink(Guest.Requested).Name):
+            Guest.Phase==Comptoir::Customer::Drinking?TEXT("Dégustation"):
+            Guest.Phase==Comptoir::Customer::Processing?TEXT("Paiement en cours"):TEXT("Rejoint / attend la caisse");
+        Text(Detail,38,Y+40,.95f,Cream);
     }
     const FVector P=Player->GetActorLocation();
     if (!Player->IsTabletOpen() && ((P.X>0 && P.X<240) || S.Held!=Comptoir::Glass::None))
@@ -83,23 +83,22 @@ void AComptoirHUD::DrawHUD()
         Card(X,Y,440,220);Text(TEXT("DERRIERE LE COMPTOIR"),X+17,Y+15,.68f,Gold);
         Text(TEXT("Preparations en cours"),X+17,Y+36,1.4f,Cream);
         Rect(X+17,Y+68,406,1,Border);
-        const TCHAR* Prep=S.Held==Comptoir::Glass::None?TEXT("Choisissez une pinte au rangement des verres."):
-            S.Held==Comptoir::Glass::Empty?TEXT("Pinte vide · approchez la tireuse."):
-            S.Held==Comptoir::Glass::Full?TEXT("Biere prete sur le plateau · servir avec E."):
-            TEXT("Biere pression · maintenir le clic gauche pour doser.");
+        const auto& Recipe=Comptoir::Drink(S.Vessel);
+        const FString Prep=S.Held==Comptoir::Glass::None?TEXT("E sur VERRERIE pour choisir un contenant."):
+            FString::Printf(TEXT("%s · %s"),UTF8_TO_TCHAR(Recipe.Vessel),UTF8_TO_TCHAR(Recipe.Station));
         Text(Prep,X+17,Y+83,.9f,Cream);
         Rect(X+17,Y+114,406,9,FLinearColor(1,1,1,.10f));
-        Rect(X+17,Y+114,406*static_cast<float>(S.Amount/50),9,Gold);
-        Text(FString::Printf(TEXT("%.0f / 50 cl"),S.Amount),X+17,Y+134,.95f,Gold);
+        Rect(X+17,Y+114,406*static_cast<float>(S.Amount/Recipe.Target),9,Gold);
+        Text(FString::Printf(TEXT("%.0f / %.0f %s"),S.Amount,Recipe.Target,UTF8_TO_TCHAR(Recipe.Unit)),X+17,Y+134,.95f,Gold);
         Rect(X+17,Y+164,406,1,Border);
-        Text(S.Held==Comptoir::Glass::Full?TEXT("PLATEAU   Biere pression — 5 €"):TEXT("PLATEAU   Aucune boisson terminee"),X+17,Y+181,.85f,Muted);
+        Text(FString::Printf(TEXT("PLATEAU %d/4 · %d bière(s), %d vin(s), %d café(s)"),S.TrayCount(),S.ReadyCount(Comptoir::Recipe::Beer),S.ReadyCount(Comptoir::Recipe::Wine),S.ReadyCount(Comptoir::Recipe::Coffee)),X+17,Y+181,.8f,Muted);
     }
     if (!Player->IsTabletOpen())
     {
         Rect(W*.5f-1.5f,H*.5f-1.5f,3,3,Cream);
         if (const AComptoirProp* Prop=Player->FocusedProp())
         {
-            const FString Prompt=Game->Prompt(Prop->Target);
+            const FString Prompt=Game->Prompt(Prop->Target,Prop->CustomerSlot);
             if (!Prompt.IsEmpty())
             {
                 const float Width=FMath::Min(780.f,W-46);
@@ -131,18 +130,27 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     AComptoirGameMode* Game=GetWorld()->GetAuthGameMode<AComptoirGameMode>();
     if(!Player||!Game)return;
     if(Game->Session.MenuVisible()){Game->MenuAction(BoxName);return;}
+    if(Player->IsGlassPickerOpen())
+    {
+        if(BoxName==TEXT("glass_close")){Player->SetGlassPicker(false);HideTablet();return;}
+        for(int I=0;I<3;++I)if(BoxName==FName(*FString::Printf(TEXT("glass_%d"),I)))Game->ChooseGlass(I);
+        if(!Player->IsGlassPickerOpen())HideTablet();
+        return;
+    }
     if(!Player->IsTabletOpen())return;
     if(BoxName.ToString().StartsWith(TEXT("dev_"))){Game->DeveloperAction(BoxName);return;}
-    if (BoxName==TEXT("tablet") || BoxName==TEXT("tablet_header") || BoxName==TEXT("return_bar")) Player->ToggleTablet();
-    else if (BoxName==TEXT("service")) Game->Interact(EComptoirTarget::Sign);
-    else if (BoxName==TEXT("restock") && Game->Simulation.Reserve>0 && Game->Simulation.Beer<1000)
-        Game->Interact(EComptoirTarget::Stock);
-    else if (BoxName==TEXT("buy_stock") && Game->Simulation.Reserve==0)
-        Game->Interact(EComptoirTarget::Stock);
-    else if (BoxName==TEXT("take_order") && Game->Simulation.Phase==Comptoir::Customer::Order && Game->CanReachTabletTarget(EComptoirTarget::Customer))
-        Game->Interact(EComptoirTarget::Customer);
-    else if (BoxName==TEXT("pay_card") && Game->CanReachTabletTarget(EComptoirTarget::Till))
-        Game->Interact(EComptoirTarget::Till);
+    for(int I=0;I<Comptoir::Game::MaxCustomers;++I)
+        if(BoxName==FName(*FString::Printf(TEXT("customer_%d"),I)))
+        {if(Game->CanReachTabletTarget(EComptoirTarget::Customer,I))Game->Interact(EComptoirTarget::Customer,I);return;}
+    for(int I=0;I<3;++I)
+        if(BoxName==FName(*FString::Printf(TEXT("supply_%d"),I)))
+        {if(Game->Simulation.Supply(static_cast<Comptoir::Recipe>(I))){Game->Notify(TEXT("Stock mis à jour."));Game->Save();}return;}
+    for(int I=0;I<Comptoir::Game::TrayCapacity;++I)
+        if(BoxName==FName(*FString::Printf(TEXT("tray_discard_%d"),I)))
+        {if(Game->Simulation.DiscardTray(I)){Game->Notify(TEXT("Boisson retirée du plateau, sans remboursement."));Game->Save();}return;}
+    if(BoxName==TEXT("tablet")||BoxName==TEXT("tablet_header")||BoxName==TEXT("return_bar"))Player->ToggleTablet();
+    else if(BoxName==TEXT("service"))Game->Interact(EComptoirTarget::Sign);
+    else if(BoxName==TEXT("pay_card")&&Game->CanReachTabletTarget(EComptoirTarget::Till))Game->Interact(EComptoirTarget::Till);
     else if (BoxName==TEXT("tab_service")) TabletPage=0;
     else if (BoxName==TEXT("tab_orders")) TabletPage=1;
     else if (BoxName==TEXT("tab_register")) TabletPage=2;

@@ -21,6 +21,18 @@ namespace
 {
     // Avoid generic globals that trigger MSVC shadowing errors in Unreal templates.
     const FString GComptoirSaveSlotName = TEXT("LePetitComptoir_Unreal_Pilot_v1");
+    int RecipeForTarget(EComptoirTarget Target)
+    {
+        return Target==EComptoirTarget::Tap?0:Target==EComptoirTarget::Wine?1:Target==EComptoirTarget::Coffee?2:-1;
+    }
+    FVector SeatPosition(int Slot){return FVector(430,460+Slot*140,0);}
+    FVector StationPosition(Comptoir::Recipe Recipe)
+    {
+        return Recipe==Comptoir::Recipe::Beer?FVector(272,415,113.3):
+            Recipe==Comptoir::Recipe::Wine?FVector(110,290,106):FVector(247,843,115.2);
+    }
+    FString DrinkModel(Comptoir::Recipe Recipe,int Level)
+    {return FString::Printf(TEXT("drink_%s_%d"),UTF8_TO_TCHAR(Comptoir::Drink(Recipe).Key),Level);}
 }
 
 AComptoirGameMode::AComptoirGameMode()
@@ -91,6 +103,8 @@ void AComptoirGameMode::BuildRoom()
         return Prop;
     };
     Target(FVector(272, 415, 168), FVector(35, 95, 75), EComptoirTarget::Tap);
+    Target(FVector(92,290,125),FVector(40,38,60),EComptoirTarget::Wine);
+    Target(FVector(247,843,148),FVector(55,80,65),EComptoirTarget::Coffee);
     Target(FVector(85, 700, 130), FVector(45, 125, 65), EComptoirTarget::GlassRack);
     Target(FVector(288, 265, 144), FVector(50, 70, 65), EComptoirTarget::Till);
     Target(FVector(-350, 230, 130), FVector(70, 350, 180), EComptoirTarget::Stock);
@@ -103,30 +117,30 @@ void AComptoirGameMode::BuildRoom()
         ServiceSign->Label->SetWorldSize(11);
         ServiceSign->Label->SetWorldRotation(FRotator(0, 180, 0));
     }
-    Customer = Target(FVector(430, 600, 130), FVector(55, 60, 150), EComptoirTarget::Customer);
-    const auto Model = [&](const TCHAR* Collection)
+    const auto Model = [&](const FString& Collection)
     {
-        AComptoirScene* Actor = GetWorld()->SpawnActor<AComptoirScene>();
-        if (Actor && !Actor->Build(Collection)) Notify(TEXT("Modeles absents : relancez Setup-Unreal.ps1."));
+        AComptoirScene* Actor=GetWorld()->SpawnActor<AComptoirScene>();
+        if(Actor&&!Actor->UseModel(Collection))Notify(TEXT("Modèles absents : relancez Setup-Unreal.ps1."));
+        if(Actor)Actor->SetAmbientModel();
         return Actor;
     };
-    CustomerSeated = Model(TEXT("customerSeated"));
-    CustomerStanding = Model(TEXT("customerStanding"));
-    EmptyGlass = Model(TEXT("glass"));
-    FullGlass = Model(TEXT("beer"));
+    for(int I=0;I<Comptoir::Game::MaxCustomers;++I)
+    {
+        AComptoirProp* Person=Target(SeatPosition(I)+FVector(0,0,130),FVector(55,60,150),EComptoirTarget::Customer);
+        if(Person)Person->CustomerSlot=I;
+        Customers.Add(Person);
+        CustomerSeated.Add(Model(FString::Printf(TEXT("guest%d_seated"),I)));
+        CustomerStanding.Add(Model(FString::Printf(TEXT("guest%d_standing"),I)));
+        CustomerDrinks.Add(Model(DrinkModel(Comptoir::Recipe::Beer,8)));
+    }
+    PreparationVisual=Model(DrinkModel(Comptoir::Recipe::Beer,0));
+    for(int I=0;I<Comptoir::Game::TrayCapacity;++I)TrayVisuals.Add(Model(DrinkModel(Comptoir::Recipe::Beer,8)));
     DoorLeft=GetWorld()->SpawnActor<AComptoirScene>();
     DoorRight=GetWorld()->SpawnActor<AComptoirScene>();
     if(DoorLeft) { if(!DoorLeft->Build(TEXT("doorLeft"),true))Notify(TEXT("Porte absente : relancez Setup-Unreal.ps1."));DoorLeft->SetActorLocation(FVector(1002,455,0)); }
     if(DoorRight) { if(!DoorRight->Build(TEXT("doorRight"),true))Notify(TEXT("Porte absente : relancez Setup-Unreal.ps1."));DoorRight->SetActorLocation(FVector(1002,745,0)); }
     GetWorld()->SpawnActor<AComptoirStreetLife>();
-    if (EmptyGlass) EmptyGlass->SetActorLocation(FVector(272, 415, 113.3));
-    if (FullGlass) FullGlass->SetActorLocation(FVector(285, 498, 113.3));
-    BeerVisual = Make(FVector(272, 415, 115), FVector(13, 13, 1), FLinearColor(.69f,.38f,.07f));
-    if (BeerVisual)
-    {
-        BeerVisual->Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
-        BeerVisual->SetActorEnableCollision(false);
-    }
+
 }
 
 void AComptoirGameMode::Tick(float DeltaSeconds)
@@ -147,11 +161,12 @@ void AComptoirGameMode::Tick(float DeltaSeconds)
         if(DoorRight)DoorRight->SetActorRotation(FRotator(0,DoorAngle,0));
     }
     const int PreviousSold = Simulation.Sold;
+    const int PreviousCash=Simulation.Cash;
     const int PreviousDay = Simulation.Day;
     Simulation.Tick(DeltaSeconds);
     MessageRemaining = FMath::Max(0.f, MessageRemaining - DeltaSeconds);
     UpdateVisuals();
-    if (Simulation.Sold > PreviousSold) { Notify(TEXT("Paiement confirme : +5 EUR.")); Save(); }
+    if (Simulation.Sold > PreviousSold) { Notify(FString::Printf(TEXT("Paiement confirmé : +%.2f €."),(Simulation.Cash-PreviousCash+(Simulation.Day>PreviousDay?Comptoir::Game::NightCost:0))/100.0)); Save(); }
     if (Simulation.Day > PreviousDay) { Notify(TEXT("Service termine : 35 EUR de charges. E sur le panneau pour le soir suivant.")); Save(); }
     AutosaveRemaining -= DeltaSeconds;
     if (AutosaveRemaining <= 0) { Save(); AutosaveRemaining = 5; }
@@ -159,31 +174,46 @@ void AComptoirGameMode::Tick(float DeltaSeconds)
 
 void AComptoirGameMode::UpdateVisuals()
 {
-    const bool Visible = Simulation.Phase != Comptoir::Customer::None;
-    const bool Seated = Simulation.Phase == Comptoir::Customer::Order ||
-        Simulation.Phase == Comptoir::Customer::Drink || Simulation.Phase == Comptoir::Customer::Drinking;
-    FVector Position(430,600,0);
-    if (Simulation.Phase == Comptoir::Customer::Walking)
+    using namespace Comptoir;
+    for(int I=0;I<Game::MaxCustomers;++I)
     {
-        const float Progress = 1.f - static_cast<float>(Simulation.CustomerRemaining / 3.0);
-        if (Progress < .2f) Position = FMath::Lerp(Position, FVector(500, 600, 0), Progress / .2f);
-        else if (Progress < .8f) Position = FMath::Lerp(FVector(500, 600, 0), FVector(500, 245, 0), (Progress-.2f)/.6f);
-        else Position = FMath::Lerp(FVector(500, 245, 0), FVector(415, 245, 0), (Progress-.8f)/.2f);
+        const auto& C=Simulation.Guests[I];const bool Visible=C.Phase!=Customer::None;
+        const bool Seated=C.Phase==Customer::Order||C.Phase==Customer::Drink||C.Phase==Customer::Drinking;
+        int Rank=0;
+        for(const auto& Other:Simulation.Guests)
+            if(C.Phase!=Customer::Processing&&Other.Id>0&&Other.Id!=C.Id&&
+                (Other.Phase==Customer::Processing||(Other.Id<C.Id&&(Other.Phase==Customer::Walking||Other.Phase==Customer::Payment))))++Rank;
+        const FVector Queue(415+Rank*75,245,0);FVector Position=SeatPosition(I);
+        if(C.Phase==Customer::Walking)
+        {
+            const float P=1.f-static_cast<float>(C.Remaining/3.0);
+            const FVector A(550+Rank*20,Position.Y,0),B(550+Rank*20,245,0);
+            Position=P<.2f?FMath::Lerp(Position,A,P/.2f):P<.8f?FMath::Lerp(A,B,(P-.2f)/.6f):FMath::Lerp(B,Queue,(P-.8f)/.2f);
+        }
+        else if(C.Phase==Customer::Payment||C.Phase==Customer::Processing)Position=Queue;
+        if(Customers[I]){Customers[I]->SetActorEnableCollision(Visible);Customers[I]->SetActorLocation(Position+FVector(0,0,130));}
+        if(CustomerSeated[I]){CustomerSeated[I]->SetActorHiddenInGame(!Visible||!Seated);CustomerSeated[I]->SetActorLocation(Position);}
+        if(CustomerStanding[I]){CustomerStanding[I]->SetActorHiddenInGame(!Visible||Seated);CustomerStanding[I]->SetActorLocation(Position);}
+        if(CustomerDrinks[I])
+        {
+            const bool Drinking=C.Phase==Customer::Drinking;CustomerDrinks[I]->SetActorHiddenInGame(!Drinking);
+            if(Drinking){CustomerDrinks[I]->UseModel(DrinkModel(C.Requested,8));CustomerDrinks[I]->SetActorLocation(SeatPosition(I)+FVector(-90,0,113.3));}
+        }
     }
-    else if (Simulation.Phase == Comptoir::Customer::Payment || Simulation.Phase == Comptoir::Customer::Processing)
-        Position = FVector(415, 245, 0);
-    if (Customer) { Customer->SetActorEnableCollision(Visible); Customer->SetActorLocation(Position+FVector(0, 0, 130)); }
-    if (CustomerSeated) { CustomerSeated->SetActorHiddenInGame(!Visible || !Seated); CustomerSeated->SetActorLocation(Position); }
-    if (CustomerStanding) { CustomerStanding->SetActorHiddenInGame(!Visible || Seated); CustomerStanding->SetActorLocation(Position); }
-    const bool Filling = Simulation.Held == Comptoir::Glass::Filling;
-    if (EmptyGlass) EmptyGlass->SetActorHiddenInGame(!Filling);
-    if (FullGlass) FullGlass->SetActorHiddenInGame(Simulation.Held != Comptoir::Glass::Full);
-    if (BeerVisual)
+    if(PreparationVisual)
     {
-        const double Height = FMath::Max(.1, Simulation.Amount / 50.0 * 25.5);
-        BeerVisual->SetActorHiddenInGame(!Filling || Simulation.Amount <= 0);
-        BeerVisual->Mesh->SetWorldScale3D(FVector(.13,.13,Height/100));
-        BeerVisual->SetActorLocation(FVector(272,415,114.5+Height/2));
+        PreparationVisual->SetActorHiddenInGame(Simulation.Held==Glass::None);
+        if(Simulation.Held!=Glass::None)
+        {
+            const int Level=Simulation.Amount<=0?0:FMath::Clamp(FMath::CeilToInt(Simulation.Amount/Drink(Simulation.Vessel).Target*8),1,8);
+            PreparationVisual->UseModel(DrinkModel(Simulation.Vessel,Level));
+            PreparationVisual->SetActorLocation(StationPosition(Simulation.Vessel));
+        }
+    }
+    for(int I=0;I<Game::TrayCapacity;++I)if(TrayVisuals[I])
+    {
+        const int R=Simulation.Tray[I];TrayVisuals[I]->SetActorHiddenInGame(R<0);
+        if(R>=0){TrayVisuals[I]->UseModel(DrinkModel(static_cast<Recipe>(R),8));TrayVisuals[I]->SetActorLocation(FVector(285+(I/2)*32,498+(I%2)*26,113.3));}
     }
     if (ServiceSign) ServiceSign->Label->SetText(FText::FromString(Simulation.Closing?
         TEXT("DERNIERE TOURNEE\nFIN DU SERVICE"):Simulation.Open?TEXT("OUVERT\nFERMER LE BAR"):TEXT("FERME\nOUVRIR LE BAR")));
@@ -191,80 +221,100 @@ void AComptoirGameMode::UpdateVisuals()
 
 void AComptoirGameMode::Notify(const FString& Text) { Message = Text; MessageRemaining = 7; }
 
-bool AComptoirGameMode::CanReachTabletTarget(EComptoirTarget Target) const
+bool AComptoirGameMode::CanReachTabletTarget(EComptoirTarget Target,int32 Slot) const
 {
-    const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
-    if (!Player || Simulation.Bankrupt()) return false;
-    if (Target == EComptoirTarget::Customer && Customer && Simulation.Phase != Comptoir::Customer::None)
-        return FVector::Dist2D(Player->GetActorLocation(), Customer->GetActorLocation()) <= 300;
-    if (Target == EComptoirTarget::Till)
-        return FVector::Dist2D(Player->GetActorLocation(), FVector(288, 265, 144)) <= 300;
+    const APawn* Player=UGameplayStatics::GetPlayerPawn(this,0);
+    if(!Player||Simulation.Bankrupt())return false;
+    if(Target==EComptoirTarget::Customer&&Simulation.HasCustomer(Slot)&&Customers.IsValidIndex(Slot)&&Customers[Slot])
+        return FVector::Dist2D(Player->GetActorLocation(),Customers[Slot]->GetActorLocation())<=300;
+    if(Target==EComptoirTarget::Till)return FVector::Dist2D(Player->GetActorLocation(),FVector(288,265,144))<=300;
+    if(Target==EComptoirTarget::GlassRack)return FVector::Dist2D(Player->GetActorLocation(),FVector(85,700,130))<=300;
     return false;
 }
 
-void AComptoirGameMode::Interact(EComptoirTarget Target)
+void AComptoirGameMode::ChooseGlass(int32 Index)
+{
+    if(!Session.CanSimulate()||!Comptoir::ValidRecipe(Index)||!CanReachTabletTarget(EComptoirTarget::GlassRack))return;
+    if(Simulation.TakeGlass(static_cast<Comptoir::Recipe>(Index)))
+    {
+        Notify(FString::Printf(TEXT("%s choisi · rendez-vous au poste : %s."),UTF8_TO_TCHAR(Comptoir::Drinks[Index].Vessel),UTF8_TO_TCHAR(Comptoir::Drinks[Index].Station)));
+        if(AComptoirCharacter* Player=Cast<AComptoirCharacter>(UGameplayStatics::GetPlayerPawn(this,0)))Player->SetGlassPicker(false);
+        UpdateVisuals();Save();
+    }
+}
+
+void AComptoirGameMode::Interact(EComptoirTarget Target,int32 Slot)
 {
     if(!Session.CanSimulate())return;
-    bool Changed = false;
-    switch (Target)
+    bool Changed=false;
+    switch(Target)
     {
         case EComptoirTarget::Door:
         {
             const APawn* Player=UGameplayStatics::GetPlayerPawn(this,0);
             if(bDoorOpen&&Player&&ComptoirWorld::BlocksDoorClosing(Player->GetActorLocation().X,Player->GetActorLocation().Y))
-            { Notify(TEXT("Eloignez-vous du passage pour fermer la porte.")); return; }
-            bDoorOpen=!bDoorOpen;
-            Notify(bDoorOpen?TEXT("Porte ouverte : vous pouvez sortir dans la rue."):TEXT("Porte fermee."));
-            return;
+            {Notify(TEXT("Éloignez-vous du passage pour fermer la porte."));return;}
+            bDoorOpen=!bDoorOpen;Notify(bDoorOpen?TEXT("Porte ouverte : vous pouvez sortir dans la rue."):TEXT("Porte fermée."));return;
         }
-        case EComptoirTarget::Sign: Changed = Simulation.ToggleService(); break;
-        case EComptoirTarget::GlassRack: Changed = Simulation.TakeGlass(); break;
-        case EComptoirTarget::Tap: Changed = Simulation.TakeBeer(); break;
-        case EComptoirTarget::Customer: Changed = Simulation.InteractCustomer(); break;
-        case EComptoirTarget::Till: Changed = Simulation.PayCard(); break;
-        case EComptoirTarget::Stock: Changed = Simulation.Supply(); break;
-        default: return;
+        case EComptoirTarget::Sign:Changed=Simulation.ToggleService();break;
+        case EComptoirTarget::GlassRack:
+            if(AComptoirCharacter* Player=Cast<AComptoirCharacter>(UGameplayStatics::GetPlayerPawn(this,0)))Player->SetGlassPicker(true);
+            return;
+        case EComptoirTarget::Tap:case EComptoirTarget::Wine:case EComptoirTarget::Coffee:
+            Changed=Simulation.FinishDrink(static_cast<Comptoir::Recipe>(RecipeForTarget(Target)));break;
+        case EComptoirTarget::Customer:Changed=Simulation.InteractCustomer(Slot);break;
+        case EComptoirTarget::Till:Changed=Simulation.PayCard();break;
+        default:return;
     }
-    Notify(Changed ? TEXT("Action effectuee.") : Prompt(Target));
-    UpdateVisuals();
-    if (Changed) Save();
+    Notify(Changed?TEXT("Action effectuée."):Prompt(Target,Slot));UpdateVisuals();if(Changed)Save();
 }
 
-void AComptoirGameMode::Pour(float DeltaSeconds)
+void AComptoirGameMode::Pour(EComptoirTarget Target,float DeltaSeconds)
 {
     if(!Session.CanSimulate())return;
-    const auto Before = Simulation.Held;
-    if (!Simulation.Pour(DeltaSeconds)) return;
-    if (Before != Simulation.Held) Save();
+    const int Index=RecipeForTarget(Target);if(Index<0)return;
+    const auto Before=Simulation.Held;
+    if(!Simulation.Pour(static_cast<Comptoir::Recipe>(Index),DeltaSeconds))return;
+    if(Before!=Simulation.Held)Save();
 }
 
-FString AComptoirGameMode::Prompt(EComptoirTarget Target) const
+FString AComptoirGameMode::Prompt(EComptoirTarget Target,int32 Slot) const
 {
+    using namespace Comptoir;
     if(Target==EComptoirTarget::Door)return bDoorOpen?TEXT("E - Fermer la porte"):TEXT("E - Ouvrir la porte et sortir");
-    if (Simulation.Bankrupt()) return TEXT("Tresorerie negative : partie terminee.");
-    switch (Target)
+    if(Simulation.Bankrupt())return TEXT("Trésorerie négative : partie terminée.");
+    const int R=RecipeForTarget(Target);
+    if(R>=0)
     {
-        case EComptoirTarget::Sign:
-            return Simulation.Closing ? TEXT("Derniere tournee : terminez le service du client.") : Simulation.Open ? TEXT("E - Derniere tournee puis fermeture (-35 EUR)") : TEXT("E - Ouvrir le bar");
-        case EComptoirTarget::GlassRack:
-            return Simulation.Held == Comptoir::Glass::None ? TEXT("E - Prendre une pinte vide") : TEXT("Vous avez deja un verre. R sur la tireuse pour le jeter/ranger.");
-        case EComptoirTarget::Tap:
-            if (Simulation.Held == Comptoir::Glass::None) return TEXT("Prenez d'abord une pinte au rangement VERRES.");
-            if (Simulation.Held == Comptoir::Glass::Full) return TEXT("Biere sur le plateau : servez le client (E).");
-            if (Simulation.Held == Comptoir::Glass::Empty && Simulation.Beer < 50) return TEXT("Stock insuffisant : utilisez la RESERVE.");
-            return Simulation.Amount >= 50 ? TEXT("E - Recuperer la biere / R - Jeter") : TEXT("Maintenir clic gauche en visant la tireuse : doser 50 cl");
+        const auto& Info=Drinks[R];
+        if(Simulation.Held==Glass::None)return FString::Printf(TEXT("%s : prenez un contenant au rangement VERRERIE (E)."),UTF8_TO_TCHAR(Info.Station));
+        if(static_cast<int>(Simulation.Vessel)!=R)return FString::Printf(TEXT("Ce poste nécessite : %s. R pour ranger le contenant vide."),UTF8_TO_TCHAR(Info.Vessel));
+        if(Simulation.Held==Glass::Empty&&Simulation.Stock[R]<Info.Use)return TEXT("Stock insuffisant : commandez dans la réserve.");
+        if(Simulation.Amount>=Info.Target)return Simulation.TrayCount()>=Game::TrayCapacity?TEXT("Plateau plein : servez une boisson."):TEXT("E - Poser la boisson sur le plateau / R - Jeter");
+        return FString::Printf(TEXT("%s : maintenir clic gauche pour doser %.0f %s / R - Ranger ou jeter"),UTF8_TO_TCHAR(Info.Name),Info.Target,UTF8_TO_TCHAR(Info.Unit));
+    }
+    switch(Target)
+    {
+        case EComptoirTarget::Sign:return Simulation.Closing?TEXT("Dernière tournée : terminez tous les clients."):Simulation.Open?TEXT("E - Dernière tournée puis fermeture (-35 €)"):TEXT("E - Ouvrir le bar");
+        case EComptoirTarget::GlassRack:return TEXT("E - Choisir un verre ou une tasse");
         case EComptoirTarget::Customer:
-            if (Simulation.Phase == Comptoir::Customer::Order) return TEXT("E - Prendre la commande : une biere / X - Refuser");
-            if (Simulation.Phase == Comptoir::Customer::Drink) return TEXT("E - Servir une biere du plateau / X - Refuser");
-            if (Simulation.Phase == Comptoir::Customer::Drinking) return TEXT("Le client deguste sa biere.");
-            return TEXT("Le client rejoint la caisse. Encaissez avec E sur la CAISSE.");
+        {
+            if(!Simulation.HasCustomer(Slot))return {};
+            const auto& C=Simulation.Guests[Slot];const FString Name=UTF8_TO_TCHAR(Drink(C.Requested).Name);
+            if(C.Phase==Customer::Order)return FString::Printf(TEXT("Client #%d : E - Prendre la commande / X - Refuser"),C.Id);
+            if(C.Phase==Customer::Drink)return FString::Printf(TEXT("Client #%d : %s · E - Servir depuis le plateau / X - Refuser"),C.Id,*Name);
+            if(C.Phase==Customer::Drinking)return FString::Printf(TEXT("Client #%d déguste : %s"),C.Id,*Name);
+            return TEXT("Le client attend son passage à la caisse.");
+        }
         case EComptoirTarget::Till:
-            if (Simulation.Phase == Comptoir::Customer::Payment) return TEXT("E - Encaisser 5 EUR par carte (3 secondes)");
-            if (Simulation.Phase == Comptoir::Customer::Processing) return TEXT("Paiement carte en cours...");
-            return TEXT("Aucun client pret a payer.");
-        case EComptoirTarget::Stock:
-            return TEXT("E / Tab - Ouvrir la gestion de la reserve");
-        default: return FString();
+        {
+            if(Simulation.ProcessingSlot()>=0)return TEXT("Paiement carte en cours…");
+            const int I=Simulation.PaymentSlot();
+            if(I>=0)return FString::Printf(TEXT("E - Encaisser le client #%d : %.2f €"),Simulation.Guests[I].Id,Drink(Simulation.Guests[I].Requested).Price/100.0);
+            return TEXT("Aucun client prêt à payer.");
+        }
+        case EComptoirTarget::Stock:return TEXT("E / Tab - Gestion de la réserve");
+        default:return {};
     }
 }
 

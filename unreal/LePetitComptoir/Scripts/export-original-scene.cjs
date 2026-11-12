@@ -30,6 +30,18 @@ function exportScene() {
   scene.customer(standing, {x:0, z:0, id:1, time:0, moving:false, angle:0});
   scene.glass(scene.geometry(glass), 'beer', 0, 0, 0, 0);
   scene.glass(scene.geometry(beer), 'beer', 0, 0, 0, 1);
+  for(let i=0;i<3;i++)for(const pose of ['seated','standing']) {
+    const guest=[];scene.customer(guest,{x:0,z:0,id:i+1,time:0,moving:false,seated:pose==='seated',seatHeight:.84,angle:0});
+    models[`guest${i}_${pose}`]=guest;
+  }
+  // Shared model keys for empty vessels, eight fill levels and the full tray.
+  // Liquid has a dedicated non-metallic material, with enough ambient colour in
+  // the shadow under the tap. Glass walls keep their separate transparent pass.
+  for(const recipe of ['beer','wine','coffee'])for(let level=0;level<=8;level++) {
+    const items=[];scene.glass(scene.geometry(items),recipe,0,0,0,level/8);
+    models[`drink_${recipe}_${level}`]=items.map(item=>({...item,
+      mat:item.mat===scene.materials.glass||item.c==='#ede1c5'?16:item.mat}));
+  }
   // Preserve original dimensions, angles, tapered cylinders, side colors and labels.
   const keys = ['x','y','z','w','h','d','c','mat','solid','roomFloor','round','shape','rx','ry','rz',
     'topRadius','bottomRadius','sideColor','label','labelFace','labelColor','exterior','streetFloor','assembly','venueName'];

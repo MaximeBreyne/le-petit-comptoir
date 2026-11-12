@@ -17,6 +17,8 @@ public:
     virtual void Tick(float DeltaSeconds) override;
     AComptoirProp* FocusedProp() const;
     bool IsTabletOpen() const { return bTabletOpen; }
+    bool IsGlassPickerOpen() const { return bGlassPicker; }
+    void SetGlassPicker(bool Open);
     void ToggleTablet();
     void OpenTablet(int32 Page);
     bool IsInReserve() const;
@@ -26,6 +28,7 @@ private:
     bool bMenuBlocked = true;
     bool bPouring = false;
     bool bTabletOpen = false;
+    bool bGlassPicker = false;
     void Forward(float Value);
     void Right(float Value);
     void Turn(float Value);

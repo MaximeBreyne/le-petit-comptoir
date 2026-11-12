@@ -18,6 +18,9 @@ bool FComptoirSessionSaveTest::RunTest(const FString&)
     UComptoirSave* Original=NewObject<UComptoirSave>();
     Original->BarName=TEXT("Chez Élise");
     Comptoir::Game Game;Game.SetDeveloper(true);Game.ToggleTestClock();Game.AddTestMoney(1000);
+    Game.ToggleService();Game.Tick(1);Game.Tick(16);Game.Tick(16);
+    Game.InteractCustomer(0);Game.InteractCustomer(1);Game.InteractCustomer(2);
+    Game.TakeGlass(Comptoir::Recipe::Wine);Game.Pour(Comptoir::Recipe::Wine,4);Game.FinishDrink(Comptoir::Recipe::Wine);
     Original->Simulation=UTF8_TO_TCHAR(Game.Serialize().c_str());
     TArray<uint8> Bytes;
     if(!TestTrue(TEXT("Serialize into memory without touching player saves"),UGameplayStatics::SaveGameToMemory(Original,Bytes)))return false;
@@ -26,6 +29,7 @@ bool FComptoirSessionSaveTest::RunTest(const FString&)
     TestEqual(TEXT("Venue name survives reload"),Loaded->BarName,Original->BarName);
     Comptoir::Game Restored;TestTrue(TEXT("Restore simulation"),Restored.Restore(TCHAR_TO_UTF8(*Loaded->Simulation)));
     TestTrue(TEXT("Developer settings stay with the save"),Restored.Developer&&Restored.ClockPaused&&Restored.Cash==126000);
+    TestTrue(TEXT("Independent orders and ready drinks survive Unreal save"),Restored.CustomerCount()==3&&Restored.ReadyCount(Comptoir::Recipe::Wine)==1&&Restored.PendingCount(Comptoir::Recipe::Coffee)==1);
     return !HasAnyErrors();
 }
 #endif

@@ -57,13 +57,14 @@ void Preview(const Layout& L,const std::string& File)
 }
 int main(int Argc,char** Argv)
 {
-    State S;S.Cash=26000;S.Beer=1000;S.Reserve=500;S.Open=true;S.Phase=1;
+    State S;S.Cash=26000;S.Open=true;
+    for(int I=0;I<3;++I)S.Guests[I]={I+1,I,1,0,true};
     int Layouts=0;
     for(const auto& Size:std::vector<std::pair<float,float>>{{800,600},{1280,720},{1920,1080},{3440,1440},{2560,720}})
     for(int P=0;P<5;++P)
     for(int Phase=0;Phase<7;++Phase)
     {
-        S.Active=static_cast<Page>(P);S.Phase=Phase;
+        S.Active=static_cast<Page>(P);for(auto& G:S.Guests)G.Phase=Phase;
         const auto L=Build(S,Size.first,Size.second);
         CheckReadability(L);
         assert(L.X>=0&&L.Y>=0&&L.X+1120*L.Scale<=Size.first+.01&&L.Y+720*L.Scale<=Size.second+.01);
@@ -91,16 +92,23 @@ int main(int Argc,char** Argv)
         assert(!Has(L,"tab_building")&&!Has(L,"tab_decor")&&!Has(L,"tab_licenses")&&!Has(L,"tab_team"));
         ++Layouts;
     }
-    S.Active=Page::Service;S.Phase=1;S.NearCustomer=false;assert(!Has(Build(S,1280,800),"take_order"));
-    S.NearCustomer=true;assert(Has(Build(S,1280,800),"take_order"));
+    S.Active=Page::Service;S.Guests[0].Phase=1;S.Guests[0].Near=false;
+    assert(!Has(Build(S,1280,800),"customer_0"));S.Guests[0].Near=true;assert(Has(Build(S,1280,800),"customer_0"));
+    S.Guests[0].Phase=2;assert(!Has(Build(S,1280,800),"customer_0"));
+    S.Tray[0]=1;assert(!Has(Build(S,1280,800),"customer_0")); // A wine cannot serve a beer order.
+    S.Tray[0]=0;assert(Has(Build(S,1280,800),"customer_0"));
     S.Closing=true;assert(!Has(Build(S,1280,800),"service"));S.Closing=false;
-    S.Active=Page::Register;S.Phase=5;S.NearTill=false;assert(!Has(Build(S,1280,800),"pay_card"));
-    S.NearTill=true;assert(Has(Build(S,1280,800),"pay_card"));
-    S.Phase=6;assert(!Has(Build(S,1280,800),"pay_card"));
-    S.Active=Page::Reserve;S.Beer=900;assert(Has(Build(S,1280,800),"restock"));assert(!Has(Build(S,1280,800),"buy_stock"));
-    S.Reserve=0;assert(!Has(Build(S,1280,800),"restock"));assert(Has(Build(S,1280,800),"buy_stock"));
-    S.Delivery=5;assert(!Has(Build(S,1280,800),"buy_stock"));S.Delivery=0;
-    S.Cash=1599;assert(!Has(Build(S,1280,800),"buy_stock"));
+    S.Active=Page::Register;S.Payment=0;S.NearTill=false;assert(!Has(Build(S,1280,800),"pay_card"));
+    S.NearTill=true;assert(Has(Build(S,1280,800),"pay_card"));S.Payment=-1;S.Processing=0;
+    assert(!Has(Build(S,1280,800),"pay_card"));
+    S.Active=Page::Reserve;
+    for(int I=0;I<3;++I)
+    {
+        const std::string Key="supply_"+std::to_string(I);S.Stock[I]=0;S.Cash=26000;
+        assert(Has(Build(S,1280,800),Key));S.Reserve[I]=0;assert(Has(Build(S,1280,800),Key));
+        S.Delivery[I]=5;assert(!Has(Build(S,1280,800),Key));S.Delivery[I]=0;
+        S.Cash=Comptoir::Drinks[I].PackCost-1;assert(!Has(Build(S,1280,800),Key));
+    }
     S.Active=Page::Developer;
     assert(Has(Build(S,1280,800),"dev_toggle"));
     assert(!Has(Build(S,1280,800),"dev_money_1000"));
@@ -129,13 +137,32 @@ int main(int Argc,char** Argv)
     assert(!Has(Build(S,1280,800),"menu_confirm_new"));
     S.ValidName=true;assert(Has(Build(S,1280,800),"menu_confirm_new"));
     S.View=ComptoirSession::Screen::Playing;
+    S.GlassPicker=true;S.NearRack=true;S.Held=0;S.Tray={{-1,-1,-1,-1}};
+    for(const auto& Size:std::vector<std::pair<float,float>>{{800,600},{1280,720},{1920,1080},{3440,1440}})
+    {
+        const auto L=Build(S,Size.first,Size.second);CheckReadability(L);
+        assert(!Has(L,"tablet")&&!Has(L,"tab_service")&&Has(L,"glass_close"));
+        for(int I=0;I<3;++I)assert(Has(L,"glass_"+std::to_string(I)));
+        std::vector<Command> Hits;
+        for(const auto& C:L.Commands)if(C.Type==Kind::Hit)
+        {
+            assert(HitTest(L,L.X+(C.X+C.W/2)*L.Scale,L.Y+(C.Y+C.H/2)*L.Scale)==C.Value);
+            for(const auto& Other:Hits)assert(C.X+C.W<=Other.X||Other.X+Other.W<=C.X||C.Y+C.H<=Other.Y||Other.Y+Other.H<=C.Y);
+            Hits.push_back(C);
+        }
+    }
+    S.Held=2;assert(!Has(Build(S,1280,800),"glass_0"));S.Held=0;
+    S.NearRack=false;assert(!Has(Build(S,1280,800),"glass_1"));S.NearRack=true;
+    S.Tray={{0,1,2,0}};assert(!Has(Build(S,1280,800),"glass_2"));S.GlassPicker=false;
     if(Argc==2)
     {
-        S.Cash=26000;S.Reserve=500;S.Phase=1;S.Beer=900;S.Held=2;S.Amount=32;
+        S.Cash=26000;S.Reserve={{500,75,20}};S.Stock={{900,135,39}};S.Held=0;S.Amount=0;
+        for(int I=0;I<3;++I)S.Guests[I]={I+1,I,2,0,true};
         for(int P=0;P<5;++P){S.Active=static_cast<Page>(P);Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(P)+".svg");}
         int I=5;
         for(const auto View:{ComptoirSession::Screen::Home,ComptoirSession::Screen::NewGame,ComptoirSession::Screen::Pause})
         {S.View=View;Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(I++)+".svg");}
     }
+    if(Argc==2){S.View=ComptoirSession::Screen::Playing;S.GlassPicker=true;S.Tray={{-1,-1,-1,-1}};Preview(Build(S,1280,800),std::string(Argv[1])+"8.svg");}
     std::cout<<"PASS: "<<Layouts<<" tablet layouts fit; text contrast >= 4.5:1 and size >= 14; responsive hit testing and action availability are enforced.\n";
 }

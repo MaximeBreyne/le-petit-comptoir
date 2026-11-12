@@ -94,7 +94,7 @@ create_map()
 content = Path(unreal.Paths.project_content_dir())
 for relative in ("Maps/ComptoirOriginal.umap", "Original/Materials/M_Original_00.uasset",
                  "Original/UI/T_ComptoirLogo.uasset", "Original/Fonts/F_ComptoirWorld.uasset",
-                 "Original/Materials/M_ComptoirText.uasset"):
+                 "Original/Materials/M_ComptoirText.uasset", "Original/Materials/M_Original_16.uasset"):
     if not (content / relative).is_file():
         raise RuntimeError(f"Asset manquant apres creation : {relative}")
 unreal.log("Le Petit Comptoir : decor original pret. Ouvrir Maps/ComptoirOriginal et appuyer sur Play.")

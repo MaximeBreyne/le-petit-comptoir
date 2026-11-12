@@ -79,7 +79,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
     VenueLabels.Reset();VenueLabelSizes.Reset();
     Geometry->ClearAllMeshSections();
     GeometryRevision=0;
-    TArray<Section> Sections;Sections.SetNum(16);
+    TArray<Section> Sections;Sections.SetNum(17);
     for(const auto& Item:*Items)
     {
         const auto O=Item->AsObject();if(!O.IsValid())continue;
@@ -90,7 +90,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         if(S.Size.X<=0||S.Size.Y<=0||S.Size.Z<=0)continue;
         S.Kind=String(O,TEXT("shape"))==TEXT("sphere")?2:Flag(O,TEXT("round"))?1:0;
         S.Top=Number(O,TEXT("topRadius"),1);S.Bottom=Number(O,TEXT("bottomRadius"),1);
-        const int32 MaterialIndex=FMath::Clamp(static_cast<int32>(Number(O,TEXT("mat"))),0,15);
+        const int32 MaterialIndex=FMath::Clamp(static_cast<int32>(Number(O,TEXT("mat"))),0,16);
         const FLinearColor Tint=FLinearColor::FromSRGBColor(FColor::FromHex(String(O,TEXT("c"),TEXT("#ffffff"))));
         const FLinearColor Side=O->HasField(TEXT("sideColor"))?
             FLinearColor::FromSRGBColor(FColor::FromHex(String(O,TEXT("sideColor")))):Tint;
@@ -186,6 +186,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         Daylight->SetLightColor(FLinearColor(.83f,.89f,1.f));Daylight->SetIntensity(2.5f);Daylight->RegisterComponent();
     }
     GeometryRevision=5;
+    CurrentCollection=Collection;
     return true;
 }
 
@@ -216,4 +217,9 @@ void AComptoirScene::SetVenueName(const FString& Name)
         const FVector2D Size=VenueLabelSizes[I];
         ComptoirText::FitToPanel(Label,Size.X*90,Size.Y*80);
     }
+}
+
+bool AComptoirScene::UseModel(const FString& Collection)
+{
+    return CurrentCollection==Collection||Build(Collection);
 }

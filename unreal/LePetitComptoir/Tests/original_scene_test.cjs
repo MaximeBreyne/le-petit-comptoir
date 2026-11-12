@@ -33,6 +33,17 @@ assert.ok(data.collections.world.some(s=>s.label?.includes('5 €')),'Menu must 
 for(let i=0;i<3;i++)for(const part of ['body','legLeft','legRight','armLeft','armRight'])
   assert.ok(data.collections[`ped${i}_${part}`].length>0,`Missing pedestrian ${i} ${part}`);
 for(let i=0;i<2;i++)assert.ok(data.collections[`traffic${i}`].some(s=>s.collision));
+for(let i=0;i<3;i++)for(const pose of ['seated','standing'])assert.ok(data.collections[`guest${i}_${pose}`].length>0);
+for(const recipe of ['beer','wine','coffee'])for(let level=0;level<=8;level++) {
+  const model=data.collections[`drink_${recipe}_${level}`];assert.ok(model.length>0);
+  assert.ok(model.every(s=>!s.collision),'Drinks must not block movement or interaction');
+  if(recipe==='beer') {
+    const liquid=model.filter(s=>s.mat===16&&s.c==='#d8a348');
+    assert.equal(liquid.length>0,level>0,'Beer must use golden liquid material while pouring and on the tray');
+    assert.ok(model.some(s=>s.mat===11),'Glass must remain transparent');
+    if(level>0)assert.ok(model.some(s=>s.mat===16&&s.c==='#ede1c5'),'Beer must have pale foam');
+  }
+}
 const context=vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(sourceRoot,'renderer.js'),'utf8'),context);
 const Renderer=vm.runInContext('BarRenderer',context),renderer=Object.create(Renderer.prototype);

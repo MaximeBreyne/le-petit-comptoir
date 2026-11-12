@@ -11,8 +11,8 @@ def create_original_assets():
     folder = "/Game/Original/Materials"
     unreal.EditorAssetLibrary.make_directory(folder)
     code = (Path(__file__).parent / "original_surface.hlsl").read_text(encoding="utf-8")
-    roughness = [.65, .46, .38, .96, .96, .23, .14, .5, .94, .68, .48, .09, .34, .52, .82, .97]
-    for index in range(16):
+    roughness = [.65, .46, .38, .96, .96, .23, .14, .5, .94, .68, .48, .09, .34, .52, .82, .97, .24]
+    for index in range(17):
         name = f"M_Original_{index:02d}"
         if unreal.EditorAssetLibrary.does_asset_exist(f"{folder}/{name}"):
             # Migrate only the coordinate conversion in our generated shader.
@@ -82,7 +82,7 @@ def create_original_assets():
         # A little ambient bounce matches the old renderer without the pilot's ceiling hotspots.
         glow = expression(unreal.MaterialExpressionMultiply, -100, -150)
         connect(surface, "", glow, "A")
-        glow.set_editor_property("const_b", 1.8 if index == 7 else .12)
+        glow.set_editor_property("const_b", 1.8 if index == 7 else .55 if index == 16 else .12)
         result(glow, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
         if index == 11:
             result(constant(.16, -200, 450), unreal.MaterialProperty.MP_OPACITY)

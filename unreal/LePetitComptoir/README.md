@@ -18,10 +18,10 @@ plus par la police bitmap du HUD ni par une texture agrandie. Les tailles agrand
 les contrastes renforcés et les boutons plus hauts sont conservés. Les clics utilisent
 la géométrie du widget, y compris lorsque la fenêtre est redimensionnée.
 
-**La migration fonctionnelle reste partielle** : une bière, un client à la fois,
-paiement par carte, stocks, fermeture et sauvegarde. Les autres recettes, employés,
-extensions, commandes multiples et menus complets du prototype ne sont pas encore
-portés. La géométrie est vérifiée par comparaison avec le moteur original ;
+**La migration fonctionnelle reste partielle** : bière, vin rouge et espresso, trois
+clients simultanés au comptoir, plateau de quatre boissons, choix du contenant,
+paiement par carte, stocks, fermeture et sauvegarde. Les cocktails, employés,
+extensions et réglages complets du prototype ne sont pas encore portés. La géométrie est vérifiée par comparaison avec le moteur original ;
 **la nouvelle compilation Unreal, les matériaux et le rendu doivent être validés
 sur un poste équipé du moteur**. Un test de géométrie ne valide pas une image finale.
 
@@ -56,8 +56,8 @@ powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-
 
 Cette option exécute `LePetitComptoir.Tablet.RenderedText` dans Unreal avant d'ouvrir
 l'éditeur. Le test compare les pixels réellement rendus avec et sans texte sur les
-cinq pages et les trois menus ; il échoue si les caractères ou les titres ne sont pas visibles.
-Il enregistre les captures `Saved/Tests/Tablet/Tablet-0.bmp` à `Tablet-7.bmp` et un
+cinq pages, les trois menus et le choix du verre ; il échoue si les caractères ou les titres ne sont pas visibles.
+Il enregistre les captures `Saved/Tests/Tablet/Tablet-0.bmp` à `Tablet-8.bmp` et un
 rapport dans `Saved/Tests/TabletReport-…`. Il vérifie la présence des textes, pas leur
 netteté visuelle : vérifier aussi la tablette en Play, les cinq onglets, les clics,
 le retour au jeu avec Tab et le redimensionnement de la fenêtre. Sans cette option,
@@ -110,7 +110,7 @@ le menu reste ouvert. Dans PIE, Échap reste la commande Unreal d’arrêt du je
 
 - argent de test : +100 €, +1 000 € ou +10 000 € ;
 - compteur de clients : +25 ou +100, sans encaissement ;
-- remplissage du comptoir (1 000 cl) et de la réserve (500 cl), livraison incluse ;
+- remplissage des stocks de bière, vin et café au comptoir et en réserve, livraisons incluses ;
 - gel/reprise de l’horloge : clients, versement et livraisons continuent ;
 - avance d’une heure, uniquement pendant un service ouvert avant la dernière tournée.
 
@@ -131,26 +131,45 @@ se trouve à droite, comme dans le jeu original.
    **Tab** ou **Ranger**. Les onglets changent de page ; la prise de commande et
    l'encaissement restent limités à la proximité du client/de la caisse. Le panneau placé dans la vitrine à côté de la porte fonctionne
    aussi avec **E**. Le service continue pendant l'utilisation de la tablette.
-3. Regarder le client au comptoir puis **E** pour prendre sa commande.
-4. **E** sur le rangement des verres pour prendre une pinte.
-5. Regarder la tireuse, maintenir le **clic gauche** jusqu'à **50 cl**, puis **E** pour
-   récupérer la bière. Le versement cesse si la tireuse n'est plus visée/à portée.
-6. **E** sur le client pour servir. Il boit, puis rejoint la caisse.
-7. **E** sur la caisse : les **5 €** sont crédités après trois secondes.
-8. Dans la tablette, transférer la bière de réserve vers le comptoir. Une réserve vide
-   permet de commander **500 cl pour 16 €**, livrés après dix secondes. La réserve
-   physique ouvre directement cet onglet avec **E** ou **Tab**, où que vous regardiez
-   dans cette pièce. Les transferts et achats se font ensuite avec les boutons de la tablette.
-9. Le panneau ou la tablette lance la dernière tournée. La fermeture attend le client,
-   prélève **35 €** et prépare le soir suivant. Le service va de 17 h à 4 h, une minute
-   de jeu toutes les deux secondes réelles.
+3. Regarder chaque client au comptoir puis **E** pour prendre sa commande. Jusqu’à
+   **trois clients** peuvent commander, boire ou attendre le paiement simultanément.
+   Chaque client porte un numéro dans le HUD et la tablette.
+4. **E sur VERRERIE** ouvre un pop-up : **Pinte**, **Verre à vin** ou **Tasse**.
+   Les quantités à servir et déjà préparées sont indiquées, sans imposer le choix.
+   Il est possible de préparer une boisson à l’avance, même bar fermé. **Tab** ferme
+   le pop-up sans rien choisir. Un contenant encore vide peut être remplacé gratuitement.
+5. Rejoindre le poste correspondant et maintenir le **clic gauche**, puis **E** pour
+   poser la boisson terminée sur le plateau. Le versement cesse si le poste n’est plus visé.
+   Un mauvais contenant ne consomme aucun stock. Une préparation commencée doit être
+   terminée ou jetée avec **R** avant de changer de contenant.
+
+   | Boisson | Contenant | Poste | Quantité | Prix client |
+   | --- | --- | --- | --- | --- |
+   | Bière blonde | Pinte | Tireuse | 50 cl | 5 € |
+   | Vin rouge | Verre à vin | Bouteille VIN du meuble arrière | 15 cl | 6 € |
+   | Espresso | Tasse | Machine à café | 25 ml, soit 1 dose | 3 € |
+
+6. Le **plateau contient quatre boissons**. **E sur un client** sert uniquement la
+   boisson qu’il a commandée ; les autres restent disponibles. Le service peut se faire
+   dans n’importe quel ordre. L’onglet **À préparer** liste les trois commandes et le
+   contenu du plateau, avec un bouton **Jeter** par boisson pour libérer une place.
+7. Chaque client rejoint la caisse après consommation. **E sur la caisse** lance le
+   règlement du prochain client prêt à payer : montant propre à sa boisson, crédité
+   après trois secondes. Le terminal traite **un paiement à la fois**.
+8. L’onglet **Réserve** gère les stocks séparément : bière, vin et café. La réserve
+   physique ouvre cet onglet avec **E** ou **Tab**. Lots livrés après dix secondes :
+   **500 cl de bière pour 16 €**, **75 cl de vin pour 7 €**, **20 doses de café pour 5 €**.
+   Le stock est déduit une seule fois au début du versement ; jeter ne rembourse pas.
+9. Le panneau ou la tablette lance la dernière tournée. La fermeture attend **tous**
+   les clients, prélève **35 € une seule fois** et prépare le soir suivant.
+   Le service va de 17 h à 4 h, une minute de jeu toutes les deux secondes réelles.
 
 **E sur la porte vitrée** : ouvrir/fermer les deux battants et sortir dans la rue.
 La fermeture est bloquée si vous êtes dans le passage. Six passants marchent sur
 les trottoirs ; deux voitures parcourent la chaussée et s’arrêtent devant le joueur.
 La promenade reste limitée au pâté de maisons devant le bar.
 
-**P** : menu de pause/reprise. **R** en visant la tireuse : ranger/jeter le verre sans remboursement.
+**P** : menu de pause/reprise. **R** en visant un poste de préparation ou la verrerie : ranger le contenant vide ou jeter la préparation sans remboursement.
 **X** en visant un client non encore servi : refuser la commande. **F5** : sauvegarder.
 **F9** : charger. Dans l'éditeur, **Échap** arrête Play.
 
@@ -160,7 +179,7 @@ La promenade reste limitée au pâté de maisons devant le bar.
   `SourceArt/Scene/scene.js` et `venue.js`, avec les catalogues et couleurs de `engine.js`.
 - La réserve, la rue, les enseignes, les tables rondes, les chaises, les six tabourets,
   la tireuse, la machine à café, les bouteilles, le terminal et la verrerie.
-- Les modèles originaux du client assis/debout et de la pinte vide/pleine.
+- Trois variantes de clients assis/debout, les pintes, verres à vin et tasses, vides ou remplis.
 - La caméra d'origine : hauteur 1,68 m et champ de vision vertical de 75 degrés,
   converti en champ horizontal selon le format de la fenêtre Unreal.
 - Le logo original et les panneaux de service/préparation compacts. La tablette native
@@ -185,6 +204,13 @@ leur position est replacée au départ du décor original. Les sauvegardes du d�
 inversé (révision 2) sont converties vers le nouveau repère (révision 3) : position et
 orientation sont conservées par rapport au mobilier. Les nouvelles sauvegardes
 mémorisent la position dans la salle, la réserve ou la portion de rue accessible.
+
+Le format de simulation **v3** conserve chaque commande, le plateau, le contenant,
+le dosage et les trois stocks/livraisons. Les formats v1 et v2 restent lisibles : le
+client existant reste à sa place centrale, une ancienne bière prête rejoint le plateau,
+et un versement ou paiement en cours reprend sans double débit/crédit. Les nouvelles
+réserves de vin et de café reçoivent leurs quantités initiales. Une sauvegarde v3 ne
+peut pas être ouverte avec l’ancien code : synchroniser les deux PC avant de continuer.
 
 `Saved/SaveGames/` n'est pas envoyé à GitHub : les deux PC partagent le projet,
 pas automatiquement la partie en cours. En cas de sauvegarde invalide, les écritures
@@ -234,12 +260,12 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/sess
 /tmp/comptoir-session-test
 ```
 
-Le premier test compare **562 344 positions et normales** de 5 662 formes (décor,
+Le premier test compare **886 800 positions et normales** de 7 402 formes (décor,
 clients, verres, portes et animation de rue) à la sortie réelle du renderer JavaScript. Il vérifie la fraîcheur
 de l'export, les sols, le passage de la porte, le dégagement du réfrigérateur
 et les collisions des objets solides. La projection
 à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
-Le second teste service, stock, paiement unique, fermeture et sauvegardes. Le troisième
+Le second teste commandes simultanées, contenants, plateau, stocks, file de paiement, fermeture, migration v1/v2 et 20 000 séquences d’actions/sauvegardes. Le troisième
 contrôle 175 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
 disponibilité des actions, conversion des coordonnées des clics, taille de texte
 minimale dans le repère de la tablette et contraste texte/fond d'au moins 4,5:1.
@@ -278,10 +304,11 @@ Pour contrôler les pixels réellement rendus sur le PC Unreal :
 powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-Unreal.ps1 -VerifyUI -OpenEditor
 ```
 
-Cette option contrôle la tablette (5 pages), l’accueil, la création et la pause,
+Cette option contrôle la tablette (5 pages), l’accueil, la création, la pause et le choix du verre,
 les glyphes de la police, le symbole € rendu par le HUD et un panneau 3D, ainsi que
-la sauvegarde en mémoire du nom et du mode développeur. Les captures sont dans
-`Saved/Tests/Tablet/` et `Saved/Tests/WorldText/`. Le script s’arrête si un test manque
+la sauvegarde en mémoire du nom, du mode développeur et des commandes multiples.
+Elle vérifie aussi les pixels dorés d’une bière à moitié remplie et pleine dans une scène de rendu. Les captures sont dans
+`Saved/Tests/Tablet/`, `Saved/Tests/WorldText/` et `Saved/Tests/Drinks/`. Le script s’arrête si un test manque
 ou échoue. Aucun test ne remplace une inspection du nom en devanture et de la saisie
 avec clavier/souris dans Play. Ces contrôles GPU ne fonctionnent pas avec `-NullRHI`.
 
@@ -290,3 +317,19 @@ et le formulaire de création ne lancent ni simulation ni sauvegarde. Les tests 
 modèle couvrent aussi les anciennes sauvegardes v1 et les outils développeur v2.
 Les trois sauvegardes manuelles et les réglages complets de l’ancienne interface web
 ne sont pas encore portés dans ce menu natif.
+
+
+## Rendu des boissons
+
+La préparation ne dessine plus un cylindre de bière avec le matériau sombre du mobilier.
+Les boissons reprennent les modèles d’origine, avec huit niveaux de remplissage et un
+matériau de liquide dédié (`M_Original_16`) : couleur blonde et mousse claire pour la
+bière, parois transparentes séparées. Le modèle ne se reconstruit que lorsque le type
+ou le niveau visible change, jamais systématiquement à chaque image. Le plateau et
+les verres servis utilisent le même modèle plein.
+
+Après la mise à jour, lancer le script pour générer ce nouveau matériau. Le test
+`LePetitComptoir.Drinks.GoldenBeer`, inclus dans `-VerifyUI`, capture les modèles à
+mi-remplissage et pleins et échoue si les pixels dorés attendus sont absents.
+Ces tests GPU et la compilation C++ Unreal doivent être exécutés sur le PC équipé
+d’Unreal ; les contrôles hors moteur ne prouvent pas le rendu final dans le bar.
