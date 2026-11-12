@@ -41,7 +41,13 @@ def create_original_assets():
         position = expression(unreal.MaterialExpressionWorldPosition, -700, 150)
         normal = expression(unreal.MaterialExpressionPixelNormalWS, -700, 300)
         surface = expression(unreal.MaterialExpressionCustom, -350, 50)
-        surface.set_editor_property("inputs", [unreal.CustomInput(input_name=n) for n in ("Tint", "World", "Normal")])
+        # CustomInput's generated Python constructor takes no arguments in UE 5.8.
+        inputs = []
+        for input_name in ("Tint", "World", "Normal"):
+            custom_input = unreal.CustomInput()
+            custom_input.set_editor_property("input_name", input_name)
+            inputs.append(custom_input)
+        surface.set_editor_property("inputs", inputs)
         surface.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
         surface.set_editor_property("code", f"const int Surface = {index};\n" + code)
         connect(tint, "RGB", surface, "Tint")
