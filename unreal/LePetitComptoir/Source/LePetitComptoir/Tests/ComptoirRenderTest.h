@@ -112,7 +112,8 @@ public:
                     Preview.GetScene()->GetShaderPlatform());
                 UpdateContext.AddMaterial(Material);
                 Material->SetFeatureLevelToCompile(Preview.GetScene()->GetFeatureLevel(),true);
-                Material->CacheResourceShadersForRendering(false,EMaterialShaderPrecompileMode::Synchronous);
+                // Public entry point; the resource-level cache API is private in UE 5.8.
+                Material->CacheShaders(EMaterialShaderPrecompileMode::Synchronous);
                 Material->EnsureIsComplete();
                 FAssetCompilingManager::Get().FinishAllCompilation();
             } // Recreate dependent component/instance render state before capture.
