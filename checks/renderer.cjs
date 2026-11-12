@@ -139,3 +139,25 @@ test('tiled annexes retain the complete light and shadow volume after changing f
  assert.equal(r.buildingWidth,21);
  game.purchaseDecor('floor','oak');r.setScene(Scene.create(game.s));assert.equal(r.buildingWidth,21);
 });
+
+test('register tickets reuse one display canvas and leave all static labels and UVs unchanged',()=>{
+ const r=renderer(2048);r.setScene(Scene.create());const labels=[...r.labelMap].map(([key,rect])=>[key,{...rect}]);
+ const screen={x:2.65,y:1.438,z:2.928,w:.551,h:.310,d:.004,mat:14,c:'#ffffff',display:'register',labelFace:'front',screenData:{ticket:1,customer:'Lucie',recipe:'Nuit Pourpre',price:16,tip:1,total:17,phase:'payment',method:'cash'}};
+ const before=r.mesh([screen]).slice(),canvas=r.registerCanvas,updates=r.registerUpdates;
+ for(let i=0;i<20;i++)assert.deepEqual(r.mesh([screen]),before);
+ assert.equal(r.registerUpdates,updates,'Unchanged bills do not redraw the canvas');
+ for(let i=0;i<200;i++)r.mesh([{...screen,screenData:{...screen.screenData,ticket:i,total:i+.5}}]);
+ assert.equal(r.registerCanvas,canvas);assert.equal(canvas.width,1024);assert.equal(canvas.height,576);
+ assert.equal(r.labelMap.size,labels.length);for(const [key,rect]of labels)assert.deepEqual({...r.labelMap.get(key)},rect);
+ assert.deepEqual(r.mesh([screen]),before,'Changing a ticket never changes its screen geometry or texture coordinates');
+});
+
+test('street ground and neighbouring buildings continue beyond the visible range without adding interior collisions or shadow casters',()=>{
+ for(const state of [new context.BarEngine.Game().s,{management:Object.fromEntries(Object.keys(context.BarEngine.managementUpgrades).map(key=>[key,true]))}]){
+  const boxes=Scene.create(state),exterior=boxes.filter(box=>box.exterior),ground=exterior.find(box=>box.mat===15&&box.d===5.1);
+  assert.ok(ground.x-ground.w/2<-180&&ground.x+ground.w/2>180+context.BarEngine.buildingLayout(state).width);
+  assert.ok(exterior.length>100);assert.ok(exterior.every(box=>box.castShadow===false&&!box.solid));
+  const housing=boxes.find(box=>box.registerHousing);assert.ok(housing.y+housing.h/2<=1.62,'A standing customer can be seen above the register');
+  assert.ok(housing.y-housing.h/2>1.245,'The monitor does not intersect the cash drawer');
+ }
+});

@@ -18,9 +18,11 @@ app.whenReady().then(async()=>{
    const action=(kind,id)=>'#tabletModal [data-tablet-order-action="'+kind+'"][data-order-id="'+id+'"]';
    const key=(code,type='keydown')=>window.dispatchEvent(new KeyboardEvent(type,{code,key:code,bubbles:true,cancelable:true}));
    const tick=seconds=>{for(let i=0;i<Math.ceil(seconds*10);i++)game.tick(.1);state=game.s;ui();BarTablet.refresh(true)};
+   const waitCheckout=id=>{for(let i=0;i<1400&&game.checkoutCustomer()?.id!==id;i++)tick(.1);check(game.checkoutCustomer()?.id===id,'Client reaches checkout '+id);};
    const aimAt=point=>{const dx=point.x-camera.x,dy=point.y-camera.y,dz=point.z-camera.z;camera.a=Math.atan2(dx,dz);camera.pitch=Math.atan2(dy,Math.hypot(dx,dz));};
    const atTable=id=>{const table=BarEngine.tables.find(table=>table.id===id);camera={...camera,x:table.x+(table.x<6?1.25:-1.25),y:1.68,z:table.z};aimAt({...BarScene.tableSeat(id),y:1.25});customerVisuals.clear();};
-   const atRegister=()=>{camera={...camera,x:2.65,y:1.68,z:1.85};aimAt({x:2.65,y:1.59,z:2.94});};
+   const atRegister=()=>{camera={...camera,x:2.65,y:1.68,z:1.85};aimAt({x:2.65,y:1.39,z:2.94});};
+   const atCheckout=id=>{camera={...camera,x:2.65,y:1.68,z:1.85};const point=game.checkoutInfo(id).position;aimAt({...point,y:point.y+1.65});customerVisuals.clear();};
    const atTerminal=()=>{camera={...camera,x:3.25,y:1.68,z:1.85};aimAt({x:3.25,y:1.2,z:2.65});};
    const atPreparationPoint=(point,height=.18)=>{camera={...camera,x:point.x,y:1.68,z:point.z<1?1.65:point.z-.65};aimAt({...point,y:point.y+height});};
    const closeRegister=async()=>{click('#close');for(let attempt=0;attempt<30&&!BarInput.isLooking();attempt++)await flush();check(BarInput.isLooking(),'Closing register resumes the camera');};
@@ -50,7 +52,7 @@ app.whenReady().then(async()=>{
    BarTablet.close();await flush();atTable(1);canvas.click();
    check(state.orders[0].phase==='drinking'&&state.cash===initialCash&&state.sold===0,'Serving does not collect payment');
    tick(8);check(state.orders[0].phase==='payment','Customer requests payment after drinking');
-   key('KeyE');check(state.orders[0].phase==='cash-collected'&&!BarTablet.isOpen(),'Cash collected directly at the table');
+   key('KeyE');check(state.orders[0].phase==='payment'&&!BarTablet.isOpen(),'Cash cannot be collected at the former table');waitCheckout(1);atCheckout(1);key('KeyE');check(state.orders[0].phase==='cash-collected','Cash collected from behind the register');atTable(1);
    BarTablet.open('register',1);check(BarTablet.getTab()==='register'&&document.querySelector('[data-change-input="1"]').disabled,'Optional register consult is read-only away from it');
    BarTablet.close();await flush();atRegister();key('KeyE');await flush();
    check(BarService.isRegisterOpen()&&!BarTablet.isOpen(),'E at the register opens the physical cash drawer');
@@ -66,7 +68,7 @@ app.whenReady().then(async()=>{
    click('[data-change-confirm="1"]');check(state.orders[0].phase==='change-ready'&&state.cash===initialCash,'Preparing change awaits handover before booking revenue');
    const preparedTill=state.payments.till;save(true);GameMenu.returnHome();GameMenu.continueGame();await flush();
    check(state.orders[0].phase==='change-ready'&&state.payments.till===preparedTill&&state.cash===initialCash,'Continue preserves pending cash and drawer money');
-   atTable(1);key('KeyE');await flush();check(!BarTablet.isOpen(),'Change is handed over directly');
+   atCheckout(1);key('KeyE');await flush();check(!BarTablet.isOpen(),'Change is handed over directly at the cashier');
    check(state.orders.length===0&&state.sold===1&&state.cash===initialCash+due,'Cash handover records exactly one sale');
    game.completeCash(1,camera);check(state.cash===initialCash+due&&state.payments.receipts.length===1,'Cash receipt cannot be paid twice');
 
@@ -74,11 +76,11 @@ app.whenReady().then(async()=>{
    atTable(3);key('KeyE');tick(8);BarTablet.open('service',2);
    check(!document.querySelector(action('card',2)),'The tablet does not offer remote card payments');
    const beforeCard=state.cash;game.payCard(2,camera);check(state.orders[0].phase==='payment'&&state.cash===beforeCard,'Missing terminal blocks payment in engine too');
-   BarTablet.close();await flush();atTerminal();key('KeyE');
+   BarTablet.close();await flush();waitCheckout(2);atTerminal();key('KeyE');
    check(state.payments.terminalCarried,'Terminal picked up at register');
    BarTablet.open('service',2);check(!document.querySelector(action('card',2)),'Terminal cannot be operated through the tablet');
-   game.payCard(2,camera);check(state.orders[0].phase==='payment','Card engine rejects remote use');
-   BarTablet.close();await flush();atTable(3);key('KeyE');check(!BarTablet.isOpen(),'Terminal is presented directly');
+   atTable(3);game.payCard(2,camera);check(state.orders[0].phase==='payment','Card engine rejects remote use at the old table');
+   BarTablet.close();await flush();atCheckout(2);key('KeyE');check(!BarTablet.isOpen(),'Terminal is presented directly at the cashier');
    check(state.orders[0].phase==='card-processing'&&state.cash===beforeCard,'Card starts asynchronous authorization');
    game.payCard(2,camera);tick(3);check(state.orders.length===0&&state.cash===beforeCard+7&&state.sold===2,'Card authorization records exactly one sale');
    tick(3);check(state.cash===beforeCard+7&&state.payments.receipts.length===2,'Repeated ticks do not duplicate a payment');

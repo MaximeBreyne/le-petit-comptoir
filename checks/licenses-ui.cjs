@@ -26,7 +26,7 @@ app.whenReady().then(async()=>{
    window.requestAnimationFrame=()=>0;await flush();click('[data-menu-action="new"]');await flush();
    BarTablet.open('service');click('#tabletServiceToggle');state.spawn=999;BarTablet.close();await flush();
    camera={...BarScene.playCamera,x:7,z:1.4};BarPreparation.openVessels();
-   check(Object.keys(recipes).length===10,'Ten drinks are available in the glass catalogue');
+   check(document.querySelectorAll('#modal [data-vessel-recipe]').length===Object.keys(recipes).length,'The glass catalogue includes every current drink');
    const added=['virginMojito','lemonade','whisky','ginTonic','ginFizz','cubaLibre'];
    for(const id of added)check(document.querySelector('#modal [data-vessel-recipe="'+id+'"]').disabled,'A locked drink cannot be prepared from its glass: '+id);
    $('modal').close();await flush();BarTablet.open('licenses');
@@ -63,7 +63,7 @@ app.whenReady().then(async()=>{
     for(const [key,amount]of Object.entries(recipes[id].ingredients))check(Math.abs(state.stock[key]-(before[key]-amount))<1e-8,'Ingredients consumed once: '+id+'/'+key);
     key('KeyE');camera={...BarScene.playCamera};key('KeyE');
     check(order.phase==='drinking','New drink can be served directly after glass selection: '+id);
-    advance(4.1);game.pickupTerminal(BarEngine.registerPosition);const cash=state.cash;game.payCard(order.id,camera);advance(3.1);
+    advance(4.1);game.pickupTerminal(BarEngine.registerPosition);const cash=state.cash;game.payCard(order.id,camera);check(order.phase==='payment','Payment cannot occur at the previous seat');for(let i=0;i<800&&!game.checkoutInfo(order)?.ready;i++)game.tick(.1);check(game.checkoutInfo(order)?.ready,'Recipe customer reaches the cashier');camera={...camera,...BarEngine.registerPosition,y:1.68};game.payCard(order.id,camera);advance(3.1);
     check(state.cash===cash+recipes[id].price+1,'Payment matches the new recipe and tip: '+id);
     served.push(id);render();check(renderer.gl.getError()===0,'New drink renders without WebGL errors: '+id);
    }

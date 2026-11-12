@@ -36,7 +36,8 @@ test('paid rooms and their purchased tables appear independently while the origi
  assert.deepEqual(Array.from(tablesIn(Scene.create(full))),[1,2,3,4,5,6,7,8]);
  for(const state of [undefined,empty,first,full]){
   const boxes=Scene.create(state);
-  assert.equal(boxes.filter(box=>box.label==='CAISSE\nENCAISSER').length,1,'The original counter is never duplicated');
+  assert.equal(boxes.filter(box=>box.registerHousing).length,1,'The original counter is never duplicated');
+  const props=[];Scene.registerVisuals(props,state);assert.equal(props.filter(box=>box.display==='register').length,1,'There is one live register display for every building size');
   assert.ok(boxes.every(box=>['x','y','z','w','h','d'].every(key=>Number.isFinite(box[key]))));
  }
 });

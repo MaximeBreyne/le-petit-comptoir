@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const {Game,recipes,ingredients,managementUpgrades,isValidStock,registerPosition}=require('../dist/engine.js');
 
 const {staff,gather,stationPosition}=require('./preparation-fixtures.cjs');
+const {reachCheckout}=require('./checkout-fixtures.cjs');
 const newIngredients=['whisky','gin','tonic','cola'];
 const newRecipes=['virginMojito','lemonade','whisky','ginTonic','ginFizz','cubaLibre'];
 const licenses=['cocktails','softDrinks','spirits','signature'];
@@ -88,11 +89,11 @@ test('each new recipe can be stocked, dosed, finished, served and paid exactly o
   if(Number.isInteger(recipe.finishStep)){assert.equal(game.s.prep.step,recipe.finishStep);assert.equal(game.s.prep.ready,false);game.plate(station);assert.equal(game.s.tray.length,0);game.finishMix(station)}
   assert.equal(game.s.prep.ready,true);game.plate(station);assert.equal(game.s.tray.length,1);assert.equal(game.s.tray[0].recipe,id);
   const order=addOrder(game,id),position=game.orderPosition(order);order.paymentMethod=index%2?'cash':'card';
-  game.serve(order.id,position);assert.equal(game.s.cash,cash);assert.equal(game.s.sold,0);advance(game,4.1);
+  game.serve(order.id,position);assert.equal(game.s.cash,cash);assert.equal(game.s.sold,0);advance(game,4.1);reachCheckout(game,order);
   if(order.paymentMethod==='cash'){
-   game.collectCash(order.id,position);game.prepareChange(order.id,order.tender-order.due,registerPosition);assert.equal(game.s.cash,cash);game.completeCash(order.id,position);game.completeCash(order.id,position);
+   game.collectCash(order.id,registerPosition);game.prepareChange(order.id,order.tender-order.due,registerPosition);assert.equal(game.s.cash,cash);game.completeCash(order.id,registerPosition);game.completeCash(order.id,registerPosition);
   }else{
-   game.pickupTerminal(registerPosition);game.payCard(order.id,position);assert.equal(game.s.cash,cash);advance(game,3.1);game.payCard(order.id,position);
+   game.pickupTerminal(registerPosition);game.payCard(order.id,registerPosition);assert.equal(game.s.cash,cash);advance(game,3.1);game.payCard(order.id,registerPosition);
   }
   assert.equal(game.s.cash,cash+recipe.price+1);assert.equal(game.s.sold,1);assert.equal(game.s.orders.length,0);
   assert.equal(game.s.payments.receipts.length,1);assert.equal(game.s.payments.receipts[0].recipe,id);

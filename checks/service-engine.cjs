@@ -3,6 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {Game,recipes,tables,registerPosition}=require('../dist/engine.js');
 const {staff,gather,stationPosition}=require('./preparation-fixtures.cjs');
+const {reachCheckout}=require('./checkout-fixtures.cjs');
 
 const advance=(game,seconds)=>{for(let i=0;i<Math.ceil(seconds*10);i++)game.tick(.1)};
 function session(){const game=new Game();game.open();game.s.spawn=999;return game}
@@ -14,7 +15,7 @@ function readyToPay(game,extra={}){
  const customer=order(game,{phase:'preparing',...extra});
  game.s.tray.push({recipe:customer.recipe,quality:100});
  game.serve(customer.id,game.orderPosition(customer));advance(game,8.1);
- assert.equal(customer.phase,'payment');return customer;
+ assert.equal(customer.phase,'payment');reachCheckout(game,customer);return customer;
 }
 const reload=game=>new Game(JSON.parse(JSON.stringify(game.s)));
 
@@ -44,19 +45,19 @@ test('table orders need proximity and explicit order taking; serving does not bo
 });
 
 test('cash is counted at the register and credited only when change is returned, even through reloads',()=>{
- let game=session(),customer=readyToPay(game);const id=customer.id,position=tables[0],due=customer.due,till=game.s.payments.till;
- game.collectCash(id,registerPosition);assert.equal(customer.phase,'payment');
+ let game=session(),customer=readyToPay(game);const id=customer.id,position=registerPosition,due=customer.due,till=game.s.payments.till;
+ game.collectCash(id,tables[0]);assert.equal(customer.phase,'payment');
  game.collectCash(id,position);assert.equal(customer.phase,'cash-collected');
  assert.equal(game.s.cash,260);assert.equal(game.s.payments.till,till);
  game=reload(game);customer=game.s.orders[0];assert.equal(customer.phase,'cash-collected');
  const before=JSON.stringify(game.s),change=customer.tender-due;
  for(const wrong of [NaN,Infinity,-1,'4',change+.5]){game.prepareChange(id,wrong,registerPosition);assert.equal(JSON.stringify(game.s),before)}
- game.prepareChange(id,change,position);assert.equal(JSON.stringify(game.s),before);
+ game.prepareChange(id,change,tables[0]);assert.equal(JSON.stringify(game.s),before);
  game.prepareChange(id,change,registerPosition);assert.equal(customer.phase,'change-ready');assert.equal(game.s.payments.till,till+due);assert.equal(game.s.cash,260);
  game=reload(game);customer=game.s.orders[0];assert.equal(customer.phase,'change-ready');assert.equal(game.s.payments.till,till+due);
  const prepared=JSON.stringify(game.s);game.prepareChange(id,change,registerPosition);assert.equal(JSON.stringify(game.s),prepared);
  advance(game,150);assert.equal(game.s.orders.length,1,'Collected money never disappears on a patience timeout');
- game.completeCash(id,registerPosition);assert.equal(game.s.orders.length,1);
+ game.completeCash(id,tables[0]);assert.equal(game.s.orders.length,1);
  game.completeCash(id,position);assert.equal(game.s.orders.length,0);assert.equal(game.s.cash,260+due);assert.equal(game.s.payments.till,till+due);assert.equal(game.s.sold,1);assert.equal(game.s.totalSold,1);assert.equal(game.s.payments.cashRevenue,due);
  assert.equal(game.s.payments.receipts[0].method,'cash');assert.equal(game.s.payments.receipts[0].amount,due);
  const settled=JSON.stringify(game.s);game.completeCash(id,position);game.collectCash(id,position);assert.equal(JSON.stringify(game.s),settled);
@@ -68,9 +69,9 @@ test('card requires the carried terminal, proximity and asynchronous approval; i
  const id=first.id,due=first.due,till=game.s.payments.till;
  game.payCard(id,tables[0]);assert.equal(first.phase,'payment');
  game.pickupTerminal(tables[0]);assert.equal(game.s.payments.terminalCarried,false);
- game.pickupTerminal(registerPosition);game.payCard(id,registerPosition);assert.equal(first.phase,'payment');
- game.payCard(id,tables[0]);assert.equal(first.phase,'card-processing');assert.equal(game.s.cash,260);
- game.payCard(second.id,tables[1]);assert.equal(second.phase,'payment');
+ game.pickupTerminal(registerPosition);game.payCard(id,tables[0]);assert.equal(first.phase,'payment');
+ game.payCard(id,registerPosition);assert.equal(first.phase,'card-processing');assert.equal(game.s.cash,260);
+ game.payCard(second.id,registerPosition);assert.equal(second.phase,'payment');
  game.returnTerminal(registerPosition);assert.equal(game.s.payments.terminalCarried,true);
  advance(game,1.4);game=reload(game);assert.equal(game.s.orders[0].phase,'card-processing');
  assert.equal(game.s.payments.terminalOrderId,id);advance(game,1.5);assert.equal(game.s.cash,260);advance(game,.2);
@@ -89,16 +90,16 @@ test('cash float transfers and purchases preserve total treasury and cannot crea
 
 test('insufficient change leaves a cash ticket untouched and funding the drawer allows completion',()=>{
  const game=session(),customer=readyToPay(game);game.s.payments.till=0;
- game.collectCash(customer.id,tables[0]);const before=JSON.stringify(game.s);
+ game.collectCash(customer.id,registerPosition);const before=JSON.stringify(game.s);
  game.prepareChange(customer.id,customer.tender-customer.due,registerPosition);assert.equal(JSON.stringify(game.s),before);
  game.fundTill(10,registerPosition);game.prepareChange(customer.id,customer.tender-customer.due,registerPosition);assert.equal(customer.phase,'change-ready');
- game.completeCash(customer.id,tables[0]);assert.equal(game.s.cash,260+customer.due);
+ game.completeCash(customer.id,registerPosition);assert.equal(game.s.cash,260+customer.due);
 });
 
 test('closing waits for outstanding payments and reports cash/card receipts separately',()=>{
  const game=session(),customer=readyToPay(game);game.close();advance(game,110);
  assert.equal(game.s.open,true);assert.equal(game.s.day,1);assert.equal(game.end(),null);
- game.collectCash(customer.id,tables[0]);game.prepareChange(customer.id,customer.tender-customer.due,registerPosition);game.completeCash(customer.id,tables[0]);
+ game.collectCash(customer.id,registerPosition);game.prepareChange(customer.id,customer.tender-customer.due,registerPosition);game.completeCash(customer.id,registerPosition);
  const report=game.tick(.1);assert.equal(report.sold,1);assert.equal(report.cashRevenue,customer.due);assert.equal(report.cardRevenue,0);assert.equal(game.s.day,2);assert.equal(game.s.payments.cashRevenue,0);assert.equal(game.s.payments.receipts.length,1);
 });
 
@@ -141,7 +142,9 @@ test('waiter takes table orders, delivers prepared drinks and then handles the p
  advance(game,6.1);assert.equal(customer.phase,'preparing');advance(game,8.2);
  assert.equal(game.s.staff.waiter.task,'serve');assert.equal(game.s.staff.waiter.orderId,customer.id);assert.equal(game.s.tray.length,0);assert.ok(game.s.staff.waiter.drink);
  game.s.tray.push({recipe:'beer',quality:100});game.serve(customer.id,tables[0]);assert.equal(customer.phase,'preparing','Player cannot double-serve a reserved waiter delivery');assert.equal(game.s.tray.length,1);
- advance(game,15);assert.equal(customer.phase,'payment');assert.equal(game.s.cash,260);assert.equal(game.s.sold,0);assert.equal(game.s.staff.waiter.task,'collect-cash');
+ advance(game,15);assert.equal(customer.phase,'payment');assert.equal(game.s.cash,260);assert.equal(game.s.sold,0);assert.equal(game.checkoutInfo(customer).state,'walking');
+ for(let step=0;step<600&&game.s.staff.waiter?.task!=='collect-cash';step++)game.tick(.1);
+ assert.equal(game.s.staff.waiter.task,'collect-cash');assert.equal(game.checkoutCustomer().id,customer.id);
  advance(game,40);assert.equal(game.s.orders.length,0);assert.equal(game.s.cash,266);assert.equal(game.s.payments.cashRevenue,6);assert.equal(game.s.sold,1);
 });
 

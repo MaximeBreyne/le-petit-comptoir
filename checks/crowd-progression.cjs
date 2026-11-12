@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const {Game,recipes,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout,managementUpgrades,buildingLayout,availableTables}=require('../dist/engine.js');
 const {staff,approach}=require('./preparation-fixtures.cjs');
+const {reachCheckout}=require('./checkout-fixtures.cjs');
 
 const clone=value=>JSON.parse(JSON.stringify(value));
 const advance=(game,seconds)=>{for(let remaining=seconds;remaining>1e-9;remaining-=.1)game.tick(Math.min(.1,remaining))};
@@ -90,7 +91,7 @@ test('serving and pending card approval do not unlock a stool until the twentiet
  const game=session(19);game.s.spawn=999;game.spawnCustomer();game.spawnCustomer();game.s.spawn=999;
  const order=game.s.orders.find(order=>!order.tableId);order.recipe='beer';order.arrivalRemaining=0;order.paymentMethod='card';
  game.s.tray.push({recipe:'beer',quality:100});game.serve(order.id,game.orderPosition(order));
- assert.equal(game.crowdInfo().capacity,7);advance(game,4);assert.equal(order.phase,'payment');
+ assert.equal(game.crowdInfo().capacity,7);advance(game,4);assert.equal(order.phase,'payment');reachCheckout(game,order);
  game.pickupTerminal(registerPosition);game.payCard(order.id,game.orderPosition(order));
  advance(game,2.9);assert.equal(game.s.totalSold,19);assert.equal(game.crowdInfo().capacity,7);
  const cash=game.s.cash;advance(game,.1);
@@ -114,7 +115,7 @@ test('ten-customer saves retain preparations, deliveries, staff jobs and a payme
  preparing.recipe='beer';preparing.phase='preparing';
  game.s.staff.bartender={orderId:preparing.id,recipe:'beer',total:8,remaining:4};
  serving.phase='preparing';game.assignWaiterJob('serve',serving);game.s.staff.waiter.drink={recipe:serving.recipe,quality:92};
- paying.arrivalRemaining=0;paying.phase='payment';paying.paymentMethod='card';game.pickupTerminal(registerPosition);game.payCard(paying.id,game.orderPosition(paying));
+ paying.arrivalRemaining=0;paying.phase='payment';paying.paymentMethod='card';reachCheckout(game,paying);game.pickupTerminal(registerPosition);game.payCard(paying.id,game.orderPosition(paying));
  canonicalOrders(game);
  const saved=clone(game.s),original=clone(saved),restored=new Game(saved);
  assert.deepEqual(saved,original);assert.equal(restored.s.orders.length,10);assertDistinctSeats(restored);
@@ -258,12 +259,12 @@ test('fourteen customers and a waiter in the far room survive saving with the sa
  const game=expandedBar();game.open();fill(game);canonicalOrders(game);
  game.s.management.waiter=true;game.s.staff.waiterPosition={x:17.65,z:8.65};
  const paying=game.s.orders.find(order=>order.tableId===8);paying.arrivalRemaining=0;paying.phase='payment';paying.paymentMethod='card';paying.paymentBy='waiter';
- game.s.payments.terminalWithWaiter=true;game.assignWaiterJob('take-card',paying);game.tick(.1);
+ reachCheckout(game,paying);game.s.payments.terminalWithWaiter=true;game.assignWaiterJob('take-card',paying);game.tick(.1);
  const saved=clone(game.s),before=clone(saved),restored=new Game(saved);
  assert.deepEqual(saved,before);assert.equal(restored.s.orders.length,14);assertDistinctSeats(restored);
  for(const key of ['management','orders','cash','expenses','stock','reserve','staff','payments'])assert.deepEqual(restored.s[key],saved[key],key);
- assert.deepEqual(restored.buildingInfo(),game.buildingInfo());assert.equal(restored.canReachOrder(paying.id,{x:17.65,z:8.65}),true);
- assert.equal(restored.canReachOrder(paying.id,registerPosition),false);
+ assert.deepEqual(restored.buildingInfo(),game.buildingInfo());assert.equal(restored.canReachOrder(paying.id,{x:17.65,z:8.65}),false);
+ assert.equal(restored.canReachOrder(paying.id,registerPosition),true);
 });
 
 test('invalid expansion prerequisites and unbought saved table positions never grant free rooms',()=>{

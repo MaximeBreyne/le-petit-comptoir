@@ -19,7 +19,8 @@ app.whenReady().then(async()=>{
    const key=code=>window.dispatchEvent(new KeyboardEvent('keydown',{code,key:code,bubbles:true,cancelable:true}));
    const aimAt=point=>{const dx=point.x-camera.x,dy=point.y-camera.y,dz=point.z-camera.z;camera.a=Math.atan2(dx,dz);camera.pitch=Math.atan2(dy,Math.hypot(dx,dz));};
    const atTable=id=>{const seat=BarScene.tableSeat(id),table=BarEngine.tables.find(t=>t.id===id);camera={x:table.x+(table.x<6?1.25:-1.25),z:table.z,y:1.68,a:0,pitch:0};aimAt({...seat,y:1.25});customerVisuals.clear();};
-   const atRegister=()=>{camera={x:2.65,y:1.68,z:1.85,a:0,pitch:0};aimAt({x:2.65,y:1.59,z:2.94});};
+   const atRegister=()=>{camera={x:2.65,y:1.68,z:1.85,a:0,pitch:0};aimAt({x:2.65,y:1.39,z:2.94});};
+   const atCheckout=id=>{camera={x:2.65,y:1.68,z:1.85,a:0,pitch:0};const point=game.checkoutInfo(id).position;aimAt({...point,y:point.y+1.65});customerVisuals.clear();};
    const atTerminal=()=>{camera={x:3.25,y:1.68,z:1.85,a:0,pitch:0};aimAt({x:3.25,y:1.2,z:2.65});};
    const tick=(seconds,draw=false)=>{for(let i=0;i<Math.ceil(seconds*10);i++){game.tick(.1);visualTime+=.1;if(draw)render();}state=game.s;ui();BarTablet.refresh(true);};
    const until=(predicate,message,max=600,draw=false)=>{for(let i=0;i<max&&!predicate();i++)tick(.1,draw);check(predicate(),message+' '+JSON.stringify({job:state.staff.waiter,payments:state.payments,orders:state.orders}));};
@@ -33,8 +34,8 @@ app.whenReady().then(async()=>{
    window.requestAnimationFrame=()=>0;await flush();GameMenu.newGame();await flush();game.open();state.spawn=999;
    state.management.waiter=true;state.orders=[order(1,1,'cash',6)];state.nextId=2;ui();
    const initialCash=state.cash,initialTill=state.payments.till;
-   tick(.1);check(game.paymentHandledByWaiter(1)&&state.staff.waiter?.task==='collect-cash','Waiter reserves a pending cash payment');
-   atTable(1);check(/serveur/i.test(BarService.target(camera)?.label||''),'Direct prompt explains waiter is handling the bill');
+   until(()=>game.paymentHandledByWaiter(1),'Client reaches checkout and waiter reserves the cash payment');check(state.staff.waiter?.task==='collect-cash','Waiter reserves a pending cash payment only at checkout');
+   atCheckout(1);check(/serveur/i.test(BarService.target(camera)?.label||''),'Direct prompt explains waiter is handling the bill');
    key('KeyE');check(state.orders[0].phase==='payment'&&state.cash===initialCash,'Player cannot collect a reserved cash payment');
    BarTablet.open('service',1);check(unavailable('[data-tablet-order-action="collect"][data-order-id="1"]'),'Tablet cannot collect waiter payment');
    check(/serveur/i.test(document.querySelector('[data-service-order="1"]').textContent),'Tablet shows waiter payment responsibility');BarTablet.close();await flush();
@@ -45,7 +46,7 @@ app.whenReady().then(async()=>{
    await reload();check(state.orders[0]?.phase==='cash-collected'&&game.paymentHandledByWaiter(1),'Actual save preserves waiter-owned collected cash');
    until(()=>state.orders[0]?.phase==='change-ready','Waiter counts exact change at register');
    check(state.cash===initialCash&&state.payments.till===initialTill+6,'Drawer receives net cash once before change handover');
-   atTable(1);key('KeyE');check(state.orders[0]?.phase==='change-ready'&&state.cash===initialCash,'Player cannot double-complete waiter cash handover');
+   atCheckout(1);key('KeyE');check(state.orders[0]?.phase==='change-ready'&&state.cash===initialCash,'Player cannot double-complete waiter cash handover');
    until(()=>!state.orders.length,'Waiter returns change and finishes cash payment');
    check(state.cash===initialCash+6&&state.payments.till===initialTill+6&&state.sold===1&&state.payments.cashRevenue===6,'Waiter cash revenue and drawer total match');
    check(state.payments.receipts.length===1,'Cash payment has one receipt');
@@ -65,7 +66,7 @@ app.whenReady().then(async()=>{
    const cashBeforeCard=state.cash;
    until(()=>state.orders[0]?.phase==='card-processing','Waiter presents terminal at customer',600,true);
    check(state.cash===cashBeforeCard&&state.payments.terminalOrderId===2,'Authorization starts before card revenue is booked');
-   atTable(3);key('KeyE');check(state.payments.terminalWithWaiter&&!state.payments.terminalCarried,'Direct player interaction leaves waiter authorization alone');
+   atCheckout(2);key('KeyE');check(state.payments.terminalWithWaiter&&!state.payments.terminalCarried,'Direct player interaction leaves waiter authorization alone');
    const visual=waiterVisual;camera={x:(visual?.x||8.8)-1.25,y:1.5,z:(visual?.z||6.5)-1.1,a:0,pitch:0};aimAt({x:visual?.x||8.8,y:1.12,z:visual?.z||6.5});render();renderer.gl.finish();
    check(renderer.gl.getError()===0,'Waiter holding terminal renders without WebGL errors');
    window.__waiterPaymentQA={check,flush,key,atTerminal,atTable,tick,until,reload,initialCash,initialTill,cashBeforeCard};

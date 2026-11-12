@@ -1,6 +1,6 @@
 /* Original shop geometry. Dimensions are in metres; static meshes are uploaded once. */
 const BarScene=(()=>{
- const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10,clearGlass:11,stone:12,leather:13};
+ const M={paint:0,wood:1,tile:2,plaster:3,brick:4,metal:5,glass:6,light:7,fabric:8,skin:9,floor:10,clearGlass:11,stone:12,leather:13,screen:14,asphalt:15};
  const playCamera={x:6,y:1.68,z:1.55,a:0,pitch:-.06};
  const homeCamera={x:10.5,y:1.72,z:8.5,a:3.91,pitch:-.045};
  const stockroomCamera={x:.95,y:1.68,z:-.72,a:2.70,pitch:-.09};
@@ -261,6 +261,83 @@ const BarScene=(()=>{
   const angle=camera.a+Math.PI,cs=Math.cos(angle),sn=Math.sin(angle);
   for(const item of local)items.push({...item,x:origin.x+item.x*cs+item.z*sn,y:origin.y+item.y,z:origin.z-item.x*sn+item.z*cs,ry:(item.ry||0)+angle,castShadow:false});
  }
+ function street(items,building){
+  const g=geometry(items),base={castShadow:false,exterior:true},b=(...args)=>{args[8]={...base,...args[8]};return g.box(...args)},c=(...args)=>{args[8]={...base,...args[8]};return g.cylinder(...args)},s=(...args)=>{args[8]={...base,...args[8]};return g.sphere(...args)};
+  const left=-220,right=building.width+220,center=(left+right)/2,length=right-left;
+  // Continuous ground extends past the 180 m far plane. Atmospheric distance
+  // hides the far clipping boundary, including oblique upstairs window views.
+  b(center,-.30,50,length,.16,100,'#59615c',M.asphalt);
+  b(center,-.08,11.05,length,.16,2.1,'#a19f94',M.tile);
+  b(center,-.16,14.65,length,.15,5.1,'#43474a',M.asphalt);
+  b(center,-.08,17.9,length,.16,1.4,'#a7a499',M.tile);
+  for(const z of [12.12,17.18]){b(center,-.015,z,length,.21,.15,'#b0b0a4',M.stone);b(center,-.115,z+(z<15?.12:-.12),length,.018,.16,'#363e3d',M.asphalt);}
+  for(let x=-210;x<right;x+=7)b(x,-.076,14.35,3.3,.008,.085,'#d4cdb0');
+  const colors=['#8c7868','#b2aa97','#827c75','#8e9b98','#9e8d80','#a19d8c'];
+  const trims=['#c3b7a2','#d7d0b9','#b7b7a8'];
+  for(let index=-30;index<36;index++){
+   const x=index*7+1,h=8.2+(Math.abs(index*7)%5)*.62,near=x>-30&&x<building.width+38,color=colors[(index+120)%colors.length],trim=trims[(index+120)%3];
+   b(x,h/2,22.7,6.96,h,8.0,color,index%3?M.brick:M.plaster);
+   b(x,.38,18.63,6.96,.76,.20,'#77776b',M.stone);
+   b(x,h+.05,22.7,7.08,.16,8.2,'#605f59',M.stone);
+   for(const y of [3.5,6.4,h-.18])b(x,y,18.59,7.02,.13,.23,trim,M.stone);
+   b(x+3.35,h*.5,18.5,.11,h,.10,'#676c66',M.metal);
+   // Recessed window bays and projecting stone sills give the opposite side
+   // depth when seen from the very edge of the shop window.
+   for(let y=4.7;y<h-.7;y+=2.8)for(const dx of [-2.05,0,2.05]){
+    b(x+dx,y,18.57,1.23,1.68,.22,trim,M.stone);
+    b(x+dx,y,18.44,1.03,1.48,.028,(index+Math.round(y)+Math.round(dx))%5===0?'#c5b28b':'#586b73',(index+Math.round(y)+Math.round(dx))%5===0?M.light:M.glass);
+    b(x+dx,y,18.40,.055,1.5,.07,'#46524f',M.wood);b(x+dx,y-.83,18.38,1.34,.10,.36,trim,M.stone);
+    if(near)b(x+dx,y+.18,18.405,1.07,.045,.045,'#48534f',M.wood);
+   }
+   if(near){
+    const shop=['#324a45','#574d49','#515c61'][(index+120)%3];
+    b(x,1.55,18.45,6.35,2.63,.25,shop,M.wood);
+    b(x-1.15,1.52,18.30,3.28,2.22,.045,'#8a9891',M.glass);
+    b(x+1.94,1.43,18.30,1.2,2.35,.055,'#384841',M.wood);
+    b(x+1.94,1.81,18.26,.94,1.41,.026,'#b0a78c',M.glass);
+    b(x+2.36,1.23,18.21,.035,.26,.035,'#c1af7e',M.metal);
+    for(const dx of [-2.8,.55,1.28,2.6])b(x+dx,1.55,18.23,.08,2.65,.12,shop,M.wood);
+    b(x,3.34,18.30,6.35,.42,.15,shop,M.wood);
+    if(index>=-1&&index<=5)b(x,3.34,18.20,5.8,.34,.028,shop,M.paint,{label:['LIBRAIRIE','MAISON FLEURIE','BOULANGERIE','ATELIER','ÉPICERIE','LE QUARTIER','CAFÉ DES ARTS'][index+1],labelPixels:480,labelColor:'#e8ddc3'});
+    // Folded fabric awning, street number plate and a lit display ledge.
+    b(x-1.15,2.94,17.91,3.8,.08,.8,index%2?'#706d53':'#556f65',M.fabric,{rx:.13});
+    b(x-1.15,2.87,17.52,3.8,.19,.035,index%2?'#706d53':'#556f65',M.fabric);
+    b(x-1.15,.49,18.27,3.32,.08,.20,'#b8ac90',M.wood);
+    for(let j=0;j<4;j++)b(x-2.3+j*.69,.72+(j%2)*.15,18.30,.37,.35+(j%2)*.3,.12,['#b29972','#9c785d','#91a394','#b9b2a0'][j],M.paint);
+   }else {b(x,1.5,18.56,5.8,2.5,.1,'#485a57',M.glass);}
+  }
+  // Neighbouring properties continue the shop's own pavement at both sides.
+  for(const side of [-1,1])for(let i=0;i<23;i++){
+   const x=side<0?-3.6-i*7:building.width+3.6+i*7,h=8.3+(i%4)*.7;
+   b(x,h/2,5.6,6.9,h,8.6,colors[(i+2)%colors.length],M.brick);b(x,h+.03,5.6,7,.15,8.8,'#62645d',M.stone);
+   for(let y=1.8;y<h-.5;y+=2.75)for(const dx of [-2,0,2]){b(x+dx,y,9.93,1.26,1.8,.12,'#c4bba7',M.stone);b(x+dx,y,10.003,1.06,1.58,.025,'#506668',M.glass);}
+  }
+  for(let x=-38;x<building.width+40;x+=12){
+   c(x,1.86,11.64,.065,3.72,.065,'#344b44',M.metal);c(x,.14,11.64,.15,.28,.15,'#394b44',M.metal);
+   b(x,3.67,11.9,.075,.075,.55,'#344b44',M.metal);b(x,3.59,12.13,.38,.13,.35,'#33463e',M.metal);b(x,3.515,12.13,.29,.018,.27,'#e6cb91',M.light);
+   b(x+.6,-.073,11.97,.40,.015,.21,'#4a5049',M.metal);
+   for(let j=0;j<5;j++)b(x+.45+j*.075,-.063,11.97,.022,.009,.18,'#777c6f',M.metal);
+  }
+  // The crossing is offset from the door; no abrupt painted slab at the edge.
+  for(let z=12.45;z<16.95;z+=.65)b(-5.2,-.076,z,2.5,.01,.35,'#c6c3ae');
+  for(const x of [-6.8,-3.6])c(x,.38,11.58,.10,.76,.10,'#4a5e52',M.metal);
+  for(const x of [9,33]){c(x,-.069,13.15,.62,.015,.62,'#5a625d',M.metal);for(let i=0;i<5;i++)b(x-.2+i*.1,-.059,13.15,.025,.004,.38,'#3b4540',M.metal);}
+  function car(x,z,color,flip=false){
+   const body={ry:flip?Math.PI:0};
+   b(x,.36,z,3.65,.40,1.48,color,M.paint,body);b(x,.65,z,3.47,.30,1.43,color,M.paint,body);
+   b(x-.15,.98,z,1.94,.53,1.24,'#344c53',M.glass,body);b(x-.15,1.27,z,1.98,.06,1.26,color,M.paint,body);
+   for(const dx of [-1.08,-.12,.83])b(x+dx,.98,z,.055,.57,1.29,color,M.metal);
+   for(const dz of [-.64,.64])b(x-.14,.69,z+dz,2.06,.05,.07,color,M.metal);
+   for(const dx of [-1.16,1.16])for(const dz of [-.7,.7]){c(x+dx,.31,z+dz,.56,.18,.56,'#202929',M.paint,{rx:Math.PI/2});c(x+dx,.31,z+dz*1.13,.30,.018,.30,'#82918b',M.metal,{rx:Math.PI/2});}
+   b(x, .22,z,3.7,.07,1.49,'#273530',M.metal);for(const dx of [-1.82,1.82])for(const dz of [-.48,.48])b(x+dx,.59,z+dz,.025,.14,.22,dx<0?'#d5c9a4':'#a05b45',M.paint);
+   b(x-1.83,.39,z,.025,.11,.38,'#d3ceb8',M.paint);b(x+1.83,.39,z,.025,.11,.38,'#d3ceb8',M.paint);
+  }
+  for(const [i,x]of [-18,-10,5,13,28,43,57].entries()){car(x,16.30,['#4c626a','#7a5148','#788b7c','#aaa89a'][i%4],!!(i%2));for(const dx of [-2.3,2.3])b(x+dx,-.076,16.16,.07,.008,1.85,'#bdb99f');}
+  for(const x of [-1,20,36]){
+   b(x,.3,17.78,.8,.6,.65,'#79786a',M.stone);c(x,1.12,17.78,.09,1.15,.09,'#6a5946',M.wood);
+   for(const [dx,dy,dz]of [[0,1.65,0],[-.25,1.82,.05],[.28,1.95,-.05],[.03,2.17,.08]])s(x+dx,dy,17.78+dz,.75,.85,.68,'#536a4d',M.paint);
+  }
+ }
  function create(state){
   const items=[],g=geometry(items),{box:b,cylinder:c,sphere:s}=g;
   const solid={solid:true},noShadow={castShadow:false};
@@ -475,20 +552,7 @@ const BarScene=(()=>{
   b(6,.15,9.91,2.9,.3,.1,'#293b34',M.wood);
   for(const x of [5.84,6.16])c(x,1.18,9.82,.026,.38,.026,'#b79d62',M.metal);
   b(6,.006,9.06,2.3,.013,1.15,'#383e36',M.fabric,noShadow);
-  // Street beyond the windows, deliberately simple and outside the playable room.
-  const streetExtra=building.width-12;
-  b(6+streetExtra/2,-.08,11.1,20+streetExtra,.14,2.1,'#92928a',M.tile,noShadow);
-  b(6+streetExtra/2,-.18,14.3,25+streetExtra,.13,4.2,'#424c50',0,noShadow);
-  b(6+streetExtra/2,-.08,16.8,25+streetExtra,.14,1.5,'#94968f',M.tile,noShadow);
-  for(let x=-3;x<17+streetExtra;x+=3.4){
-   b(x,4.2,18,3.35,8.4,.4,['#77665b','#637073','#827869'][Math.abs(Math.round(x*10))%3],M.brick,noShadow);
-   for(let y=1.2;y<8;y+=2.15){
-    b(x,y,17.72,1.7,1.5,.14,'#272f32',M.metal,noShadow);
-    b(x,y,17.62,1.48,1.29,.04,y<2?'#b5a076':'#53656c',M.glass,noShadow);
-    b(x,y,17.57,.045,1.3,.045,'#252f31',M.metal,noShadow);
-    b(x,y,17.57,1.5,.045,.045,'#252f31',M.metal,noShadow);
-   }
-  }
+  street(items,building);
   // Back bar cabinetry, three bays with varied glass bottles and readable signs.
   for(const x of [3,6,9]){
    b(x,.47,.52,2.72,.94,.82,'#443e32',M.wood,solid);
@@ -576,10 +640,10 @@ const BarScene=(()=>{
   // Cash drawer and till face the staff aisle (-Z), with the display tilted
   // upward toward the barman. The room sees the monitor's closed back.
   b(2.65,1.17,2.94,.68,.15,.53,'#26332f',M.metal);
-  b(2.65,1.26,3.0,.42,.035,.29,'#33433b',M.metal);
-  b(2.65,1.405,3.0,.10,.30,.09,'#38433e',M.metal);
-  b(2.65,1.59,2.97,.68,.43,.055,'#1c302b',M.paint,{rx:.22});
-  b(2.65,1.597,2.938,.595,.335,.009,'#234d3c',M.paint,{rx:.22,label:'CAISSE\nENCAISSER',labelFace:'front',labelColor:'#edf4df',castShadow:false});
+  b(2.65,1.251,3.16,.34,.012,.22,'#33433b',M.metal);
+  b(2.65,1.31,3.07,.10,.11,.09,'#38433e',M.metal);
+  b(2.65,1.43,2.97,.63,.36,.055,'#1c302b',M.paint,{rx:.22,registerHousing:true});
+  b(2.65,1.437,2.938,.554,.312,.009,'#101c19',M.paint,{rx:.22,castShadow:false});
   // The cordless terminal rests beside the till until the player picks it up.
   b(3.25,1.12,2.65,.185,.035,.27,'#273532',M.metal);
   for(const dx of [-.082,.082])c(3.25+dx,1.12,2.65,.023,.035,.27,'#273532',M.metal);
@@ -756,6 +820,8 @@ const BarScene=(()=>{
  }
  function registerVisuals(items,state,{open=false}={}){
   const {box:b,cylinder:c}=geometry(items),z=open?2.59:2.94;
+  const order=globalThis.BarEngine?.checkoutCustomer?.(state)||null,recipe=order&&globalThis.BarEngine?.recipes?.[order.recipe];
+  b(2.65,1.438,2.928,.551,.310,.004,'#e8eee5',M.screen,{rx:.22,display:'register',labelFace:'front',castShadow:false,screenData:{day:state?.day||1,open:!!state?.open,customer:order?.name||null,ticket:order?.id||null,place:order?.tableId?'Table '+order.tableId:'Comptoir',recipe:recipe?.name,price:recipe?.price||0,tip:order?.tip||0,total:order?.due||0,tender:order?.tender||0,change:order?Math.max(0,order.tender-order.due):0,phase:order?.phase,method:order?.paymentMethod,till:state?.payments?.till||0,queueCount:state?.orders?.filter(item=>item.checkout).length||0}});
   // Open tray extends toward the barman, with separate note/coin compartments.
   b(2.65,1.122,z,.615,.016,.46,'#354239',M.metal);
   for(const x of [2.345,2.955])b(x,1.157,z,.013,.07,.46,'#475347',M.metal);

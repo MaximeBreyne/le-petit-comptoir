@@ -2,6 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {Game,managementUpgrades,ingredients,recipes,buildingLayout,tables,MAX_CUSTOMERS,registerPosition}=require('../dist/engine.js');
 const {prepare}=require('./preparation-fixtures.cjs');
+const {reachCheckout}=require('./checkout-fixtures.cjs');
 const clone=value=>JSON.parse(JSON.stringify(value));
 const advance=(game,seconds)=>{for(let remaining=seconds;remaining>1e-8;remaining-=.1)game.tick(Math.min(.1,remaining))};
 function buy(game,id){
@@ -69,13 +70,14 @@ test('the same horizontal coordinates on another floor cannot take orders, serve
  assert.equal(target.floorY,3.6);assert.equal(game.canReachOrder(guest.id,downstairs),false);assert.equal(game.canReachOrder(guest.id,upstairs),true);
  const before=clone(game.s);game.takeOrder(guest.id,downstairs);assert.deepEqual(game.s,before);game.takeOrder(guest.id,upstairs);assert.equal(guest.phase,'preparing');
  game.s.tray.push({recipe:'beer',quality:100});game.serve(guest.id,downstairs);assert.equal(game.s.tray.length,1);game.serve(guest.id,upstairs);assert.equal(guest.phase,'drinking');
- guest.phase='payment';game.collectCash(guest.id,downstairs);assert.equal(guest.phase,'payment');game.collectCash(guest.id,upstairs);assert.equal(guest.phase,'cash-collected');
+ guest.phase='payment';game.collectCash(guest.id,downstairs);assert.equal(guest.phase,'payment');game.collectCash(guest.id,upstairs);assert.equal(guest.phase,'payment');
+ reachCheckout(game,guest);game.collectCash(guest.id,upstairs);assert.equal(guest.phase,'payment');game.collectCash(guest.id,registerPosition);assert.equal(guest.phase,'cash-collected');
  assert.equal(game.nearRegister({...registerPosition,y:5.28}),false);assert.equal(game.canWork({x:6,y:5.28,z:1.55}),false);
  assert.equal(game.nearRegister({...registerPosition,y:NaN}),false);assert.equal(game.canWork({x:6,y:Infinity,z:1.55}),false);
  game.prepareChange(guest.id,guest.tender-guest.due,{...registerPosition,y:5.28});assert.equal(guest.phase,'cash-collected');
  game.prepareChange(guest.id,guest.tender-guest.due,registerPosition);assert.equal(guest.phase,'change-ready');
- const cash=game.s.cash;game.completeCash(guest.id,downstairs);assert.equal(game.s.cash,cash);game.completeCash(guest.id,upstairs);assert.equal(game.s.cash,cash+guest.due);
- const card=order(game,{phase:'payment',method:'card'});game.pickupTerminal(registerPosition);game.payCard(card.id,downstairs);assert.equal(card.phase,'payment');game.payCard(card.id,upstairs);assert.equal(card.phase,'card-processing');
+ const cash=game.s.cash;game.completeCash(guest.id,upstairs);assert.equal(game.s.cash,cash);game.completeCash(guest.id,registerPosition);assert.equal(game.s.cash,cash+guest.due);
+ const card=order(game,{phase:'payment',method:'card'});game.pickupTerminal(registerPosition);game.payCard(card.id,downstairs);assert.equal(card.phase,'payment');reachCheckout(game,card);game.payCard(card.id,upstairs);assert.equal(card.phase,'payment');game.payCard(card.id,registerPosition);assert.equal(card.phase,'card-processing');
 });
 
 test('two preparers reserve different orders and tray slots, survive saves, and consume each recipe only once',()=>{
@@ -115,15 +117,17 @@ test('club customers request the exclusive menu while every other room keeps its
  game.s.orders=[];const clubGuest=order(game,{tableId:13,recipe:'vodkaEnergy'});game.deliverDrink(clubGuest,{quality:100});assert.equal(clubGuest.tip,2);
  const standardGuest=order(game,{tableId:1});game.deliverDrink(standardGuest,{quality:100});assert.equal(standardGuest.tip,1);
  let saved=new Game(clone(game.s));assert.equal(saved.s.orders.find(o=>o.id===clubGuest.id).due,16);assert.equal(saved.s.orders.find(o=>o.id===clubGuest.id).tip,2);
- saved.open();saved.s.spawn=999;advance(saved,8.1);const cash=saved.s.cash,target=saved.orderPosition(saved.s.orders.find(o=>o.id===clubGuest.id));
+ saved.open();saved.s.spawn=999;advance(saved,8.1);reachCheckout(saved,saved.s.orders.find(o=>o.id===clubGuest.id));const cash=saved.s.cash,target=saved.orderPosition(saved.s.orders.find(o=>o.id===clubGuest.id));
  saved.collectCash(clubGuest.id,target);saved.prepareChange(clubGuest.id,4,registerPosition);saved.completeCash(clubGuest.id,target);saved.completeCash(clubGuest.id,target);
  assert.equal(saved.s.cash,cash+16);assert.equal(saved.s.payments.receipts.length,1);assert.equal(saved.s.payments.receipts[0].tip,2);
  const card=order(saved,{tableId:14,recipe:'nightPurple',method:'card'});saved.deliverDrink(card,{quality:100});advance(saved,8.1);
+ // The ordinary customer's older ticket is paid before the next club guest.
+ const preceding=saved.s.orders.find(o=>o.id===standardGuest.id);reachCheckout(saved,preceding);saved.finishPayment(preceding,'card');reachCheckout(saved,card);
  saved.pickupTerminal(registerPosition);saved.payCard(card.id,saved.orderPosition(card));advance(saved,1);saved=new Game(clone(saved.s));advance(saved,2.1);
- assert.equal(saved.s.cash,cash+16+18);assert.equal(saved.s.payments.receipts.length,2);assert.equal(saved.s.payments.receipts[0].tip,2);
+ assert.equal(saved.s.cash,cash+16+18+6);assert.equal(saved.s.payments.receipts.length,3);assert.equal(saved.s.payments.receipts[0].tip,2);
 });
 
-test('routes include the stair rise, save their true height and allow the waiter to collect upstairs and club cash and cards',()=>{
+test('customers walk down the stairs to pay the waiter at the ground-floor register and save their true height',()=>{
  for(const tableId of [9,13])for(const method of ['cash','card']){
   let game=developed();buy(game,'waiter');buy(game,'floorManager');game.open();game.s.spawn=999;
   const guest=order(game,{tableId,phase:'payment',method}),cash=game.s.cash;
@@ -132,9 +136,9 @@ test('routes include the stair rise, save their true height and allow the waiter
   else assert.ok(arrival.every(point=>(point.y||0)===0));
   let sawStairs=false,sawUpper=false,reloaded=false;
   for(let step=0;step<1800&&(game.s.orders.length||game.s.payments.terminalWithWaiter);step++){
-   game.tick(.1);const y=game.s.staff.waiterPosition.y||0;
-   if(y>.1&&y<3.5){sawStairs=true;if(!reloaded){const state=clone(game.s);game=new Game(state);assert.equal(game.s.staff.waiterPosition.y,state.staff.waiterPosition.y);reloaded=true;}}
-   if(tableId===13&&!reloaded&&game.s.staff.waiter?.remaining<game.s.staff.waiter?.total/2){const state=clone(game.s);game=new Game(state);assert.deepEqual(game.s.staff.waiterPosition,state.staff.waiterPosition);reloaded=true;}
+   game.tick(.1);const info=game.checkoutInfo(guest.id),y=info?.position.y||0;
+   if(y>.1&&y<3.5){sawStairs=true;if(!reloaded){const state=clone(game.s);game=new Game(state);assert.equal(game.checkoutInfo(guest.id).position.y,y);reloaded=true;}}
+   if(tableId===13&&!reloaded&&info?.moving){const state=clone(game.s);game=new Game(state);assert.deepEqual(game.checkoutInfo(guest.id).position,info.position);reloaded=true;}
    if(y===3.6)sawUpper=true;
   }
   assert.ok(reloaded);if(tableId===9)assert.ok(sawStairs&&sawUpper);else assert.ok(!sawStairs&&!sawUpper);assert.equal(game.s.orders.length,0,method+' finishes');assert.equal(game.s.payments.terminalWithWaiter,false);assert.equal(game.s.payments.receipts.length,1);assert.equal(game.s.payments.receipts[0].method,method);assert.equal(game.s.cash,cash+5);

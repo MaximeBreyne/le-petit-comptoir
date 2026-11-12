@@ -98,22 +98,30 @@ commande sur la tablette qui s’ouvre. Validez Prendre la commande à proximit�
 Revenez avec la boisson sur le plateau et interagissez de la même
 façon pour servir automatiquement la bonne boisson. La tablette conserve
 la liste des commandes, mais n’est pas nécessaire pour servir ou encaisser.
-Après la dégustation, le client demande à payer en espèces ou par carte.
+Après la dégustation, les clients quittent leur siège et rejoignent la caisse,
+y compris depuis l’étage et la boîte de nuit. Deux places forment la file devant
+le guichet ; les autres clients attendent leur tour assis. Les règlements se font
+un par un, seulement lorsque le premier client est arrivé devant la caisse.
 
-Espèces : prenez l’argent auprès du client, revenez à la caisse derrière le bar
-et regardez son écran avec E. La caisse s’ouvre directement, sans tablette.
+Espèces : rejoignez la caisse derrière le bar et regardez son écran avec E.
+La caisse s’ouvre directement, sans tablette, avec le ticket du client présent,
+sa boisson, le pourboire et le total. Prenez les espèces depuis cet écran.
 Choisissez les pièces et billets à rendre, validez le montant,
-puis rapportez la monnaie et le ticket au client. Un montant incorrect est refusé.
+puis remettez la monnaie et le ticket au guichet. Un montant incorrect est refusé.
 La caisse commence avec 80 euros, inclus dans les 260 euros de trésorerie initiale.
 Vous pouvez alimenter son tiroir depuis la trésorerie disponible hors caisse.
 
-Carte : prenez le terminal sans fil sur son socle près de la caisse, rejoignez
-le client et présentez-le avec E ou un clic. La validation prend trois secondes.
+Carte : prenez le terminal sans fil sur son socle près de la caisse, ou avec
+le bouton de la caisse, et présentez-le au client arrivé au guichet. Vous pouvez
+utiliser l’écran de caisse ou regarder le client avec E ou un clic.
+La validation prend trois secondes ; les paiements à table sont indisponibles.
 Vous gardez le terminal jusqu’à son retour sur le socle. Les recettes et la
 progression sont comptées à la confirmation du règlement, sans double paiement.
 Le terminal affiche le montant et l’état du paiement. Son écran, son clavier
 numérique, ses touches de validation et son socle de recharge sont modélisés.
-Les commandes, encaissements en cours et tâches des employés sont sauvegardés.
+Les déplacements vers la caisse, la file, les commandes, encaissements en cours
+et tâches des employés sont sauvegardés. La caisse ouverte laisse avancer le
+service et la file ; Échap et les réglages mettent toujours le jeu en pause.
 Le bilan du soir attend la fin des commandes et des paiements.
 
 RÉSERVE ET STOCKS
@@ -144,14 +152,16 @@ huit après les salons, douze avec l’étage et seize avec le club. Le bâtimen
 complet accueille jusqu’à vingt-deux clients avec les six places du comptoir.
 La fréquentation initiale reste inchangée. Un agrandissement vide ne crée
 aucune place supplémentaire et aucun achat ne fait apparaître de clients.
-Les clients et le serveur utilisent les nouvelles salles pour les commandes,
-le service et les paiements. Achats, clients et position sont sauvegardés.
+Les clients et le serveur utilisent les nouvelles salles pour les commandes
+et le service. Les clients reviennent à la caisse pour payer. Achats, clients
+et position sont sauvegardés.
 
 ÉTAGE ET BOÎTE DE NUIT
 Étage panoramique : 110 clients encaissés et 1 800 euros, après le deuxième
 agrandissement et la table 8. Il ajoute 54 m² à l’étage et un escalier de 18 m²,
 pour une surface totale de 246 m². L’escalier se rejoint au fond des annexes ;
-montez et descendez à pied pour servir les tables et encaisser les clients.
+montez et descendez à pied pour servir les tables ; les clients redescendent
+ensuite à la caisse pour régler.
 Tables 9 à 12 : achats successifs à 200, 220, 240 et 260 euros, après
 respectivement 110, 125, 140 et 155 clients encaissés.
 Boîte de nuit : 180 clients encaissés et 2 600 euros, après l’achat de l’étage.
@@ -197,7 +207,8 @@ Il prépare les commandes prises en consommant les ingrédients du comptoir et
 dépose les boissons sur le plateau, dans la limite de sa capacité.
 Serveur : 32 clients encaissés et 380 euros, puis 22 euros par soir. Il prend les
 commandes à table, apporte les boissons et encaisse les espèces et les cartes.
-Pour les espèces, il passe à la caisse, compte la monnaie et la rapporte au client.
+Pour les espèces, il attend le client au guichet, compte la monnaie et la lui remet
+depuis le côté barman de la caisse.
 Si nécessaire, il alimente le tiroir depuis la trésorerie disponible ; si elle
 ne suffit pas, il attend de la monnaie et continue les autres tâches possibles.
 Pour les cartes, il prend le terminal partagé, attend l’autorisation puis le
@@ -289,7 +300,13 @@ Le comptoir en pierre, le métal brossé, le parquet et les tissus ont des rendu
 distincts. La lumière de la rue baisse pendant le service, tandis que les
 suspensions gardent le bar éclairé pendant toute la nuit.
 Les clients arrivent et repartent en marchant,
-conservent leur place au comptoir et bloquent le passage lorsqu'ils attendent.
+rejoignent leur siège puis la caisse, et bloquent le passage lorsqu’ils attendent.
+La rue se prolonge des deux côtés du bâtiment : trottoirs et bordures continus,
+façades en volume, vitrines, stores, lampadaires, marquages et voitures garées.
+Les façades lointaines se fondent dans l’atmosphère pour éviter une coupure nette
+en regardant de biais depuis les fenêtres du bar ou de l’étage.
+Le moniteur de caisse affiche un ticket lisible avec la boisson, le total et
+l’état du règlement. Son écran est abaissé pour garder le client visible.
 Les chaises font face aux tables et la machine à café laisse un espace
 distinct pour la tasse en préparation, sans tasse superposée.
 Les montants des chaises sont placés derrière le dossier. Les étiquettes,
@@ -314,6 +331,8 @@ electron checks/preparation-ui.cjs vérifie les dix recettes par interactions
 E/clic, les déplacements réels dans l’allée, les stocks et le refus à distance.
 electron checks/direct-service.cjs vérifie le service et les paiements directs,
 le comptage à la caisse et le terminal, sans ouvrir la tablette.
+electron checks/checkout-ui.cjs contrôle la file devant la caisse, son déplacement
+pendant la consultation du ticket, les règlements au guichet et leur sauvegarde.
 electron checks/waiter-payments-ui.cjs vérifie les encaissements du serveur,
 le partage du terminal, les sauvegardes et les commandes disponibles au joueur.
 electron checks/crowd-ui.cjs vérifie les six tabourets, les paliers d’affluence,

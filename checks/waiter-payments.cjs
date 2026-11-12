@@ -1,6 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {Game,registerPosition}=require('../dist/engine.js');
+const {reachCheckout}=require('./checkout-fixtures.cjs');
 const advance=(game,seconds)=>{for(let i=0;i<Math.ceil(seconds*10);i++)game.tick(.1)};
 const reload=game=>new Game(JSON.parse(JSON.stringify(game.s)));
 function session(){const game=new Game();game.open();game.s.spawn=999;game.s.management.waiter=true;return game}
@@ -44,28 +45,31 @@ test('each cash and card job resumes after saving without duplicate receipt or s
  }
 });
 
-test('the waiter waits for the player terminal while still serving cash customers',()=>{
+test('the checkout queue waits for the player terminal, then serves cash in order',()=>{
  const game=session();game.pickupTerminal(registerPosition);const card=payable(game,'card'),cash=payable(game,'cash',{tableId:2});
+ reachCheckout(game,card);
  assert.equal(game.waiterPaymentStatus(card.id).blocked,'terminal');
- until(game,()=>!game.s.orders.some(order=>order.id===cash.id),'Cash settles without taking player terminal');
- assert.equal(card.phase,'payment');assert.equal(game.s.payments.terminalCarried,true);assert.equal(game.s.payments.terminalWithWaiter,false);assert.equal(game.s.cash,266);
+ advance(game,30);assert.ok(game.s.orders.includes(cash));assert.equal(game.checkoutInfo(cash).state,'queued');
+ assert.equal(card.phase,'payment');assert.equal(game.s.payments.terminalCarried,true);assert.equal(game.s.payments.terminalWithWaiter,false);assert.equal(game.s.cash,260);
  game.returnTerminal(registerPosition);until(game,()=>!game.s.orders.length&&!game.s.payments.terminalWithWaiter,'Card settles after player returns terminal');
  assert.equal(game.s.cash,272);assert.equal(game.s.payments.receipts.length,2);
 });
 
 test('the waiter does not take over cash or card payments begun by the player',()=>{
  const game=session();game.s.management.waiter=false;const cash=payable(game),card=payable(game,'card',{tableId:2});
- game.collectCash(cash.id,game.orderPosition(cash));game.pickupTerminal(registerPosition);game.payCard(card.id,game.orderPosition(card));game.s.management.waiter=true;
- advance(game,20);assert.equal(cash.phase,'cash-collected');assert.equal(game.paymentHandledByWaiter(cash.id),false);assert.equal(game.s.cash,266);assert.equal(game.s.payments.terminalCarried,true);assert.equal(game.s.staff.waiter,null);
- game.prepareChange(cash.id,4,registerPosition);game.completeCash(cash.id,game.orderPosition(cash));assert.equal(game.s.cash,272);assert.equal(game.s.payments.receipts.length,2);
+ reachCheckout(game,cash);game.collectCash(cash.id,game.orderPosition(cash));game.pickupTerminal(registerPosition);game.s.management.waiter=true;
+ advance(game,20);assert.equal(cash.phase,'cash-collected');assert.equal(game.paymentHandledByWaiter(cash.id),false);assert.equal(game.s.cash,260);assert.equal(game.s.payments.terminalCarried,true);assert.equal(game.s.staff.waiter,null);
+ game.prepareChange(cash.id,4,registerPosition);game.completeCash(cash.id,game.orderPosition(cash));assert.equal(game.s.cash,266);
+ reachCheckout(game,card);game.payCard(card.id,registerPosition);assert.equal(card.phase,'card-processing');advance(game,3.1);
+ assert.equal(game.s.cash,272);assert.equal(game.s.payments.receipts.length,2);assert.equal(game.s.payments.terminalCarried,true);
 });
 
-test('automatic till funding transfers existing funds and a shortage does not block other customers',()=>{
+test('a cash shortage holds the checkout queue until real treasury funds can replenish the drawer',()=>{
  const game=session(),cash=payable(game);stage(game,'prepare-change');
  game.s.cash=0;game.s.payments.till=0;advance(game,30);assert.equal(cash.phase,'cash-collected');assert.equal(game.s.staff.waiter,null);assert.equal(game.waiterPaymentStatus(cash.id).blocked,'change');assert.equal(game.s.cash,0);
- const card=payable(game,'card',{tableId:2});until(game,()=>!game.s.orders.some(order=>order.id===card.id),'Card handled despite pending change');
- until(game,()=>!game.s.orders.length&&!game.s.payments.terminalWithWaiter,'New funds pay the pending change');
- assert.equal(game.s.cash,12);assert.equal(game.s.payments.till,10);assert.equal(game.availableBank(),2);assert.equal(game.s.payments.receipts.length,2);
+ const card=payable(game,'card',{tableId:2});advance(game,30);assert.equal(game.s.orders.length,2);assert.equal(game.checkoutInfo(card).state,'queued');assert.equal(game.s.cash,0);
+ game.s.cash=4;until(game,()=>!game.s.orders.length&&!game.s.payments.terminalWithWaiter,'Actual treasury funds unblock change and then card');
+ assert.equal(game.s.cash,16);assert.equal(game.s.payments.till,10);assert.equal(game.availableBank(),6);assert.equal(game.s.payments.receipts.length,2);
 });
 
 test('unfunded cash payments remain available to the player without fabricated money',()=>{
@@ -87,7 +91,8 @@ test('legacy ownership is preserved and malformed duplicate holders never duplic
 });
 
 test('waiter routes use the left passage and action timers allow the full route',()=>{
- const game=session();payable(game,'cash',{tableId:4});stage(game,'prepare-change');const job=game.s.staff.waiter;
+ const game=session();payable(game,'cash',{tableId:4});stage(game,'collect-cash');const job=game.s.staff.waiter;
  assert.ok(job.route.some(point=>point.x===.95&&point.z===1.9));assert.ok(job.route.some(point=>point.x===.95&&point.z===4.9));assert.ok(job.total>=job.travel+1.999);
  for(let i=1;i<job.route.length;i++){const a=job.route[i-1],b=job.route[i];if(Math.min(a.z,b.z)<3.02&&Math.max(a.z,b.z)>3.02)assert.ok(a.x<1.3&&b.x<1.3,'Route never crosses the counter');}
+ stage(game,'prepare-change');assert.ok(game.s.staff.waiter.route.every(point=>point.z<2.5),'The cashier remains behind the bar to prepare change');
 });

@@ -17,14 +17,14 @@ class BarRenderer {
    void main(){
     vec3 p=position-camera;float cy=cos(angle.x),sy=sin(angle.x),cp=cos(angle.y),sp=sin(angle.y);
     float x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,y=p.y*cp-z*sp;z=p.y*sp+z*cp;
-    gl_Position=vec4(x*projection.x,y*projection.y,1.002002*z-0.1001001,z);
+    gl_Position=vec4(x*projection.x,y*projection.y,1.000556*z-0.1000278,z);
     tint=color;world=position;faceNormal=normal;surface=material;labelUV=texcoord;viewDepth=z;
    }`;
   const shadowPosition=`uniform float buildingWidth;vec3 lightPosition(vec3 p){float extension=max(0.0,buildingWidth-12.0);p-=vec3(buildingWidth*.5,0.8,5.0);return vec3(dot(p,vec3(0.614,0.0,-0.789))/(9.0+extension*.45),dot(p,vec3(-0.649,0.574,-0.505))/(9.0+extension*.45),-dot(p,vec3(0.452,0.823,0.351))/(12.0+extension*.4));}`;
   const fragment=`${derivatives?'#extension GL_OES_standard_derivatives : enable':''}
    precision highp float;
    varying vec3 tint;varying vec3 world;varying vec3 faceNormal;varying float surface;varying vec2 labelUV;varying float viewDepth;
-   uniform mediump vec3 camera;uniform float brightness;uniform float daylight;uniform float shadowFloor;uniform sampler2D labels;uniform sampler2D shadowMap;uniform vec2 shadowInfo;uniform vec4 people[${BarRenderer.maxContactPeople}];
+   uniform mediump vec3 camera;uniform float brightness;uniform float daylight;uniform float shadowFloor;uniform sampler2D labels;uniform sampler2D registerScreen;uniform sampler2D shadowMap;uniform vec2 shadowInfo;uniform vec4 people[${BarRenderer.maxContactPeople}];
    ${shadowPosition}
    float hash(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
    float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -102,7 +102,8 @@ class BarRenderer {
      float pores=noise(uv*130.0),folds=noise(uv*8.0);
      base*=.92+.09*folds+(pores-.5)*.045*detail;roughness=.47+.12*folds;spec=.19;height=(pores-.5)*detail*.00013;
     }
-    if(labelUV.x>=0.0){base=texture2D(labels,labelUV).rgb;roughness=.82;spec=.04;height=0.0;}
+    if(surface>14.5&&surface<15.5){float aggregate=noise(uv*130.0),patch=noise(uv*.7);base*=.88+.20*patch+(aggregate-.5)*.16*detail;roughness=.97;spec=.02;height=(aggregate-.5)*detail*.0003;}
+    if(labelUV.x>=0.0){base=surface>13.5&&surface<14.5?texture2D(registerScreen,labelUV).rgb:texture2D(labels,labelUV).rgb;roughness=.82;spec=.04;height=0.0;}
     n=bump(n,height);
     vec3 v=normalize(camera-world),linear=pow(max(base,vec3(.001)),vec3(2.2));
     if(surface>10.5&&surface<11.5&&dot(n,v)<0.0)n=-n;
@@ -143,10 +144,15 @@ class BarRenderer {
     if(surface>8.5&&surface<9.5)light+=vec3(.065,.025,.014)*pow(1.0-max(0.0,dot(n,v)),2.0);
     vec3 c=(linear*light+reflection)*brightness;
     if(surface>6.5&&surface<7.5)c=linear*1.65*brightness;
+    if(surface>13.5&&surface<14.5&&labelUV.x>=0.0)c=linear*.82*brightness;
     // Filmic highlight rolloff followed by display gamma; neutral darks stay legible.
     c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.0,1.0);
     c=pow(c,vec3(1.0/2.2));
     float haze=clamp((viewDepth-12.0)*.006,0.0,.12);c=mix(c,vec3(.18,.21,.22),haze);
+    // The street continues beyond the camera range; distant geometry merges
+    // into the same atmospheric colour as the sky before the far clip plane.
+    float streetHaze=smoothstep(45.0,145.0,length(world.xz-camera.xz))*smoothstep(9.95,10.3,world.z);
+    c=mix(c,mix(vec3(.045,.065,.10),vec3(.53,.61,.67),daylight),streetHaze);
     // Only dedicated clear glass enters the sorted transparent pass. Existing
     // colored bottles remain opaque, avoiding transparency sorting artifacts.
     float alpha=1.0;
@@ -155,12 +161,13 @@ class BarRenderer {
    }`;
   this.program=this.makeProgram(vertex,fragment);
   this.attributes=Object.fromEntries(['position','color','material','normal','texcoord'].map(k=>[k,gl.getAttribLocation(this.program,k)]));
-  this.uniforms=Object.fromEntries(['camera','angle','projection','brightness','daylight','labels','shadowMap','shadowInfo','shadowFloor','buildingWidth','people[0]'].map(k=>[k,gl.getUniformLocation(this.program,k)]));
+  this.uniforms=Object.fromEntries(['camera','angle','projection','brightness','daylight','labels','registerScreen','shadowMap','shadowInfo','shadowFloor','buildingWidth','people[0]'].map(k=>[k,gl.getUniformLocation(this.program,k)]));
   this.shadowProgram=this.makeProgram(`precision highp float;attribute vec3 position;${shadowPosition}void main(){gl_Position=vec4(lightPosition(position),1.0);}`,`precision highp float;void main(){vec2 e=fract(gl_FragCoord.z*vec2(1.0,255.0));e.x-=e.y/255.0;gl_FragColor=vec4(e,0.0,1.0);}`);
   this.shadowAttribute=gl.getAttribLocation(this.shadowProgram,'position');
   this.shadowBuildingWidth=gl.getUniformLocation(this.shadowProgram,'buildingWidth');
   this.staticBuffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.shadowBuffer=gl.createBuffer();this.glassBuffer=gl.createBuffer();this.glassCapacity=0;
-  this.labelTexture=gl.createTexture();this.shadowTexture=gl.createTexture();this.shadowFramebuffer=gl.createFramebuffer();this.shadowDepth=gl.createRenderbuffer();
+  this.labelTexture=gl.createTexture();this.registerTexture=gl.createTexture();this.shadowTexture=gl.createTexture();this.shadowFramebuffer=gl.createFramebuffer();this.shadowDepth=gl.createRenderbuffer();
+  this.registerDisplay({});this.uploadRegister();
   this.people=new Float32Array(BarRenderer.maxContactPeople*4);this.shadowSize=0;this.shadowDirty=true;
   this.setScene(boxes);
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.lost=true;const error=document.getElementById('graphicsError');if(error)error.hidden=false;});
@@ -240,6 +247,39 @@ class BarRenderer {
   if(this.anisotropy)gl.texParameterf(gl.TEXTURE_2D,this.anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(this.anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);this.atlasDirty=false;
  }
+ registerDisplay(data={}){
+  const signature=JSON.stringify(data);if(this.registerSignature===signature)return;
+  if(!this.registerCanvas){this.registerCanvas=document.createElement('canvas');this.registerCanvas.width=1024;this.registerCanvas.height=576;this.registerContext=this.registerCanvas.getContext('2d');}
+  this.registerSignature=signature;this.registerUpdates=(this.registerUpdates||0)+1;
+  const ctx=this.registerContext,rect=(x,y,w,h,color)=>{ctx.fillStyle=color;ctx.fillRect(x,y,w,h)},text=(value,x,y,size=22,color='#243b36',weight=500,align='left',width=900)=>{
+   ctx.font=`${weight} ${size}px Arial, sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle=color;
+   let content=String(value);while(content.length>1&&ctx.measureText(content).width>width)content=content.slice(0,-2)+'…';ctx.fillText(content,x,y);
+  },eur=value=>(Number.isFinite(value)?value:0).toLocaleString('fr-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const active=!!data.customer,status={payment:'À ENCAISSER','cash-collected':'ESPÈCES REÇUES','change-ready':'MONNAIE PRÊTE','card-processing':'AUTORISATION…'}[data.phase]||(data.open?'EN ATTENTE':'SERVICE FERMÉ');
+  rect(0,0,1024,576,'#edf1ed');rect(0,0,1024,66,'#183e34');text('LE PETIT COMPTOIR',24,34,25,'#f6e8c9',700);text(`CAISSE 01   ·   SOIR ${data.day||1}`,996,34,20,'#b9d1c5',600,'right');
+  rect(0,66,154,510,'#233e35');
+  for(const [i,label]of ['VENTE','TICKETS','TIROIR'].entries()){if(!i)rect(12,90,130,58,'#bba779');text(label,29,119+i*83,20,i?'#b9c9c1':'#16362b',700);}
+  text('SERVICE',23,455,15,'#9fb6ac',600);text(data.open?'OUVERT':'FERMÉ',23,481,19,data.open?'#c2dec1':'#e2c197',700);
+  rect(174,88,826,60,'#ffffff');text(active?'Ticket '+String(data.ticket||1).padStart(3,'0'):'Nouvelle vente',194,111,27,'#203e33',700);
+  text(active?`${data.customer} · ${data.place||'Comptoir'}`:'Les clients se présentent ici pour régler.',194,135,17,'#64756b',400,'left',540);
+  text(status,978,119,18,data.phase==='card-processing'?'#9a7131':'#396b53',700,'right',280);
+  rect(174,164,826,34,'#dce5dc');text('ARTICLE',195,181,16,'#526358',700);text('QTÉ',704,181,16,'#526358',700,'right');text('MONTANT',978,181,16,'#526358',700,'right');
+  rect(174,199,826,144,'#ffffff');
+  if(active){text(data.recipe||'Consommation',195,232,27,'#203a31',600,'left',490);text('1',704,232,24,'#304c3b',600,'right');text(eur(data.price),978,232,27,'#203a31',600,'right');if(data.tip>0){text('Pourboire',195,284,21,'#687b6e');text(eur(data.tip),978,284,23,'#526b5b',500,'right');}}
+  else {text('Aucun ticket en cours',195,237,29,'#7b8c81',500);text(data.queueCount?`${data.queueCount} client${data.queueCount>1?'s':''} en route ou en attente.`:'Prêt pour le prochain encaissement.',195,286,21,'#7b8c81',400);}
+  rect(174,355,826,84,'#d8e5d8');text('TOTAL',195,397,28,'#2c4938',700);text(eur(data.total),978,397,57,'#183b29',700,'right');
+  const cash=data.phase==='cash-collected'||data.phase==='change-ready';
+  text(cash?`Reçu ${eur(data.tender)}   ·   À rendre ${eur(data.change)}`:active?data.method==='cash'?'Règlement en espèces':'Règlement par carte bancaire':`Fond de caisse : ${eur(data.till)}`,195,462,22,'#46614e',600,'left',780);
+  rect(174,490,394,59,data.method==='cash'&&active?'#b99957':'#d4ded3');rect(584,490,416,59,data.method==='card'&&active?'#2d6653':'#d4ded3');
+  text('ESPÈCES',371,519,25,'#213e2c',700,'center');text(data.phase==='card-processing'?'LECTURE DU TERMINAL':'CARTE BANCAIRE',792,519,data.phase==='card-processing'?20:25,data.method==='card'&&active?'#f0f4e7':'#213e2c',700,'center');
+  text('MERCI DE VOTRE VISITE',994,565,12,'#89978c',500,'right');
+  this.registerDirty=true;
+ }
+ uploadRegister(){
+  if(!this.registerDirty)return;const gl=this.gl;gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.registerTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.registerCanvas);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);this.registerDirty=false;
+ }
  static topology(){
   if(this.unitGeometry)return this.unitGeometry;
   // Cache unit meshes once, retaining JS double precision until the final
@@ -311,7 +351,7 @@ class BarRenderer {
      emit(0,1,0,0,1,0);emit(tx,1,tz,0,1,0);emit(ux,1,uz,0,1,0);
     }
    }else{
-    const label=this.label(b),labelFace={front:0,back:1,left:2,right:3,top:4,bottom:5}[b.labelFace||'front'];
+    const label=b.display==='register'?(this.registerDisplay(b.screenData),{u0:0,v0:0,u1:1,v1:1}):this.label(b),labelFace={front:0,back:1,left:2,right:3,top:4,bottom:5}[b.labelFace||'front'];
     for(let i=0;i<faces.length;i++)for(const k of faces[i]){
      const p=corners[k],n=normals[i];let u=-1,v=-1;
      if(label&&i===labelFace){let tx=(p[0]+1)/2,ty=(p[1]+1)/2;if(i===1)tx=1-tx;if(i===2)tx=(1-p[2])/2;if(i===3)tx=(p[2]+1)/2;if(i===4)ty=(p[2]+1)/2;if(i===5)ty=(1-p[2])/2;u=label.u0+tx*(label.u1-label.u0);v=label.v0+ty*(label.v1-label.v0)}
@@ -390,7 +430,8 @@ class BarRenderer {
   if(shadowFloor!==this.shadowFloor){const mesh=shadowFloor?this.upperShadowMesh:this.groundShadowMesh;gl.bindBuffer(gl.ARRAY_BUFFER,this.shadowBuffer);gl.bufferData(gl.ARRAY_BUFFER,mesh,gl.STATIC_DRAW);this.shadowCount=mesh.length/12;this.shadowFloor=shadowFloor;this.shadowDirty=true;}
   gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.depthMask(true);gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);gl.clearDepth(1);
   this.renderShadows(settings.quality==='high'?2048:1024);
-  gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.useProgram(this.program);gl.clearColor(.13,.17,.19,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const daylight=BarRenderer.daylightAt(serviceTime);
+  gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.useProgram(this.program);gl.clearColor(.045+.485*daylight,.065+.545*daylight,.10+.57*daylight,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const focal=1/Math.tan(settings.fov*Math.PI/360);
   gl.uniform3f(this.uniforms.camera,camera.x,camera.y,camera.z);gl.uniform2f(this.uniforms.angle,camera.a,camera.pitch||0);gl.uniform2f(this.uniforms.projection,focal/(this.canvas.width/this.canvas.height),focal);gl.uniform1f(this.uniforms.brightness,settings.brightness/100);gl.uniform1f(this.uniforms.daylight,BarRenderer.daylightAt(serviceTime));
   gl.uniform1f(this.uniforms.buildingWidth,this.buildingWidth);
@@ -399,6 +440,7 @@ class BarRenderer {
   gl.uniform4fv(this.uniforms['people[0]'],this.people);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.labelTexture);gl.uniform1i(this.uniforms.labels,0);
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.shadowTexture);gl.uniform1i(this.uniforms.shadowMap,1);gl.uniform2f(this.uniforms.shadowInfo,settings.quality!=='low'&&this.shadowSupported?1:0,1/this.shadowSize);
+  gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.registerTexture);gl.uniform1i(this.uniforms.registerScreen,2);
   this.draw(this.staticBuffer,this.count);
   const opaque=[],glass=[...this.staticGlass],visibility=new Map();let visibleCharacters=0;
   for(const shape of dynamic){
@@ -410,7 +452,7 @@ class BarRenderer {
    (shape.mat===11?glass:opaque).push(shape);
   }
   this.visibleCharacters=visibleCharacters;this.totalCharacters=visibility.size;
-  if(opaque.length){const data=this.mesh(opaque);this.uploadAtlas();gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamicBuffer);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,this.dynamicCapacity*2);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.draw(this.dynamicBuffer,data.length/12)}
+  if(opaque.length){const data=this.mesh(opaque);this.uploadAtlas();this.uploadRegister();gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamicBuffer);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,this.dynamicCapacity*2);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.draw(this.dynamicBuffer,data.length/12)}
   if(glass.length){
    const cp=Math.cos(camera.pitch||0),fx=Math.sin(camera.a)*cp,fy=Math.sin(camera.pitch||0),fz=Math.cos(camera.a)*cp;
    // Transparent panes retain opaque depth testing but never hide the objects

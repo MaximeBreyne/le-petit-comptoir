@@ -123,8 +123,9 @@ de l’escalier, pour un total de **294 m²**. Elle comprend une piste de danse,
 une cabine DJ et les emplacements des tables 13 à 16.
 
 **Service** distingue les tables du rez-de-chaussée, de l’étage et du club.
-La prise de commande, le service et le paiement demandent d’être au même niveau
-que le client. Toutes les préparations restent derrière le comptoir principal.
+La prise de commande et le service demandent d’être au même niveau que le
+client. Pour payer, il rejoint la caisse au rez-de-chaussée. Toutes les
+préparations restent derrière le comptoir principal.
 
 Les nouvelles licences s’achètent dans **Tablette > Licences** :
 
@@ -159,13 +160,22 @@ commande. Apportez ensuite la boisson préparée et servez directement avec **E*
 Le préparateur et le serveur peuvent effectuer ces tâches après recrutement ;
 le serveur peut aussi encaisser les espèces et les cartes.
 
-Après la dégustation, prenez les espèces du client, comptez la monnaie à la
-**Caisse**, puis rapportez-la avec le ticket. Le tiroir contient initialement
+Après la dégustation, les clients rejoignent la **Caisse**, y compris depuis
+l’étage et le club. Une file de deux places évite de superposer les clients ;
+les autres attendent leur tour à leur siège. Seul le client arrivé en tête
+peut régler. Le serveur encaisse aussi depuis le côté barman de la caisse.
+
+Regardez l’écran de caisse avec **E** pour afficher le ticket, sa boisson et
+le total. Prenez les espèces, comptez la monnaie puis remettez-la avec le
+ticket au guichet. Le tiroir contient initialement
 80 € inclus dans la trésorerie de 260 € ; son alimentation transfère de l’argent
 existant, sans créer de recettes. Pour une carte, prenez le terminal sans fil
-au comptoir et présentez-le au client ; la confirmation prend trois secondes.
+au comptoir ou depuis l’écran de caisse, et présentez-le au client arrivé
+au guichet ; la confirmation prend trois secondes. Les paiements à table sont
+indisponibles. La caisse ouverte laisse continuer la file et le service.
 Les recettes et la progression ne sont acquises qu’une fois le règlement terminé.
-Les paiements et tâches en cours sont conservés dans les sauvegardes.
+Les trajets vers la caisse, la file, les paiements et les tâches en cours sont
+conservés dans les sauvegardes.
 
 Les anciennes sauvegardes gardent leurs ingrédients au comptoir et l’accès
 aux cocktails. Leur nouvelle réserve commence vide.
@@ -184,6 +194,11 @@ machine à café possède un espace distinct pour la tasse en préparation.
 Les montants des chaises restent derrière le dossier. Les textes des étiquettes,
 enseignes et cartes murales gardent leurs proportions et s’adaptent à leur support.
 Les personnages restent stylisés.
+La rue se prolonge au-delà des fenêtres, avec des façades en volume, vitrines,
+stores, trottoirs continus, lampadaires, marquages et voitures garées. La distance
+atténue les bâtiments lointains, y compris depuis les fenêtres de l’étage.
+L’écran de caisse affiche la boisson, le total et l’état du paiement ; sa hauteur
+laisse voir le client qui se présente au guichet.
 
 Le logo original vert et doré est présent dans l’accueil, la barre du jeu,
 l’application Windows, le raccourci et les assistants d’installation et de

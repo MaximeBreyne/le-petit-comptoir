@@ -139,6 +139,9 @@ const crowdStages=Object.freeze([
  {threshold:80,counterSeatsUnlocked:6,spawnInterval:12}
 ].map(stage=>Object.freeze({...stage,capacity:4+stage.counterSeatsUnlocked})));
 const registerPosition=Object.freeze({x:2.65,z:2.0});
+const checkoutPositions=Object.freeze([{x:2.45,y:0,z:4.15},{x:2.45,y:0,z:5.0}].map(Object.freeze));
+const paymentPhases=new Set(['payment','cash-collected','change-ready','card-processing']);
+const checkoutCustomer=state=>state?.orders?.find(order=>paymentPhases.has(order.phase)&&order.checkout?.slot===0&&order.checkout.remaining<=1e-9)||null;
 const phases=new Set(['awaiting-order','preparing','drinking','payment','cash-collected','change-ready','card-processing']);
 const money=value=>Math.round((value+Number.EPSILON)*100)/100;
 const bounded=(value,min,max,fallback)=>Number.isFinite(value)?Math.min(max,Math.max(min,value)):fallback;
@@ -164,7 +167,7 @@ const preparationSlots=Object.freeze([
  {id:'cocktails2',kind:'cocktails',label:'Plan de préparation 2',...preparationLayout.stations.cocktails,x:5.85}
 ].map(Object.freeze));
 const waiterPaymentTasks=new Set(['collect-cash','prepare-change','return-change','pickup-terminal','take-card','wait-card','return-terminal']);
-const freshPayments=()=>({till:80,terminalCarried:false,terminalWithWaiter:false,terminalOrderId:null,cashRevenue:0,cardRevenue:0,receipts:[]});
+const freshPayments=()=>({till:80,terminalCarried:false,terminalWithWaiter:false,terminalOrderId:null,checkoutNext:1,cashRevenue:0,cardRevenue:0,receipts:[]});
 const fresh=()=>({...normalizeDecor(),version:2,cash:260,day:1,time:serviceSchedule.opensAt,developer:normalizeDeveloper(),open:false,closing:false,stock:{...normalizeReserve(),beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{...Object.fromEntries(Object.keys(managementUpgrades).filter(id=>id!=='tray').map(id=>[id,false])),restockTimer:0},payments:freshPayments(),staff:{bartender:null,bartender2:null,waiter:null,waiterPosition:{x:1.05,z:4.5}},orders:[],deliveries:[],prep:null,parkedPreps:[],nextPrepId:1,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
 class Game{
  constructor(saved){this.s=fresh();if(saved&&saved.version===2){const s=saved;const nums=['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','capacity','spawn','nextId'];if(nums.every(k=>Number.isFinite(s[k]))&&isValidStock(s.stock)&&Array.isArray(s.orders)&&s.orders.every(o=>o&&Object.hasOwn(recipes,o.recipe)&&Number.isFinite(o.patience))&&Array.isArray(s.tray)&&s.tray.every(t=>t&&Object.hasOwn(recipes,t.recipe))&&Array.isArray(s.deliveries)&&s.deliveries.every(d=>d&&Object.hasOwn(ingredients,d.key)&&Number.isFinite(d.remaining))&&(!s.prep||(Object.hasOwn(recipes,s.prep.recipe)&&Number.isFinite(s.prep.amount)))){this.s=JSON.parse(JSON.stringify(s));
@@ -228,6 +231,7 @@ class Game{
   const activeCard=s.orders.find(order=>order.phase==='card-processing'&&order.id===p?.terminalOrderId&&(s.payments.terminalCarried||s.payments.terminalWithWaiter&&order.paymentBy==='waiter'));
   for(const order of s.orders)if(order.phase==='card-processing'&&order!==activeCard){order.phase='payment';order.cardRemaining=0}
   if(activeCard)s.payments.terminalOrderId=activeCard.id;
+  this.normalizeCheckouts(saved);
   const point=saved.staff?.waiterPosition;
   s.staff={bartender:null,bartender2:null,waiter:null,waiterPosition:this.validStaffPosition(point)?{x:point.x,z:point.z,...(point.y!==undefined?{y:point.y}:{})}:{x:1.05,z:4.5}};
   for(const role of ['bartender','bartender2','waiter']){
@@ -239,13 +243,95 @@ class Game{
    if(role==='waiter'&&!this.validWaiterJob(job,order))continue;
    s.staff[role]={...job,remaining:bounded(job.remaining,0,job.total,job.total)};
    if(role==='waiter'){
-    const validRoute=Array.isArray(job.route)&&job.route.length>=2&&job.route.length<=48&&job.route.every(p=>this.validStaffPosition(p))&&Number.isFinite(job.travel)&&job.travel>=0&&job.travel<=job.total;
-    if(!validRoute){const position=s.staff.waiterPosition;s.staff.waiter.route=this.waiterRoute(position,this.waiterDestination(job.task,order));s.staff.waiter.travel=Math.min(job.total,this.waiterRouteLength(s.staff.waiter.route)/this.waiterSpeed());}
+    const target=this.waiterDestination(job.task,order),validRoute=Array.isArray(job.route)&&job.route.length>=2&&job.route.length<=48&&job.route.every(p=>this.validStaffPosition(p))&&Number.isFinite(job.travel)&&job.travel>=0&&job.travel<=job.total&&(!waiterPaymentTasks.has(job.task)||Math.hypot(job.route.at(-1).x-target.x,job.route.at(-1).z-target.z,(job.route.at(-1).y||0)-(target.y||0))<.1);
+    if(!validRoute){
+     if(job.task==='wait-card'){
+      // An authorisation already in progress migrates with its client to the
+      // counter, keeping the bank timer instead of starting another journey.
+      const position={...registerPosition};s.staff.waiterPosition=position;
+      Object.assign(s.staff.waiter,{route:[{...position},{...position}],travel:0,remaining:order.cardRemaining,total:Math.max(job.total,order.cardRemaining)});
+     }else{
+      const position=s.staff.waiterPosition,route=this.waiterRoute(position,this.waiterDestination(job.task,order)),travel=this.waiterRouteLength(route)/this.waiterSpeed();
+      if(waiterPaymentTasks.has(job.task))Object.assign(s.staff.waiter,{route,travel,total:travel+2,remaining:travel+2});
+      else Object.assign(s.staff.waiter,{route,travel:Math.min(job.total,travel)});
+     }
+    }
    }
   }
   if(s.payments.terminalWithWaiter&&!s.staff.waiter){
    this.assignWaiterJob(activeCard?'wait-card':'return-terminal',activeCard||null,activeCard?activeCard.cardRemaining:undefined);
   }
+ }
+ normalizeCheckouts(saved){
+  const s=this.s,occupied=new Set(),sequences=new Set();let next=1;
+  // Already exchanged money or a card authorisation survives migration at the
+  // counter. Other legacy customers physically walk there on their next tick.
+  const pending=s.orders.filter(order=>paymentPhases.has(order.phase));
+  pending.sort((a,b)=>(b.phase==='card-processing')-(a.phase==='card-processing')||(b.phase!=='payment')-(a.phase!=='payment'));
+  for(const order of s.orders)if(!paymentPhases.has(order.phase))delete order.checkout;
+  for(const order of pending){
+   const value=order.checkout,sequence=Number.isSafeInteger(value?.sequence)&&value.sequence>0&&!sequences.has(value.sequence)?value.sequence:next;
+   sequences.add(sequence);next=Math.max(next,sequence+1);
+   const slot=Number.isInteger(value?.slot)&&value.slot>=0&&value.slot<checkoutPositions.length&&!occupied.has(value.slot)?value.slot:null;
+   const validRoute=slot!==null&&Array.isArray(value.route)&&value.route.length>=2&&value.route.length<=64&&value.route.every(point=>this.validStaffPosition(point))&&Number.isFinite(value.total)&&value.total>=0&&value.total<=180&&Number.isFinite(value.remaining)&&value.remaining>=0&&value.remaining<=value.total&&Math.hypot(value.route.at(-1).x-checkoutPositions[slot].x,value.route.at(-1).z-checkoutPositions[slot].z,value.route.at(-1).y||0)<.01;
+   if(validRoute){order.checkout={sequence,slot,route:value.route.map(point=>({...point})),total:value.total,remaining:value.remaining};occupied.add(slot);}
+   else if(!value&&order.phase!=='payment'&&!occupied.has(0)){
+    const point={...checkoutPositions[0]};order.checkout={sequence,slot:0,route:[point,{...point}],total:0,remaining:0};occupied.add(0);
+   }else order.checkout={sequence,slot:null,route:null,total:0,remaining:0};
+  }
+  s.payments.checkoutNext=Math.max(next,Number.isSafeInteger(saved.payments?.checkoutNext)?saved.payments.checkoutNext:1);
+ }
+ checkoutCustomer(){return checkoutCustomer(this.s)}
+ customerSeatPosition(order){const point=this.customerRoute(order).at(-1);return {...point,y:point.y||0}}
+ checkoutInfo(value){
+  const order=typeof value==='object'?value:this.s.orders.find(order=>order.id===value);
+  if(!order||!paymentPhases.has(order.phase))return null;
+  const item=order.checkout,queue=this.s.orders.filter(entry=>paymentPhases.has(entry.phase)).sort((a,b)=>(a.checkout?.sequence??Infinity)-(b.checkout?.sequence??Infinity)||a.id-b.id),queueIndex=queue.indexOf(order);
+  if(item?.slot===null||!item){const point=this.customerSeatPosition(order),table=this.activeTables().find(table=>table.id===order.tableId);return {state:'waiting',position:{...point,angle:table?(table.x<6?Math.PI/2:-Math.PI/2):0},moving:false,seated:true,queueIndex,ready:false};}
+  const moving=item.remaining>1e-9,position=this.routePosition(item.route,item.total>0?1-item.remaining/item.total:1);
+  if(!moving)position.angle=0;
+  const ready=!moving&&item.slot===0;
+  return {state:ready?'ready':moving?'walking':'queued',position,moving,seated:false,queueIndex,ready};
+ }
+ routePosition(route,progress){
+  let distance=this.waiterRouteLength(route)*Math.max(0,Math.min(1,progress));
+  for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],length=Math.hypot(b.x-a.x,(b.y||0)-(a.y||0),b.z-a.z);if(distance<=length||i===route.length-1){const t=length?Math.min(1,distance/length):1;return {x:a.x+(b.x-a.x)*t,y:(a.y||0)+((b.y||0)-(a.y||0))*t,z:a.z+(b.z-a.z)*t,angle:Math.atan2(a.x-b.x,a.z-b.z)}}distance-=length;}
+  return {...route[0],y:route[0].y||0,angle:0};
+ }
+ startCheckoutWalk(order,slot,route){
+  const points=route.filter((point,index)=>index===0||Math.hypot(point.x-route[index-1].x,point.z-route[index-1].z,(point.y||0)-(route[index-1].y||0))>.0001).map(point=>({x:point.x,y:point.y||0,z:point.z}));
+  if(points.length<2)points.push({...points[0]});
+  const total=this.waiterRouteLength(points)/1.5;Object.assign(order.checkout,{slot,route:points,total,remaining:total});
+ }
+ checkoutRoute(order,slot=0){
+  const route=this.customerRoute(order).slice(1).reverse();
+  return [...route,{x:6,y:0,z:5.25},{x:2.45,y:0,z:5.25},{...checkoutPositions[slot]}];
+ }
+ customerExitRoute(order,position){
+  const checkout=this.checkoutInfo(order);
+  if(checkout&&!checkout.seated)return [{...position},{x:1.05,y:0,z:position.z},{x:1.05,y:0,z:5.58},{x:3.1,y:0,z:5.58},{x:6,y:0,z:5.58},{x:6,y:0,z:9.3}];
+  return [{...position},...this.customerRoute(order).slice(0,-1).reverse()];
+ }
+ checkoutTick(dt){
+  const s=this.s,pending=s.orders.filter(order=>paymentPhases.has(order.phase));
+  for(const order of pending)if(!order.checkout)order.checkout={sequence:s.payments.checkoutNext++,slot:null,route:null,total:0,remaining:0};
+  pending.sort((a,b)=>a.checkout.sequence-b.checkout.sequence||a.id-b.id);
+  for(const order of pending)order.checkout.remaining=Math.max(0,order.checkout.remaining-dt);
+  // The next guest steps forward before another leaves their seat, so two
+  // bodies never share a queue target or pass through each other in the line.
+  const occupying=pending.filter(order=>order.checkout.slot!==null);
+  for(let i=0;i<occupying.length;i++){
+   const order=occupying[i],item=order.checkout;if(item.slot===i)continue;
+   const point=this.checkoutInfo(order).position,remainingRoute=item.remaining>0?this.remainingRoute(item.route,item.total?1-item.remaining/item.total:1):[point];
+   this.startCheckoutWalk(order,i,[...remainingRoute,{...checkoutPositions[i]}]);
+  }
+  if(occupying.some(order=>order.checkout.remaining>1e-9))return;
+  if(occupying.length<checkoutPositions.length){const next=pending.find(order=>order.checkout.slot===null);if(next)this.startCheckoutWalk(next,occupying.length,this.checkoutRoute(next,occupying.length));}
+ }
+ remainingRoute(route,progress){
+  let distance=this.waiterRouteLength(route)*Math.max(0,Math.min(1,progress));
+  for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],length=Math.hypot(b.x-a.x,(b.y||0)-(a.y||0),b.z-a.z);if(distance<=length)return [this.routePosition(route,progress),...route.slice(i)];distance-=length;}
+  return [{...route.at(-1)}];
  }
  paymentHandledByWaiter(id){return this.s.management.waiter&&this.s.orders.some(order=>order.id===id&&order.paymentBy==='waiter')}
  waiterPaymentStatus(id){
@@ -253,11 +339,12 @@ class Game{
   if(job&&waiterPaymentTasks.has(job.task)&&(id===undefined||job.orderId===id))return {orderId:job.orderId,task:job.task,blocked:null};
   const order=s.orders.find(order=>(id===undefined||order.id===id)&&order.paymentBy==='waiter');
   if(order)return {orderId:order.id,task:order.phase==='change-ready'?'return-change':'prepare-change',blocked:this.canFundChange(order)?null:'change'};
-  const waiting=s.management.waiter&&s.orders.find(order=>(id===undefined||order.id===id)&&order.phase==='payment'&&(order.paymentMethod==='card'?s.payments.terminalCarried:!this.canFundChange(order)));
+  const waiting=s.management.waiter&&s.orders.find(order=>(id===undefined||order.id===id)&&this.checkoutInfo(order)?.ready&&order.phase==='payment'&&(order.paymentMethod==='card'?s.payments.terminalCarried:!this.canFundChange(order)));
   return waiting?{orderId:waiting.id,task:waiting.paymentMethod==='card'?'pickup-terminal':'collect-cash',blocked:waiting.paymentMethod==='card'?'terminal':'change'}:null;
  }
  waiterDestination(task,order){
   if(['pickup-terminal','prepare-change','return-terminal'].includes(task))return {x:3,z:1.9};
+  if(waiterPaymentTasks.has(task))return {...registerPosition};
   const table=this.activeTables().find(table=>table.id===order?.tableId),seat=this.counterSeat(order);
   return table?{x:table.x+(table.x<6?1.35:-1.35),z:table.z,...(table.y!==undefined?{y:table.y}:{})}:order?{x:seat.x,z:seat.z+.5}:{x:1.05,z:4.5};
  }
@@ -335,19 +422,21 @@ class Game{
   const expected={'take-order':'awaiting-order',serve:'preparing','collect-cash':'payment','prepare-change':'cash-collected','return-change':'change-ready','pickup-terminal':'payment','take-card':'payment','wait-card':'card-processing'}[job.task];
   if(order.phase!==expected)return false;
   if(!waiterPaymentTasks.has(job.task))return true;
+  if(!this.checkoutInfo(order)?.ready)return false;
   if(order.paymentBy!=='waiter')return false;
   if(['collect-cash','prepare-change','return-change'].includes(job.task))return order.paymentMethod==='cash';
   return order.paymentMethod==='card'&&!this.s.payments.terminalCarried&&(job.task==='pickup-terminal'||this.s.payments.terminalWithWaiter);
  }
  canFundChange(order){return money(order.tender-order.due)<=money(this.s.payments.till+this.availableBank())}
  paymentGuard(id,actor){
+  if(!this.checkoutInfo(id)?.ready)return 'Attendez que ce client se présente à la caisse.';
   if(actor==='waiter')return this.paymentHandledByWaiter(id)?null:'Cet encaissement n’est pas réservé au serveur.';
   return this.paymentHandledByWaiter(id)?'Le serveur s’occupe déjà de cet encaissement.':null;
  }
  orderPhase(order){return phases.has(order?.phase)?order.phase:'preparing'}
  counterSeat(order){return counterSeats.find(seat=>seat.slot===order?.slot)||counterSeats[Math.max(0,this.s.orders.indexOf(order))%crowdStages[0].counterSeatsUnlocked]}
- orderPosition(order){const table=order?.tableId&&this.activeTables().find(table=>table.id===order.tableId);return order?.tableId?(table?{...table,floorY:table.y||0}:null):{x:this.counterSeat(order).x,z:2.1,floorY:0}}
- canReachOrder(id,position){const order=this.s.orders.find(order=>order.id===id),target=order&&this.orderPosition(order);return !!order&&!!target&&(order.arrivalRemaining||0)<=0&&onFloor(position,target.floorY)&&positionNear(position,target,order.tableId?1.6:1.65)}
+ orderPosition(order){if(paymentPhases.has(order?.phase))return {...registerPosition,floorY:0};const table=order?.tableId&&this.activeTables().find(table=>table.id===order.tableId);return order?.tableId?(table?{...table,floorY:table.y||0}:null):{x:this.counterSeat(order).x,z:2.1,floorY:0}}
+ canReachOrder(id,position){const order=this.s.orders.find(order=>order.id===id);if(paymentPhases.has(order?.phase))return this.checkoutInfo(order)?.ready===true&&position?.z<2.5&&this.nearRegister(position);const target=order&&this.orderPosition(order);return !!order&&!!target&&(order.arrivalRemaining||0)<=0&&onFloor(position,target.floorY)&&positionNear(position,target,order.tableId?1.6:1.65)}
  nearRegister(position){return onFloor(position)&&positionNear(position,registerPosition,1.25)}
  availableBank(){const uncredited=this.s.orders.filter(o=>o.phase==='change-ready').reduce((sum,o)=>sum+(o.due||0),0);return money(Math.max(0,this.s.cash-this.s.payments.till+uncredited))}
  spend(amount){this.s.cash=money(this.s.cash-amount);const uncredited=this.s.orders.filter(o=>o.phase==='change-ready').reduce((sum,o)=>sum+(o.due||0),0);this.s.payments.till=Math.min(this.s.payments.till,money(Math.max(0,this.s.cash)+uncredited))}
@@ -618,7 +707,7 @@ class Game{
   }
   if(!s.management.waiter||s.staff.waiter)return;
   if(p.terminalWithWaiter){this.assignWaiterJob('return-terminal',null);return;}
-  const available=s.orders.filter(order=>(order.arrivalRemaining||0)<=0);
+  const available=s.orders.filter(order=>(order.arrivalRemaining||0)<=0&&(!paymentPhases.has(order.phase)||this.checkoutInfo(order)?.ready));
   const unfinished=available.find(order=>order.paymentBy==='waiter'&&(order.phase==='change-ready'||order.phase==='cash-collected'&&this.canFundChange(order)));
   if(unfinished){this.assignWaiterJob(unfinished.phase==='change-ready'?'return-change':'prepare-change',unfinished);return;}
   const payment=available.find(order=>order.phase==='payment'&&(order.paymentMethod==='cash'?this.canFundChange(order):!p.terminalCarried&&p.terminalOrderId===null));
@@ -657,11 +746,12 @@ class Game{
    const phase=this.orderPhase(order);
    if(phase==='awaiting-order'||phase==='preparing'){order.patience-=dt*(s.management.floorManager?.8:1)*(s.management.host?.85:1);if(order.patience<=0){this.removeOrder(order);s.lost++}}
    else if(phase==='drinking'){order.drinkRemaining=Math.max(0,(order.drinkRemaining||0)-dt);if(order.drinkRemaining<=1e-9)order.phase='payment'}
-   else if(phase==='card-processing'){order.cardRemaining=Math.max(0,(order.cardRemaining||0)-dt);if(order.cardRemaining<=1e-9)this.finishPayment(order,'card')}
+   else if(phase==='card-processing'&&this.checkoutInfo(order)?.ready){order.cardRemaining=Math.max(0,(order.cardRemaining||0)-dt);if(order.cardRemaining<=1e-9)this.finishPayment(order,'card')}
   }
+  this.checkoutTick(dt);
   this.staffTick(dt);
   // Do not accumulate missed arrivals while all available seats are occupied.
   s.spawn=Math.max(0,s.spawn-dt);if(!s.closing&&s.spawn<=1e-9)this.spawnCustomer();if(s.closing&&s.orders.length===0)return this.end()}
 }
-const api={Game,ingredients,recipes,serviceSchedule,formatServiceTime,serviceInfo,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout,preparationSlots,buildingLayout,buildingZones,availableTables,decorCatalog,decorStyle};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
+const api={Game,ingredients,recipes,serviceSchedule,formatServiceTime,serviceInfo,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,checkoutPositions,checkoutCustomer,preparationLayout,preparationSlots,buildingLayout,buildingZones,availableTables,decorCatalog,decorStyle};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

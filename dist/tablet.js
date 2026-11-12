@@ -60,7 +60,7 @@ window.BarTablet=(()=>{
  function refreshService(s){
   const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo(),availableTables=game.activeTables(),activeTables=new Set(availableTables.map(table=>table.id));
   for(const [zone,entry]of tableZones)entry.section.hidden=!availableTables.some(table=>tableZone(table)===zone);
-  serviceNote.textContent='Approchez-vous d’un client pour noter sa commande ici. Choisissez ensuite sa boisson au rangement des verres derrière le bar. Pour servir ou encaisser, regardez le client et utilisez la commande Interagir.';
+  serviceNote.textContent='Approchez-vous d’un client pour noter sa commande ici. Préparez sa boisson derrière le bar et servez-la à sa place. Après la dégustation, il rejoint la caisse pour régler.';
   roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
   roomSummary.textContent=`${count} / ${crowd.capacity} clients · ${unpaid} règlement${unpaid>1?'s':''} en cours · Terminal ${payments.terminalWithWaiter?'avec le serveur':payments.terminalCarried?'avec vous':'au comptoir'}`;
@@ -83,7 +83,7 @@ window.BarTablet=(()=>{
     entry.detail.textContent=locked?`Ce tabouret accueillera des clients à partir de ${threshold} clients encaissés.`:kind==='table'?'Un client pourra s’y installer.':'Les clients s’installent sur ce tabouret et annoncent leur commande.';
     entry.bill.hidden=entry.proximity.hidden=entry.patience.hidden=true;continue;
    }
-   entry.card.dataset.serviceOrder=order.id;const phase=order.phase||'preparing',arriving=(order.arrivalRemaining||0)>0,near=reachOrder(order);
+   entry.card.dataset.serviceOrder=order.id;const phase=order.phase||'preparing',arriving=(order.arrivalRemaining||0)>0,near=reachOrder(order),checkout=game.checkoutInfo(order);
    entry.badge.textContent=arriving?'S’installe…':phaseNames[phase]||'En service';entry.badge.dataset.phase=phase;
    entry.customer.textContent=order.name||'Client';
    const known=phase!=='awaiting-order',recipe=recipes[order.recipe];
@@ -91,7 +91,8 @@ window.BarTablet=(()=>{
    if(phase==='drinking')entry.detail.textContent=`${recipe?.name||'Boisson'} · dégustation, ${Math.ceil(order.drinkRemaining||0)} s`;
    if(phase==='card-processing')entry.detail.textContent=`Validation du terminal · ${Math.ceil(order.cardRemaining||0)} s`;
    if(phase==='cash-collected')entry.detail.textContent=`${money(order.tender||0)} reçus. Rejoignez la caisse pour préparer la monnaie.`;
-   if(phase==='change-ready')entry.detail.textContent=`Rapportez ${money(Math.max(0,(order.tender||0)-(order.due||0)))} de monnaie et le ticket au client.`;
+   if(phase==='change-ready')entry.detail.textContent=`Remettez ${money(Math.max(0,(order.tender||0)-(order.due||0)))} de monnaie et le ticket au guichet.`;
+   if(checkout){entry.badge.textContent={waiting:'Attend son tour',walking:'Rejoint la caisse',queued:'File de la caisse',ready:phaseNames[phase]}[checkout.state];if(!checkout.ready)entry.detail.textContent=checkout.state==='waiting'?'Le client reste à sa place jusqu’à ce que la file se libère.':checkout.state==='walking'?'Le client se déplace vers la caisse.':'Le client attend derrière le premier client à la caisse.';}
    const job=[s.staff?.bartender,s.staff?.bartender2].find(job=>job?.orderId===order.id),waiter=s.staff?.waiter,beingServed=phase==='preparing'&&waiter?.task==='serve'&&waiter.orderId===order.id;
    if(phase==='preparing'&&job?.orderId===order.id)entry.detail.textContent+=` · préparateur, ${Math.ceil(job.remaining)} s`;
    if(beingServed){entry.badge.textContent='Serveur en route';entry.detail.textContent=`${recipe?.name||'Boisson'} · apportée par le serveur, ${Math.ceil(waiter.remaining)} s`;}
@@ -106,7 +107,7 @@ window.BarTablet=(()=>{
     entry.detail.textContent=recipe.name+' · '+({todo:'À préparer',preparing:'En préparation',ready:ticket?.prepId?'Prête au poste':'Prête sur le plateau',serving:'En service'}[ticket?.status]||'À préparer');
     entry.proximity.textContent=ticket?.status==='ready'?'Prenez la boisson, regardez le client et utilisez Interagir pour servir.':'Choisissez la boisson au rangement des verres, derrière le bar.';
    }
-   if(phase==='payment'||phase==='cash-collected'||phase==='change-ready')entry.proximity.textContent='Regardez le client et utilisez Interagir pour le règlement ; la monnaie se prépare à la caisse derrière le bar.';
+   if(checkout){entry.proximity.hidden=false;entry.proximity.textContent=checkout.ready?'Le client est au guichet. Utilisez l’écran de caisse ou interagissez depuis le côté barman.':'Le règlement sera disponible quand ce client sera arrivé en tête de la file.';}
    const paymentStatus=game.waiterPaymentStatus?.(order.id);
    if(game.paymentHandledByWaiter?.(order.id)){
     entry.badge.textContent=paymentStatus?.blocked?'Serveur en attente':'Encaissement par le serveur';
@@ -123,7 +124,7 @@ window.BarTablet=(()=>{
  const terminalPanel=make('div','tablet-terminal-panel'),terminalCopy=make('div'),terminalState=make('strong'),terminalDetail=make('p');terminalCopy.append(terminalState,terminalDetail);
  const terminalActions=make('div','tablet-terminal-actions'),pickupTerminal=button('Prendre le terminal','terminal-pickup','tablet-button'),returnTerminal=button('Reposer le terminal','terminal-return','tablet-button tablet-button-subtle'),fundTill=button('Alimenter le tiroir','fund-till','tablet-button tablet-button-subtle');
  const fundControls=make('div','tablet-fund-controls'),fundAmount=make('input');fundAmount.type='number';fundAmount.min='.01';fundAmount.step='.01';fundAmount.value='20';fundAmount.id='tabletFundAmount';fundAmount.setAttribute('aria-label','Montant en euros à ajouter au tiroir');fundAmount.addEventListener('input',()=>refresh(true));fundControls.append(fundAmount,fundTill);terminalActions.append(pickupTerminal,returnTerminal,fundControls);terminalPanel.append(terminalCopy,terminalActions);
- const cashHeading=make('h3','tablet-group-title','Espèces à traiter'),cashEmpty=make('p','tablet-empty','Aucune somme à compter. Prenez les espèces auprès d’un client qui a terminé sa boisson.'),cashList=make('div','tablet-cash-list');
+ const cashHeading=make('h3','tablet-group-title','Espèces à traiter'),cashEmpty=make('p','tablet-empty','Aucune somme à compter. Les clients rejoignent la caisse après leur boisson.'),cashList=make('div','tablet-cash-list');
  const receiptsHeading=make('h3','tablet-group-title','Derniers encaissements'),receipts=make('div','tablet-receipts');register.append(registerNote,finance,terminalPanel,cashHeading,cashEmpty,cashList,receiptsHeading,receipts);
  const cashCards=new Map();let receiptsSignature='';
  function cashCard(order){
@@ -142,10 +143,10 @@ window.BarTablet=(()=>{
   registerNote.textContent=near?'Vous êtes devant la caisse. Comptez la monnaie, rechargez le tiroir ou prenez le terminal.':'Rejoignez la caisse derrière le bar pour manipuler l’argent ou prendre le terminal sans fil.';registerNote.classList.toggle('tablet-reserve-present',near);
   amounts.till.textContent=money(payments.till||0);amounts.bank.textContent=money(bank);amounts.cash.textContent=money(payments.cashRevenue||0);amounts.card.textContent=money(payments.cardRevenue||0);
   terminalState.textContent=payments.terminalWithWaiter?'Terminal sans fil : avec le serveur':terminalReserved?'Terminal réservé : le serveur arrive':payments.terminalOrderId?'Terminal : paiement en cours':payments.terminalCarried?'Terminal sans fil : avec vous':'Terminal sans fil : sur son socle';
-  terminalDetail.textContent=payments.terminalWithWaiter?'Le serveur encaisse par carte puis rapporte le terminal sur son socle.':payments.terminalCarried?'Présentez-le directement au client, puis reposez-le sur son socle pour le partager avec le serveur.':'Le terminal est partagé avec le serveur. Il le prend pour les cartes et le rapporte après chaque encaissement.';
+  terminalDetail.textContent=payments.terminalWithWaiter?'Le serveur encaisse par carte à la caisse puis rapporte le terminal sur son socle.':payments.terminalCarried?'Présentez-le au client arrivé au guichet, puis reposez-le sur son socle pour le partager avec le serveur.':'Le terminal est partagé avec le serveur. Il le prend pour les cartes et le rapporte après chaque encaissement.';
   pickupTerminal.hidden=!!payments.terminalCarried;returnTerminal.hidden=!payments.terminalCarried;
   pickupTerminal.disabled=!near||s.gameOver||payments.terminalWithWaiter||terminalReserved;returnTerminal.disabled=!near||!!payments.terminalOrderId||s.gameOver;fundAmount.disabled=!near||s.gameOver;const funding=Number(fundAmount.value);fundTill.disabled=!near||s.gameOver||!Number.isFinite(funding)||funding<=0||bank<funding||!game.fundTill;
-  const pending=s.orders.filter(order=>order.phase==='cash-collected'),ids=new Set(pending.map(order=>order.id));
+  const current=game.checkoutCustomer(),pending=current?.phase==='cash-collected'?[current]:[],ids=new Set(pending.map(order=>order.id));
   for(const [id,entry]of cashCards)if(!ids.has(id)){entry.card.remove();cashCards.delete(id);}
   cashEmpty.hidden=pending.length>0;
   for(const order of pending){
@@ -154,7 +155,7 @@ window.BarTablet=(()=>{
    entry.details.textContent=`Addition : ${money(order.due||0)} · Espèces reçues : ${money(order.tender||0)}`;entry.expected.textContent=`À rendre : ${money(change)}`;
    const handled=game.paymentHandledByWaiter?.(order.id);
    entry.input.disabled=entry.reset.disabled=entry.confirm.disabled=!near||s.gameOver||handled;for(const item of entry.coins.children)item.disabled=!near||s.gameOver||handled;
-   entry.hint.textContent=!near?'Rejoignez la caisse pour compter la monnaie.':change>(payments.till||0)?'Le tiroir manque de monnaie. Ajoutez-y de la trésorerie avant de continuer.':'Sélectionnez les pièces et billets, puis rapportez la monnaie et le ticket au client.';
+   entry.hint.textContent=!near?'Rejoignez la caisse pour compter la monnaie.':change>(payments.till||0)?'Le tiroir manque de monnaie. Ajoutez-y de la trésorerie avant de continuer.':'Sélectionnez les pièces et billets, puis remettez la monnaie et le ticket au client au guichet.';
    if(handled)entry.hint.textContent=waiterPaymentMessage(game.waiterPaymentStatus(order.id));
   }
   const history=payments.receipts||[],signature=JSON.stringify(history);if(signature!==receiptsSignature){receiptsSignature=signature;receipts.replaceChildren();if(!history.length)receipts.append(make('p','tablet-empty','Aucun règlement encaissé pour le moment.'));for(const receipt of history.slice(0,10)){const row=make('div','tablet-receipt');row.append(make('span',null,`${receipt.customerName||'Client'} · ${receipt.tableId?'Table '+receipt.tableId:'Comptoir'}`),make('span',null,receipt.method==='card'?'Carte bancaire':'Espèces'),make('strong',null,money(receipt.amount||0)));receipts.append(row);}}
