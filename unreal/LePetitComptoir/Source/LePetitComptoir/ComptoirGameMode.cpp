@@ -10,7 +10,11 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
-namespace { const FString Slot = TEXT("LePetitComptoir_Unreal_Pilot_v1"); }
+namespace
+{
+    // Avoid generic globals that trigger MSVC shadowing errors in Unreal templates.
+    const FString GComptoirSaveSlotName = TEXT("LePetitComptoir_Unreal_Pilot_v1");
+}
 
 AComptoirGameMode::AComptoirGameMode()
 {
@@ -194,20 +198,20 @@ void AComptoirGameMode::Save(bool Feedback)
         Data->PlayerLocation = Player->GetActorLocation();
         Data->PlayerRotation = Player->GetControlRotation();
     }
-    const bool Saved = UGameplayStatics::SaveGameToSlot(Data, Slot, 0);
+    const bool Saved = UGameplayStatics::SaveGameToSlot(Data, GComptoirSaveSlotName, 0);
     if (!Saved) Notify(TEXT("Echec de sauvegarde : verifiez l'espace disque."));
     else if (Feedback) Notify(TEXT("Partie Unreal sauvegardee."));
 }
 
 void AComptoirGameMode::Load(bool Feedback)
 {
-    if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))
+    if (!UGameplayStatics::DoesSaveGameExist(GComptoirSaveSlotName, 0))
     {
         bReadyToSave = true;
         if (Feedback) Notify(TEXT("Aucune sauvegarde Unreal."));
         return;
     }
-    UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
+    UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::LoadGameFromSlot(GComptoirSaveSlotName, 0));
     if (!Data || !Simulation.Restore(TCHAR_TO_UTF8(*Data->Simulation)))
     {
         // Do not overwrite a corrupt or unsupported save on the next autosave.
