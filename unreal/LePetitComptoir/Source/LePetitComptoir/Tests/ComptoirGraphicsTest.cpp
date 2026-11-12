@@ -31,20 +31,20 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
         Materials.Add(Material);
     }
     if(HasAnyErrors())return false;
-    FPreviewScene Preview{FPreviewScene::ConstructionValues().SetCreateDefaultLighting(false)};
+    const TSharedRef<ComptoirRenderTest::FSceneTest> Command=MakeShared<ComptoirRenderTest::FSceneTest>(false);
+    auto* Scene=&Command.Get();
+    FPreviewScene& Preview=Scene->Preview;
     AComptoirScene* Venue=Preview.GetWorld()->SpawnActor<AComptoirScene>();
     if(!TestNotNull(TEXT("Venue"),Venue))return false;
     if(!TestTrue(TEXT("Build refined venue"),Venue->Build(TEXT("world")))){Venue->Destroy();return false;}
     Venue->SetVenueName(TEXT("Le Petit Comptoir"));
-    // Validate renderability and compiler errors, while allowing partial maps
-    // used by on-demand compilation. Keep capturing even if this adds errors.
-    ComptoirRenderTest::PrepareScene(Preview,Materials);
-    for(UMaterial* Material:Materials)ComptoirRenderTest::CheckMaterial(*this,Material);
+    Scene->Prepare(Materials);
     constexpr int32 Width=1280,Height=720;
-    TStrongObjectPtr<UTextureRenderTarget2D> Target(NewObject<UTextureRenderTarget2D>());
+    auto* Target=Scene->Target.Get();
     Target->ClearColor=FLinearColor::Black;Target->InitCustomFormat(Width,Height,PF_B8G8R8A8,false);Target->UpdateResourceImmediate(true);
     USceneCaptureComponent2D* Capture=NewObject<USceneCaptureComponent2D>();
-    Capture->TextureTarget=Target.Get();Capture->bCaptureEveryFrame=false;Capture->bCaptureOnMovement=false;
+    Scene->Camera=Capture;
+    Capture->TextureTarget=Target;Capture->bCaptureEveryFrame=false;Capture->bCaptureOnMovement=false;
     Capture->bAlwaysPersistRenderingState=true;Capture->CaptureSource=ESceneCaptureSource::SCS_FinalColorLDR;Capture->FOVAngle=75;
     Preview.AddComponent(Capture,FTransform::Identity);
     const FString Output=FPaths::ProjectSavedDir()/TEXT("Tests/Graphics");IFileManager::Get().MakeDirectory(*Output,true);
@@ -53,24 +53,39 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
         {TEXT("Service"),{145,600,168},{285,420,135}},
         {TEXT("Street"),{1530,1100,180},{980,600,210}},
         {TEXT("Reserve"),{-80,100,168},{-370,240,145}}};
+    bool bFirstView=true;
     for(const View& V:Views)
     {
-        Capture->SetWorldLocation(V.Eye);Capture->SetWorldRotation((V.Focus-V.Eye).Rotation());
-        // Warm up temporal reflections and the time-sliced sky capture.
-        ComptoirRenderTest::Capture(Preview,Capture);
-        TArray<FColor> Pixels;
-        if(!TestTrue(TEXT("Read view"),Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels)&&Pixels.Num()==Width*Height))continue;
-        int32 Visible=0,Clipped=0;double Mean=0,Square=0;
-        for(const FColor& P:Pixels)
+        Scene->Then([Capture,V]
         {
-            const double L=(P.R*.2126+P.G*.7152+P.B*.0722);Mean+=L;Square+=L*L;
-            if(L>12)++Visible;if(P.R>250&&P.G>250&&P.B>250)++Clipped;
+            Capture->SetWorldLocation(V.Eye);Capture->SetWorldRotation((V.Focus-V.Eye).Rotation());
+        });
+        Scene->WarmUp();
+        if(bFirstView)
+        {
+            Scene->Then([this,Scene,Materials]
+            {
+                for(UMaterial* Material:Materials)ComptoirRenderTest::CheckMaterial(*this,Scene->Preview,Material);
+            });
+            bFirstView=false;
         }
-        Mean/=Pixels.Num();Square/=Pixels.Num();
-        TestTrue(FString(V.Name)+TEXT(" is not black or featureless"),Visible>Pixels.Num()/10&&Square-Mean*Mean>50);
-        TestTrue(FString(V.Name)+TEXT(" is not overexposed"),Clipped<Pixels.Num()/2);
-        TestTrue(TEXT("Save view for inspection"),FFileHelper::CreateBitmap(*(Output/(FString(V.Name)+TEXT(".bmp"))),Width,Height,Pixels.GetData()));
+        Scene->Then([this,Target,V,Output]
+        {
+            TArray<FColor> Pixels;
+            if(!TestTrue(TEXT("Read view"),Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels)&&Pixels.Num()==Width*Height))return;
+            int32 Visible=0,Clipped=0;double Mean=0,Square=0;
+            for(const FColor& P:Pixels)
+            {
+                const double L=(P.R*.2126+P.G*.7152+P.B*.0722);Mean+=L;Square+=L*L;
+                if(L>12)++Visible;if(P.R>250&&P.G>250&&P.B>250)++Clipped;
+            }
+            Mean/=Pixels.Num();Square/=Pixels.Num();
+            TestTrue(FString(V.Name)+TEXT(" is not black or featureless"),Visible>Pixels.Num()/10&&Square-Mean*Mean>50);
+            TestTrue(FString(V.Name)+TEXT(" is not overexposed"),Clipped<Pixels.Num()/2);
+            TestTrue(TEXT("Save view for inspection"),FFileHelper::CreateBitmap(*(Output/(FString(V.Name)+TEXT(".bmp"))),Width,Height,Pixels.GetData()));
+        });
     }
-    Preview.RemoveComponent(Capture);Venue->Destroy();return !HasAnyErrors();
+    FAutomationTestFramework::Get().EnqueueLatentCommand(Command);
+    return true;
 }
 #endif

@@ -472,24 +472,41 @@ depuis la racine du dépôt, contrôle la couverture des textes de la scène, la
 d’une ancienne police, sa sauvegarde et la gestion d’un échec de réimportation avec
 une API simulée. Il ne remplace pas la compilation C++ ni l’import et le rendu sous Unreal.
 
-Les captures soumettent désormais les shaders manquants après l’installation des
-objets dans la scène, attendent aussi la préparation des textures et la fin du
-chargement du cache de shaders. Ils contrôlent la validité du matériau pour le rendu
-avec `HasValidGameThreadShaderMap`. L’indicateur de complétude reste affiché à titre
-de diagnostic : la compilation à la demande peut utiliser des ensembles partiels.
-Une simple ressource non nulle ne garantit pas non plus sa validité pour le rendu.
-Les mises à jour de visibilité et de géométrie sont envoyées
-au rendu avant chaque capture. Ces attentes sont limitées aux tests de l’éditeur.
+Les tests de scènes utilisent des commandes différées : chaque vue est préparée
+pendant **24 trames distinctes du moteur**, puis lue à la trame suivante. Une boucle
+qui appelle seulement `World::Tick` et `FlushRenderingCommands` dans `RunTest` ne
+fait pas avancer le compteur de trames du moteur. Les anciens tests pouvaient ainsi
+capturer les trois modèles de bière et détruire leur scène dans une seule trame.
+La scène, les composants, les matériaux et la cible de rendu restent maintenant en
+mémoire jusqu’à la dernière lecture. Le journal donne les numéros des trames utilisées.
 
-Si le test de bière échoue encore, `Beer-4-LiquidOnly.bmp` et `Beer-8-LiquidOnly.bmp`
-montrent le liquide sans la paroi du verre ; le résultat obligatoire reste celui du
-verre complet. Le journal vérifie aussi la présence du liquide, ses couleurs et ses
-matériaux. Pour le texte 3D, `World-Empty.bmp` contrôle que l’ancienne image du HUD est
-effacée. En cas d’échec, `World-Euro-Reverse.bmp` et `World-DefaultFont.bmp` aident à
-distinguer un problème d’orientation, de police personnalisée ou de capture.
-Ces diagnostics ne modifient pas les matériaux du jeu et n’assouplissent pas les seuils.
-Une erreur de shader reste un échec du test, mais n’interrompt plus la production des
-captures : le rapport conserve ainsi une image du défaut et les images de contrôle.
+Les matériaux sont préparés une fois par scène avec `CacheShaders` puis
+`EnsureIsComplete`, sans relancer leur cache à chaque changement de niveau de bière.
+Après les trames de préparation, le contrôle interroge le proxy sur le thread de rendu
+avec le niveau graphique de la scène. Il échoue si Unreal utilise un matériau de
+secours et conserve les erreurs de compilation. Il ne déduit plus ce résultat du seul
+indicateur `HasValidGameThreadShaderMap`. Les seuils de pixels restent inchangés.
+Ces attentes sont limitées aux tests de l’éditeur, sans ajouter de blocage au jeu.
+
+Les captures `Beer-4-LiquidOnly.bmp` et `Beer-8-LiquidOnly.bmp` montrent aussi le liquide
+sans la paroi du verre et doivent conserver sa couleur dorée. Le verre complet reste
+obligatoirement vérifié. Le texte 3D est porté par un acteur comme les panneaux du bar.
+`World-Empty.bmp` vérifie que la capture efface l’ancienne image du HUD ;
+`World-Euro.bmp` doit afficher le symbole €, et `World-DefaultFont.bmp` la lettre A
+avec la police standard du moteur. `World-Euro-Reverse.bmp` conserve le contrôle
+d’orientation. Les captures sont produites même lorsqu’un matériau échoue.
+
+Le séquencement est vérifiable sans Unreal :
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/render_sequence_test.cpp -o /tmp/comptoir-render-sequence
+/tmp/comptoir-render-sequence
+```
+
+Ce test vérifie qu’appeler plusieurs fois la commande dans une même trame ne réduit
+pas les 24 trames de préparation, que chaque lecture suit les captures du bon modèle
+et qu’un abandon arrête les actions suivantes. Il ne valide pas le rendu GPU : relancer
+`-VerifyUI` sous Unreal 5.8.4 pour cette vérification.
 
 ## Prétest Windows hors de l’éditeur
 
