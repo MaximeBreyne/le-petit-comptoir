@@ -260,7 +260,7 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/sess
 /tmp/comptoir-session-test
 ```
 
-Le premier test compare **886 800 positions et normales** de 7 402 formes (décor,
+Le premier test compare **958 548 positions et normales** de 9 083 formes (décor,
 clients, verres, portes et animation de rue) à la sortie réelle du renderer JavaScript. Il vérifie la fraîcheur
 de l'export, les sols, le passage de la porte, le dégagement du réfrigérateur
 et les collisions des objets solides. La projection
@@ -308,7 +308,7 @@ Cette option contrôle la tablette (5 pages), l’accueil, la création, la paus
 les glyphes de la police, le symbole € rendu par le HUD et un panneau 3D, ainsi que
 la sauvegarde en mémoire du nom, du mode développeur et des commandes multiples.
 Elle vérifie aussi les pixels dorés d’une bière à moitié remplie et pleine dans une scène de rendu. Les captures sont dans
-`Saved/Tests/Tablet/`, `Saved/Tests/WorldText/` et `Saved/Tests/Drinks/`. Le script s’arrête si un test manque
+`Saved/Tests/Tablet/`, `Saved/Tests/WorldText/`, `Saved/Tests/Drinks/` et `Saved/Tests/Graphics/`. Le script s’arrête si un test manque
 ou échoue. Aucun test ne remplace une inspection du nom en devanture et de la saisie
 avec clavier/souris dans Play. Ces contrôles GPU ne fonctionnent pas avec `-NullRHI`.
 
@@ -333,3 +333,73 @@ Après la mise à jour, lancer le script pour générer ce nouveau matériau. Le
 mi-remplissage et pleins et échoue si les pixels dorés attendus sont absents.
 Ces tests GPU et la compilation C++ Unreal doivent être exécutés sur le PC équipé
 d’Unreal ; les contrôles hors moteur ne prouvent pas le rendu final dans le bar.
+
+
+## Amélioration visuelle — décor révision 6
+
+Cette version conserve les dimensions, les positions et les interactions du bar.
+Elle ajoute :
+
+- matériaux procéduraux avec couleur, rugosité et microrelief : parquet à joints,
+  bois veiné, briques et mortier, enduit, pierre, métal brossé, tissu et cuir ;
+- verre transparent avec reflets variables selon l'angle et éclairage de surface ;
+- chanfreins de quelques millimètres sur le mobilier, cylindres à 32 côtés,
+  silhouettes plus lisses et parois de verres/tasses à 32 segments ;
+- moulures, fixations de laiton, grilles et charnières du réfrigérateur,
+  boutons de machine à café, sous-verres, linge, menus et finition de l'enseigne ;
+- ciel atmosphérique, lumière naturelle par la vitrine, suspensions dirigées
+  vers le sol, éclairage des étagères et de la réserve, reflets écran et occlusion
+  ambiante ; ombres des clients, des voitures et des passants proches.
+
+Les surfaces ordinaires n'émettent plus de lumière artificielle. Les luminaires et
+le liquide gardent leur émission dédiée ; la mousse de bière est plus mate.
+Les coordonnées de texture sont attachées aux objets pour suivre leurs mouvements.
+Les détails fins s'atténuent avec la distance pour limiter le scintillement.
+Les formes extérieures au-delà de 40 m du centre du bar gardent leur géométrie légère.
+Les 9 083 formes de toutes les variantes réunies représentent 1 650 564 sommets ;
+ce total n'est pas le nombre de sommets visibles simultanément. Le décor reste
+regroupé par matériau et n'est pas retessellé à chaque image. Les détails ne créent
+aucune collision et ne recouvrent ni les verres en préparation ni le plateau.
+
+### Appliquer sur un projet existant
+
+Fermer Unreal, récupérer la branche puis lancer la préparation :
+
+```powershell
+git pull --ff-only origin migration/unreal
+git lfs pull
+powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-Unreal.ps1 -VerifyUI -OpenEditor
+```
+
+Les 17 matériaux générés sont actualisés à leurs chemins existants lorsqu'une
+empreinte du générateur ou du shader change. Une seconde exécution sans changement
+ne les reconstruit pas. Les autres matériaux ne sont pas modifiés. Avant de remplacer
+le décor généré de la carte existante, la préparation copie la carte dans
+`Saved/Backups/BeforeVisualUpgrade/`. Elle conserve les acteurs ajoutés manuellement.
+Les sauvegardes de partie et le nom du bar sont inchangés.
+
+Le contrôle `LePetitComptoir.Graphics.MaterialsAndViews`, inclus dans `-VerifyUI`,
+vérifie les erreurs de compilation des matériaux et génère quatre vues en 1280 × 720
+sous `Saved/Tests/Graphics/`. Il détecte un rendu entièrement sombre, uniforme ou
+largement surexposé. Pour ne lancer que ce contrôle, utiliser `-VerifyGraphics`.
+Les captures doivent aussi être regardées : ces seuils ne jugent pas l'esthétique,
+les petits défauts, la fluidité ni la lisibilité en mouvement.
+
+### Validation et limites
+
+`Tests/original_scene_test.cjs` exécute également `visual_geometry_test.cpp` :
+maillages fermés, normales, orientation des triangles, dimensions conservées,
+coordonnées de texture stables et budget de géométrie. Il contrôle le dégagement
+du service, du réfrigérateur, des portes et de la réserve.
+Le test HLSL optionnel `python3 unreal/LePetitComptoir/Tests/surface_shader_test.py`
+utilise `libshaderc` sous Linux pour contrôler les types et la syntaxe des 17 variantes.
+Il ne remplace pas la compilation des matériaux par Unreal/DX12.
+
+Le rendu utilise des sources dynamiques et des reflets en espace écran, sans imposer
+une carte RTX. Lumen et les champs de distance ne sont pas activés sur ces maillages
+procéduraux. Les reflets ne peuvent donc pas reproduire tous les objets hors écran ;
+le ciel fournit une réflexion d'environnement. Les personnages restent les modèles
+procéduraux existants, lissés, et ne sont pas des humains scannés ou des MetaHumans.
+Cette amélioration ne remplace pas une future passe de modèles artistiques dédiés.
+La compilation C++ Unreal, les contrôles GPU, l'inspection des quatre captures et
+la mesure des performances doivent être faits sur les PC équipés du moteur.

@@ -11,32 +11,28 @@ def create_original_assets():
     folder = "/Game/Original/Materials"
     unreal.EditorAssetLibrary.make_directory(folder)
     code = (Path(__file__).parent / "original_surface.hlsl").read_text(encoding="utf-8")
-    roughness = [.65, .46, .38, .96, .96, .23, .14, .5, .94, .68, .48, .09, .34, .52, .82, .97, .24]
+    # A content fingerprint upgrades existing generated assets as well as new clones.
+    # Only these 17 generated materials are rebuilt; fonts and user assets are separate.
+    import hashlib
+    signature = hashlib.sha256((code + Path(__file__).read_text(encoding="utf-8")).encode()).hexdigest()
+    roughness = [.48, .38, .29, .87, .91, .25, .16, .5, .90, .65, .38, .08, .32, .48, .75, .92, .18]
     for index in range(17):
         name = f"M_Original_{index:02d}"
-        if unreal.EditorAssetLibrary.does_asset_exist(f"{folder}/{name}"):
-            # Migrate only the coordinate conversion in our generated shader.
-            material = unreal.EditorAssetLibrary.load_asset(f"{folder}/{name}")
-            changed = False
-            for node in editing.get_material_expressions(material):
-                if isinstance(node, unreal.MaterialExpressionCustom):
-                    current = node.get_editor_property("code")
-                    old_axes = "float3 world=World.xzy*.01, n=Normal.xzy;"
-                    if "struct ComptoirNoise" in current and old_axes in current:
-                        node.set_editor_property("code", current.replace(
-                            old_axes, "float3 world=World.yzx*.01, n=Normal.yzx;"))
-                        changed = True
-            if changed:
-                editing.recompile_material(material)
-                if not unreal.EditorAssetLibrary.save_loaded_asset(material):
-                    raise RuntimeError(f"Mise a jour impossible : {name}")
+        asset_path = f"{folder}/{name}"
+        material = unreal.EditorAssetLibrary.load_asset(asset_path) if unreal.EditorAssetLibrary.does_asset_exist(asset_path) else None
+        if material and unreal.EditorAssetLibrary.get_metadata_tag(material, "Comptoir.SurfaceVersion") == signature:
             continue
-        material = tools.create_asset(name, folder, unreal.Material, unreal.MaterialFactoryNew())
+        if material is None:
+            material = tools.create_asset(name, folder, unreal.Material, unreal.MaterialFactoryNew())
         if material is None:
             raise RuntimeError(f"Creation impossible : {name}")
+        editing.delete_all_material_expressions(material)
         material.set_editor_property("two_sided", True)
+        material.set_editor_property("tangent_space_normal", False)
+        material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT if index == 11 else unreal.BlendMode.BLEND_OPAQUE)
         if index == 11:
-            material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+            material.set_editor_property("translucency_lighting_mode", unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
+            material.set_editor_property("screen_space_reflections", True)
 
         def expression(kind, x, y):
             return editing.create_material_expression(material, kind, x, y)
@@ -48,45 +44,64 @@ def create_original_assets():
 
         def connect(source, output, target, pin):
             if not editing.connect_material_expressions(source, output, target, pin):
-                outputs = list(editing.get_material_expression_output_names(source))
-                inputs = list(editing.get_material_expression_input_names(target))
-                raise RuntimeError(
-                    f"Connexion impossible : {name}/{pin}; sortie demandee={output!r}, "
-                    f"sorties disponibles={outputs!r}, entrees disponibles={inputs!r}"
-                )
+                raise RuntimeError(f"Connexion impossible : {name}/{pin} depuis {output!r}")
 
-        def result(node, prop):
-            if not editing.connect_material_property(node, "", prop):
-                raise RuntimeError(f"Sortie impossible : {name}/{prop}")
+        def result(node, prop, output=""):
+            if not editing.connect_material_property(node, output, prop):
+                raise RuntimeError(f"Sortie impossible : {name}/{prop}/{output}")
 
-        tint = expression(unreal.MaterialExpressionVertexColor, -700, 0)
-        position = expression(unreal.MaterialExpressionWorldPosition, -700, 150)
-        normal = expression(unreal.MaterialExpressionPixelNormalWS, -700, 300)
         surface = expression(unreal.MaterialExpressionCustom, -350, 50)
-        # CustomInput's generated Python constructor takes no arguments in UE 5.8.
+        vertex_normal = expression(unreal.MaterialExpressionVertexNormalWS, -1200, 300)
+        interpolated_normal = expression(unreal.MaterialExpressionVertexInterpolator, -1000, 300)
+        normal_pins = list(editing.get_material_expression_input_names(interpolated_normal))
+        if len(normal_pins) != 1:
+            raise RuntimeError(f"Entree VertexInterpolator inattendue : {normal_pins}")
+        connect(vertex_normal, "", interpolated_normal, str(normal_pins[0]))
+        source_nodes = {
+            "Tint": expression(unreal.MaterialExpressionVertexColor, -900, 0),
+            "World": expression(unreal.MaterialExpressionWorldPosition, -900, 150),
+            # Explicit vertex-to-pixel interpolation: no PixelNormalWS feedback loop.
+            "Normal": interpolated_normal,
+            "UV": expression(unreal.MaterialExpressionTextureCoordinate, -900, 450),
+            "View": expression(unreal.MaterialExpressionCameraVectorWS, -900, 600),
+            "BaseRoughness": constant(roughness[index], -900, 750),
+        }
         inputs = []
-        for input_name in ("Tint", "World", "Normal"):
+        for input_name in source_nodes:
             custom_input = unreal.CustomInput()
             custom_input.set_editor_property("input_name", input_name)
             inputs.append(custom_input)
         surface.set_editor_property("inputs", inputs)
+        outputs = []
+        for output_name, output_type in (("Roughness", unreal.CustomMaterialOutputType.CMOT_FLOAT1),
+                                         ("DetailNormal", unreal.CustomMaterialOutputType.CMOT_FLOAT3),
+                                         ("Occlusion", unreal.CustomMaterialOutputType.CMOT_FLOAT1),
+                                         ("GlassOpacity", unreal.CustomMaterialOutputType.CMOT_FLOAT1),
+                                         ("Metallic", unreal.CustomMaterialOutputType.CMOT_FLOAT1)):
+            output = unreal.CustomOutput()
+            output.set_editor_property("output_name", output_name)
+            output.set_editor_property("output_type", output_type)
+            outputs.append(output)
+        surface.set_editor_property("additional_outputs", outputs)
         surface.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
         surface.set_editor_property("code", f"const int Surface = {index};\n" + code)
-        # Select the first color output; its channel label is not an API pin name.
-        connect(tint, "", surface, "Tint")
-        connect(position, "", surface, "World")
-        connect(normal, "", surface, "Normal")
+        for input_name, node in source_nodes.items():
+            connect(node, "", surface, input_name)
         result(surface, unreal.MaterialProperty.MP_BASE_COLOR)
-        result(constant(roughness[index], -200, 250), unreal.MaterialProperty.MP_ROUGHNESS)
-        result(constant(.65 if index == 5 else 0, -200, 350), unreal.MaterialProperty.MP_METALLIC)
-        # A little ambient bounce matches the old renderer without the pilot's ceiling hotspots.
-        glow = expression(unreal.MaterialExpressionMultiply, -100, -150)
-        connect(surface, "", glow, "A")
-        glow.set_editor_property("const_b", 1.8 if index == 7 else .55 if index == 16 else .12)
-        result(glow, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        result(surface, unreal.MaterialProperty.MP_ROUGHNESS, "Roughness")
+        result(surface, unreal.MaterialProperty.MP_NORMAL, "DetailNormal")
+        result(surface, unreal.MaterialProperty.MP_AMBIENT_OCCLUSION, "Occlusion")
+        result(surface, unreal.MaterialProperty.MP_METALLIC, "Metallic")
+        # Ordinary surfaces no longer glow. Ambient light comes from the lighting rig.
+        if index in (7, 16):
+            glow = expression(unreal.MaterialExpressionMultiply, -100, -150)
+            connect(surface, "", glow, "A")
+            glow.set_editor_property("const_b", 3.0 if index == 7 else .55)
+            result(glow, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
         if index == 11:
-            result(constant(.16, -200, 450), unreal.MaterialProperty.MP_OPACITY)
+            result(surface, unreal.MaterialProperty.MP_OPACITY, "GlassOpacity")
         editing.recompile_material(material)
+        unreal.EditorAssetLibrary.set_metadata_tag(material, "Comptoir.SurfaceVersion", signature)
         if not unreal.EditorAssetLibrary.save_loaded_asset(material):
             raise RuntimeError(f"Sauvegarde impossible : {name}")
 

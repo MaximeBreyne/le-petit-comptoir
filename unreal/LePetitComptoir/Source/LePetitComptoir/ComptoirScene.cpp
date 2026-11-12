@@ -1,12 +1,10 @@
 #include "ComptoirScene.h"
 #include "ComptoirText.h"
-#include "OriginalGeometry.h"
+#include "VisualGeometry.h"
+#include "ComptoirLighting.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/TextRenderComponent.h"
-#include "Components/PointLightComponent.h"
-#include "Components/RectLightComponent.h"
-#include "Components/DirectionalLightComponent.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -29,6 +27,7 @@ namespace ComptoirSceneData
     struct Section
     {
         TArray<FVector> Vertices,Normals;
+        TArray<FVector2D> UVs;
         TArray<int32> Triangles;
         TArray<FLinearColor> Colors;
     };
@@ -95,11 +94,28 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         const FLinearColor Side=O->HasField(TEXT("sideColor"))?
             FLinearColor::FromSRGBColor(FColor::FromHex(String(O,TEXT("sideColor")))):Tint;
         Section& Batch=Sections[MaterialIndex];
-        ComptoirGeometry::Emit(S,[&](const ComptoirGeometry::Vec& P,const ComptoirGeometry::Vec& N,bool IsSide)
+        const int32 FirstVertex=Batch.Vertices.Num();
+        const auto AddVertex=[&](const ComptoirGeometry::Vec& P,const ComptoirGeometry::Vec& N,bool IsSide)
         {
             Batch.Triangles.Add(Batch.Vertices.Num());Batch.Vertices.Add(Vector(P));
             Batch.Normals.Add(Vector(N));Batch.Colors.Add(IsSide&&S.Kind!=2?Side:Tint);
-        });
+            const auto UV=ComptoirVisualGeometry::SurfaceUV(S,P,N);
+            Batch.UVs.Add(FVector2D(UV.X,UV.Y));
+        };
+        const bool bDistant=Flag(O,TEXT("exterior"))&&FMath::Abs(S.Position.X-6)>40;
+        if(bDistant)ComptoirGeometry::Emit(S,AddVertex);
+        else ComptoirVisualGeometry::Emit(S,MaterialIndex,AddVertex);
+        // Unwrap only the seam-crossing cylinder triangles, before interpolation.
+        if(S.Kind==1)
+        {
+            const double Period=ComptoirGeometry::Pi*FMath::Max(S.Size.X,S.Size.Z);
+            for(int32 V=FirstVertex;V+2<Batch.UVs.Num();V+=3)
+            {
+                const double Min=FMath::Min3(Batch.UVs[V].X,Batch.UVs[V+1].X,Batch.UVs[V+2].X);
+                const double Max=FMath::Max3(Batch.UVs[V].X,Batch.UVs[V+1].X,Batch.UVs[V+2].X);
+                if(Max-Min>Period*.5)for(int32 I=0;I<3;++I)if(Batch.UVs[V+I].X<Max-Period*.5)Batch.UVs[V+I].X+=Period;
+            }
+        }
         if(bWithCollision&&Flag(O,TEXT("collision")))
         {
             UBoxComponent* Box=NewObject<UBoxComponent>(this);
@@ -142,7 +158,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
     {
         const Section& Batch=Sections[I];if(Batch.Vertices.IsEmpty())continue;
         Geometry->CreateMeshSection_LinearColor(I,Batch.Vertices,Batch.Triangles,Batch.Normals,
-            TArray<FVector2D>(),TArray<FVector2D>(),TArray<FVector2D>(),TArray<FVector2D>(),
+            Batch.UVs,TArray<FVector2D>(),TArray<FVector2D>(),TArray<FVector2D>(),
             Batch.Colors,TArray<FProcMeshTangent>(),false,false);
         const FString MaterialPath=FString::Printf(TEXT("/Game/Original/Materials/M_Original_%02d.M_Original_%02d"),I,I);
         UMaterialInterface* Material=LoadObject<UMaterialInterface>(nullptr,*MaterialPath);
@@ -162,38 +178,21 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         Boundary(FVector(1430,-2500,150),FVector(460,10,200));
         Boundary(FVector(1430,3500,150),FVector(460,10,200));
         Boundary(FVector(1880,500,150),FVector(10,3010,200));
-        const auto Lamp=[&](FVector Location,float Intensity,bool Shadows)
-        {
-            UPointLightComponent* Light=NewObject<UPointLightComponent>(this);
-            AddInstanceComponent(Light);Light->SetupAttachment(Geometry);
-            Light->SetMobility(EComponentMobility::Movable);Light->SetRelativeLocation(Location);
-            Light->SetLightColor(FLinearColor(1.f,.82f,.58f));Light->SetIntensity(Intensity);
-            Light->SetAttenuationRadius(550);Light->SetSourceRadius(12);
-            Light->SetCastShadows(Shadows);Light->RegisterComponent();
-        };
-        for(int32 Y:{300,600,900})Lamp(FVector(465,Y,248),250,true);
-        Lamp(FVector(150,600,245),100,false);Lamp(FVector(760,600,250),80,false);
-        Lamp(FVector(-200,230,250),160,false);
-        URectLightComponent* Frontage=NewObject<URectLightComponent>(this);
-        AddInstanceComponent(Frontage);Frontage->SetupAttachment(Geometry);
-        Frontage->SetMobility(EComponentMobility::Movable);Frontage->SetRelativeLocation(FVector(970,600,180));
-        Frontage->SetRelativeRotation(FRotator(0,180,0));Frontage->SetSourceWidth(1050);Frontage->SetSourceHeight(200);
-        Frontage->SetLightColor(FLinearColor(.78f,.87f,1.f));Frontage->SetIntensity(600);
-        Frontage->SetAttenuationRadius(1400);Frontage->RegisterComponent();
-        UDirectionalLightComponent* Daylight=NewObject<UDirectionalLightComponent>(this);
-        AddInstanceComponent(Daylight);Daylight->SetupAttachment(Geometry);
-        Daylight->SetMobility(EComponentMobility::Movable);Daylight->SetRelativeRotation(FRotator(-55,-128,0));
-        Daylight->SetLightColor(FLinearColor(.83f,.89f,1.f));Daylight->SetIntensity(2.5f);Daylight->RegisterComponent();
+        ComptoirLighting::Build(this,Geometry);
     }
-    GeometryRevision=5;
+    GeometryRevision=6;
     CurrentCollection=Collection;
     return true;
 }
 
 void AComptoirScene::SetAmbientModel()
 {
-    // The street contains only a few moving meshes; avoid per-limb shadow passes.
-    Geometry->SetCastShadow(false);
+    SetModelShadows(false);
+}
+
+void AComptoirScene::SetModelShadows(bool bEnabled)
+{
+    Geometry->SetCastShadow(bEnabled);
 }
 
 bool AComptoirScene::PrepareWorldFont()

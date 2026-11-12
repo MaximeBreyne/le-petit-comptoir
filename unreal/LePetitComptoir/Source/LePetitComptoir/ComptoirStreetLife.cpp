@@ -19,7 +19,7 @@ void AComptoirStreetLife::BeginPlay()
         FActorSpawnParameters Params;Params.Owner=this;
         AComptoirScene* Actor=GetWorld()->SpawnActor<AComptoirScene>(FVector::ZeroVector,FRotator::ZeroRotator,Params);
         if(Actor&&!Actor->Build(Name,Collision)){Actor->Destroy();return static_cast<AComptoirScene*>(nullptr);}
-        if(Actor)Actor->SetAmbientModel();
+        if(Actor)Actor->SetModelShadows(true);
         return Actor;
     };
     const TCHAR* Parts[]={TEXT("body"),TEXT("legLeft"),TEXT("legRight"),TEXT("armLeft"),TEXT("armRight")};
@@ -52,6 +52,8 @@ void AComptoirStreetLife::Tick(float DeltaSeconds)
             if(!People.IsValidIndex(Person*5+Part))continue;
             AComptoirScene* Mesh=People[Person*5+Part];if(!Mesh)continue;
             Mesh->SetActorHiddenInGame(!Near);if(!Near)continue;
+            // Keep contact shadows near the player, without shadowing distant crowds.
+            Mesh->SetModelShadows(FVector::DistSquared2D(Position,PlayerPosition)<FMath::Square(2200.f));
             float Swing=Part?Stride:0;
             if(Part==2||Part==3)Swing=-Swing;
             if(Part>=3)Swing*=.7f;

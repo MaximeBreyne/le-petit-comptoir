@@ -18,6 +18,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Comptoir")
     int32 GetGeometryRevision() const { return GeometryRevision; }
     void SetAmbientModel();
+    void SetModelShadows(bool bEnabled);
     bool UseModel(const FString& Collection);
     void SetVenueName(const FString& Name);
     UFUNCTION(BlueprintCallable, Category="Comptoir")

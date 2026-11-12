@@ -47,10 +47,10 @@ def create_map():
             raise RuntimeError("Chargement de ComptoirOriginal impossible")
         level_actors = actors.get_all_level_actors()
         old_venues = [actor for actor in level_actors
-                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 5]
+                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 6]
         fix_axes = any(actor.get_geometry_revision() < 3 for actor in old_venues)
         if old_venues:
-            backup = Path(unreal.Paths.project_saved_dir()) / "Backups" / "BeforeTextRepair"
+            backup = Path(unreal.Paths.project_saved_dir()) / "Backups" / "BeforeVisualUpgrade"
             backup.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
             shutil.copy2(Path(unreal.Paths.project_content_dir()) / "Maps/ComptoirOriginal.umap",

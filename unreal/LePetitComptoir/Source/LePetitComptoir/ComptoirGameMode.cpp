@@ -80,7 +80,7 @@ void AComptoirGameMode::BuildRoom()
     for (TActorIterator<AComptoirScene> It(GetWorld()); It; ++It)
         if (It->ActorHasTag(TEXT("OriginalVenue")))
         {
-            HasVenue = It->GetGeometryRevision() >= 5 || It->Build(TEXT("world"), true);
+            HasVenue = It->GetGeometryRevision() >= 6 || It->Build(TEXT("world"), true);
             break;
         }
     if (!HasVenue)
@@ -121,7 +121,7 @@ void AComptoirGameMode::BuildRoom()
     {
         AComptoirScene* Actor=GetWorld()->SpawnActor<AComptoirScene>();
         if(Actor&&!Actor->UseModel(Collection))Notify(TEXT("Modèles absents : relancez Setup-Unreal.ps1."));
-        if(Actor)Actor->SetAmbientModel();
+        if(Actor)Actor->SetModelShadows(Collection.StartsWith(TEXT("guest")));
         return Actor;
     };
     for(int I=0;I<Comptoir::Game::MaxCustomers;++I)

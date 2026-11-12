@@ -3,7 +3,8 @@ param(
     [string]$EngineRoot = 'C:\Program Files\Epic Games\UE_5.8',
     [switch]$OpenEditor,
     [switch]$VerifyTablet,
-    [switch]$VerifyUI
+    [switch]$VerifyUI,
+    [switch]$VerifyGraphics
 )
 $ErrorActionPreference = 'Stop'
 $ProjectDirectory = Split-Path -Parent $PSScriptRoot
@@ -41,18 +42,22 @@ foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\
     }
 }
 
-if ($VerifyTablet -or $VerifyUI) {
-    Write-Host 'Verification du rendu reel des textes et interfaces (GPU requis)...'
-    $TestFilter = if ($VerifyUI) { 'LePetitComptoir' } else { 'LePetitComptoir.Tablet.RenderedText' }
-    $ReportDirectory = Join-Path $ProjectDirectory ('Saved\Tests\TabletReport-' + [Guid]::NewGuid().ToString('N'))
+if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
+    Write-Host 'Verification du rendu reel, des materiaux et interfaces (GPU requis)...'
+    $TestFilter = if ($VerifyUI -or ($VerifyTablet -and $VerifyGraphics)) { 'LePetitComptoir' } elseif ($VerifyGraphics) { 'LePetitComptoir.Graphics.MaterialsAndViews' } else { 'LePetitComptoir.Tablet.RenderedText' }
+    $ReportDirectory = Join-Path $ProjectDirectory ('Saved\Tests\RenderReport-' + [Guid]::NewGuid().ToString('N'))
     & $Commandlet $Project '-unattended' '-nop4' '-nosound' '-RenderOffscreen' '-UTF8Output' `
         "-ExecCmds=Automation RunTests $TestFilter" `
         '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$ReportDirectory"
-    if ($LASTEXITCODE -ne 0) { throw "Test de rendu de la tablette echoue. Rapport : $ReportDirectory" }
+    if ($LASTEXITCODE -ne 0) { throw "Test de rendu echoue. Rapport : $ReportDirectory" }
     $ReportFile = Join-Path $ReportDirectory 'index.json'
     if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent : $ReportFile" }
     $Report = Get-Content -LiteralPath $ReportFile -Raw | ConvertFrom-Json
-    $ExpectedTests = @('LePetitComptoir.Tablet.RenderedText')
+    $Failures = @($Report.tests | Where-Object { $_.state -ne 'Success' })
+    if ($Failures.Count -gt 0) { throw "Un test de rendu n'a pas reussi. Rapport : $ReportFile" }
+    $ExpectedTests = @()
+    if ($VerifyTablet -or $VerifyUI) { $ExpectedTests += 'LePetitComptoir.Tablet.RenderedText' }
+    if ($VerifyGraphics -or $VerifyUI) { $ExpectedTests += 'LePetitComptoir.Graphics.MaterialsAndViews' }
     if ($VerifyUI) { $ExpectedTests += @('LePetitComptoir.World.FontGlyphs', 'LePetitComptoir.World.RenderedText', 'LePetitComptoir.Session.SaveMetadata', 'LePetitComptoir.Drinks.GoldenBeer') }
     foreach ($Expected in $ExpectedTests) {
         $Result = @($Report.tests | Where-Object { $_.fullTestPath -eq $Expected })
@@ -60,7 +65,7 @@ if ($VerifyTablet -or $VerifyUI) {
             throw "Le test $Expected n'a pas reussi. Rapport : $ReportFile"
         }
     }
-    Write-Host 'Textes verifies. Captures : Saved\Tests\Tablet, Saved\Tests\WorldText et Saved\Tests\Drinks.'
+    Write-Host 'Rendu verifie. Captures : Saved\Tests\Tablet, WorldText, Drinks et Graphics.'
 }
 
 Write-Host '3/3 Projet pret. Ouvrez LePetitComptoir.uproject puis Play dans Maps/ComptoirOriginal.'

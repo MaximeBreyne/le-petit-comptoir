@@ -107,12 +107,12 @@ const BarScene=(()=>{
   // Thin tangent panels form genuinely open containers. They are transparent
   // geometry, not a solid coloured cylinder with an opaque cap over its rim.
   const ring=(height,radius,thickness=.002,ringHeight=.003)=>{
-   for(let i=0;i<16;i++){const a=i*Math.PI/8;g.box(x+Math.sin(a)*radius,y+height,z+Math.cos(a)*radius,2*radius*Math.tan(Math.PI/16),ringHeight,thickness,rim,M.clearGlass,{ry:a,castShadow:false});}
+   for(let i=0;i<32;i++){const a=i*Math.PI/16;g.box(x+Math.sin(a)*radius,y+height,z+Math.cos(a)*radius,2*radius*Math.tan(Math.PI/32),ringHeight,thickness,rim,M.clearGlass,{ry:a,castShadow:false});}
   };
   const walls=profile=>{
    for(let j=1;j<profile.length;j++){
     const [low,r0]=profile[j-1],[high,r1]=profile[j],radius=(r0+r1)/2;
-    for(let i=0;i<16;i++){const a=i*Math.PI/8;g.box(x+Math.sin(a)*radius,y+(low+high)/2,z+Math.cos(a)*radius,2*Math.max(r0,r1)*Math.tan(Math.PI/16),Math.hypot(high-low,r1-r0),.0018,rim,M.clearGlass,{rx:Math.atan2(r1-r0,high-low),ry:a,castShadow:false});}
+    for(let i=0;i<32;i++){const a=i*Math.PI/16;g.box(x+Math.sin(a)*radius,y+(low+high)/2,z+Math.cos(a)*radius,2*Math.max(r0,r1)*Math.tan(Math.PI/32),Math.hypot(high-low,r1-r0),.0018,rim,M.clearGlass,{rx:Math.atan2(r1-r0,high-low),ry:a,castShadow:false});}
    }
    const [height,radius]=profile[profile.length-1];ring(height,radius);
   };
@@ -129,9 +129,9 @@ const BarScene=(()=>{
   if(vessel==='cup'){
    g.cylinder(x,y+.009,z,.21,.018,.21,'#d5cfc0');
    g.cylinder(x,y+.029,z,.107,.022,.107,'#e3ded0');
-   for(let i=0;i<16;i++){
-    const a=i*Math.PI/8;
-    g.box(x+Math.sin(a)*.063,y+.085,z+Math.cos(a)*.063,.027,.116,.011,'#e3ded0',0,{ry:a});
+   for(let i=0;i<32;i++){
+    const a=i*Math.PI/16;
+    g.box(x+Math.sin(a)*.063,y+.085,z+Math.cos(a)*.063,.014,.116,.011,'#e3ded0',0,{ry:a});
    }
    g.cylinder(x,y+.041+fillAmount*.082,z,.113,.003,.113,fillAmount>0?color:'#c6bcaa');
    if(fillAmount>0){

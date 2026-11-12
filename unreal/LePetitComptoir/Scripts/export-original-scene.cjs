@@ -5,7 +5,7 @@ const sourceRoot = path.resolve(__dirname, '../SourceArt/Scene');
 function exportScene() {
   const context = vm.createContext({});
   const hashes = {};
-  for (const name of ['engine.js', 'scene.js', 'venue.js']) {
+  for (const name of ['engine.js', 'scene.js', 'venue.js', 'finishes.js']) {
     const source = fs.readFileSync(path.join(sourceRoot, name), 'utf8');
     hashes[name] = crypto.createHash('sha256').update(source).digest('hex');
     vm.runInContext(source, context, {filename: name});
@@ -16,6 +16,7 @@ function exportScene() {
   scene.storageVisuals(world, game.s);
   scene.preparationVisuals(world, game.s);
   scene.registerVisuals(world, game.s);
+  vm.runInContext('ComptoirFinishes', context).add(world);
   const seated = [], standing = [], glass = [], beer = [];
   const models = {};
   const pivots = {body:[0,0,0],legLeft:[-.105,.865,0],legRight:[.105,.865,0],armLeft:[-.245,1.31,0],armRight:[.245,1.31,0]};
@@ -44,7 +45,7 @@ function exportScene() {
   }
   // Preserve original dimensions, angles, tapered cylinders, side colors and labels.
   const keys = ['x','y','z','w','h','d','c','mat','solid','roomFloor','round','shape','rx','ry','rz',
-    'topRadius','bottomRadius','sideColor','label','labelFace','labelColor','exterior','streetFloor','assembly','venueName'];
+    'topRadius','bottomRadius','sideColor','label','labelFace','labelColor','exterior','streetFloor','assembly','venueName','detail'];
   const clean = items => items.map(item => ({
     ...Object.fromEntries(keys.filter(k => item[k] !== undefined).map(k => [k,item[k]])),
     // The browser also constrained walking with walkSurfaceHeight. Unreal needs

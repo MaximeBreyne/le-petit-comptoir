@@ -44,6 +44,12 @@ for(const recipe of ['beer','wine','coffee'])for(let level=0;level<=8;level++) {
     if(level>0)assert.ok(model.some(s=>s.mat===16&&s.c==='#ede1c5'),'Beer must have pale foam');
   }
 }
+const details=data.collections.world.filter(s=>s.detail);
+assert.ok(details.length>150&&details.length<350,'Controlled decorative geometry budget');
+assert.ok(details.every(s=>!s.collision),'New fittings cannot block the bar or reserve');
+// Service and tray positions must remain free above their working surfaces.
+for(const [x,z] of [[4.15,2.72],[8.43,2.47],[4.98,2.85],[5.24,2.85],[4.98,3.17],[5.24,3.17]])
+  assert.ok(!details.some(s=>Math.abs(s.x-x)<s.w/2+.065&&Math.abs(s.z-z)<s.d/2+.065&&s.y+s.h/2>1.16&&s.y-s.h/2<1.4),`Detail interferes with drink at ${x}/${z}`);
 const context=vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(sourceRoot,'renderer.js'),'utf8'),context);
 const Renderer=vm.runInContext('BarRenderer',context),renderer=Object.create(Renderer.prototype);
@@ -85,6 +91,10 @@ try {
         `screen projection differs: yaw ${yaw}, vertex ${v}, axis ${axis}`);
     }
   }
+  const visualExe=path.join(temp,process.platform==='win32'?'visual.exe':'visual');
+  cp.execFileSync(process.env.CXX||'g++',['-std=c++17','-Wall','-Wextra','-Werror','-pedantic',path.join(__dirname,'visual_geometry_test.cpp'),'-o',visualExe]);
+  const visualInput=shapes.map(s=>[s.shape==='sphere'?2:s.round?1:0,s.mat,Number(!!s.exterior&&Math.abs(s.x-6)>40),s.x,s.y,s.z,s.w,s.h,s.d,s.rx||0,s.ry||0,s.rz||0,s.topRadius??1,s.bottomRadius??1].join(' ')).join('\n');
+  console.log(cp.execFileSync(visualExe,{input:visualInput,encoding:'utf8'}).trim());
   const floor=data.collections.world.find(s=>s.x===2.3&&s.y===-.11&&s.z===-2.1);
   assert.equal(floor.collision,true,'The reserve must have a walkable floor');
   for(const s of data.collections.world.filter(s=>s.solid||s.roomFloor))assert.equal(s.collision,true);
