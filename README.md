@@ -1,5 +1,12 @@
 LE PETIT COMPTOIR — BAR · Prototype
 
+UNREAL ENGINE
+Sur la branche migration/unreal, le premier jalon C++ se trouve dans
+[unreal/LePetitComptoir](unreal/LePetitComptoir/README.md).
+Ce dossier contient les instructions de compilation pour Unreal 5.8.4 et de
+synchronisation entre deux PC. La compilation et le rendu Unreal restent à valider.
+Les instructions ci-dessous concernent le prototype Electron existant.
+
 WINDOWS 64 BITS
 Ouvrir l’installateur Le-Petit-Comptoir-Bar-VERSION-Setup.exe dans release-final.
 VERSION correspond au numéro du dernier build réussi.

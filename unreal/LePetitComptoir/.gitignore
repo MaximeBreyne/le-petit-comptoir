@@ -1,0 +1,14 @@
+/Binaries/
+/Intermediate/
+/DerivedDataCache/
+/Saved/
+/.vs/
+*.sln
+*.slnx
+*.VC.db
+*.VC.opendb
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+**/__pycache__/
+# Keep Content, Config, Source, build resources and binary-only plugins.
