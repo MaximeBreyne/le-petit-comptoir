@@ -15,6 +15,9 @@ public:
     AComptoirScene();
     UFUNCTION(BlueprintCallable, Category="Comptoir")
     bool Build(const FString& Collection, bool bWithCollision=false);
+    UFUNCTION(BlueprintPure, Category="Comptoir")
+    int32 GetGeometryRevision() const { return GeometryRevision; }
 private:
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> Geometry;
+    UPROPERTY() int32 GeometryRevision = 0;
 };

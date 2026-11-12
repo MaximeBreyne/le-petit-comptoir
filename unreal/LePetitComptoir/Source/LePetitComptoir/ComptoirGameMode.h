@@ -26,6 +26,7 @@ public:
     void Load(bool Feedback = false);
     void Notify(const FString& Text);
     FString Prompt(EComptoirTarget Target) const;
+    bool CanReachTabletTarget(EComptoirTarget Target) const;
 private:
     UPROPERTY() TObjectPtr<AComptoirProp> Customer;
     UPROPERTY() TObjectPtr<AComptoirProp> BeerVisual;

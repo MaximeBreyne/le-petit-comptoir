@@ -11,5 +11,7 @@ public:
     virtual void DrawHUD() override;
     virtual void NotifyHitBoxClick(FName BoxName) override;
 private:
+    void DrawTablet(const class AComptoirGameMode& Game, const class AComptoirCharacter& Player);
+    int32 TabletPage = 1;
     UPROPERTY() TObjectPtr<class UTexture2D> BrandLogo;
 };

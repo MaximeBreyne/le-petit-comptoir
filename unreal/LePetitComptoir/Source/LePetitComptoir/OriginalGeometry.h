@@ -25,8 +25,10 @@ inline Vec Rotate(Vec P, const Vec& R)
     P.Y=P.X*std::sin(R.Z)+P.Y*std::cos(R.Z); P.X=A;
     return P;
 }
-inline Vec Direction(const Vec& P) { return {P.X,P.Z,P.Y}; }
-inline Vec Position(const Vec& P) { return {100*P.X,100*P.Z,100*P.Y}; }
+// Original camera: +Z forward, +X screen-right, +Y up.
+// Unreal camera: +X forward, +Y screen-right, +Z up.
+inline Vec Direction(const Vec& P) { return {P.Z,P.X,P.Y}; }
+inline Vec Position(const Vec& P) { return {100*P.Z,100*P.X,100*P.Y}; }
 inline Vec Point(const Shape& S, Vec P)
 {
     P=Rotate({P.X*S.Size.X/2,P.Y*S.Size.Y/2,P.Z*S.Size.Z/2},S.Rotation);

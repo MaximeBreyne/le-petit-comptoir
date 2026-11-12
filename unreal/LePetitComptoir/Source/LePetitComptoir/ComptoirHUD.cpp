@@ -13,6 +13,7 @@ void AComptoirHUD::DrawHUD()
     const AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>();
     const AComptoirCharacter* Player = Cast<AComptoirCharacter>(GetOwningPawn());
     if (!Canvas || !Game || !Player) return;
+    if (Player->IsTabletOpen()) { DrawTablet(*Game, *Player); return; }
     const auto& S = Game->Simulation;
     const float Scale = FMath::Clamp(Canvas->SizeX / 1440.f, .65f, 1.2f);
     const float W = Canvas->SizeX / Scale, H = Canvas->SizeY / Scale;
@@ -68,7 +69,7 @@ void AComptoirHUD::DrawHUD()
         Text(Order,38,211,.95f,Cream);
     }
     const FVector P=Player->GetActorLocation();
-    if (!Player->IsTabletOpen() && ((P.Y>0 && P.Y<240) || S.Held!=Comptoir::Glass::None))
+    if (!Player->IsTabletOpen() && ((P.X>0 && P.X<240) || S.Held!=Comptoir::Glass::None))
     {
         const float X=W-463,Y=H-276;
         Card(X,Y,440,220);Text(TEXT("DERRIERE LE COMPTOIR"),X+17,Y+15,.68f,Gold);
@@ -98,22 +99,6 @@ void AComptoirHUD::DrawHUD()
             }
         }
     }
-    if (Player->IsTabletOpen())
-    {
-        Rect(0,0,W,H,FLinearColor(.025f,.06f,.05f,.65f));
-        const float X=(W-620)/2,Y=FMath::Max(80.f,(H-440)/2);
-        Card(X,Y,620,440);
-        Text(TEXT("LE PETIT COMPTOIR"),X+28,Y+23,.8f,Gold);
-        Text(TEXT("Tablette · Service"),X+28,Y+52,1.8f,Cream);
-        Text(FString::Printf(TEXT("Tresorerie : %.2f €   ·   Clients encaisses : %d"),S.Cash/100.0,S.Sold),X+28,Y+102,1.f,Cream);
-        Button(TEXT("service"),S.Open?TEXT("Derniere tournee"):TEXT("Ouvrir le bar"),X+28,Y+135,260,true);
-        Text(FString::Printf(TEXT("Biere : %d cl au comptoir / %d cl en reserve"),S.Beer,S.Reserve),X+28,Y+198,1.f,Cream);
-        Text(S.DeliveryRemaining>0?FString::Printf(TEXT("Livraison dans %.0f secondes"),S.DeliveryRemaining):TEXT("Commande : 500 cl pour 16 € · livraison sous 10 s"),X+28,Y+226,.85f,Muted);
-        Button(TEXT("supply"),S.Reserve>0?TEXT("Transferer vers le comptoir"):TEXT("Commander un fut"),X+28,Y+255,260);
-        Text(TEXT("Le service continue pendant la consultation de la tablette."),X+28,Y+315,.8f,Muted);
-        Button(TEXT("save"),TEXT("Sauvegarder"),X+28,Y+363,170);
-        Button(TEXT("tablet"),TEXT("Retour au bar [Tab]"),X+380,Y+363,210);
-    }
     Text(TEXT("ZQSD / WASD  Deplacer     Souris  Regarder     E  Interagir     Tab  Tablette     P  Pause"),23,H-25,.75f,Cream);
     Text(TEXT("Sauvegarde automatique · 17 h — 4 h · Frais : 35 € / soir"),W-425,H-25,.7f,Muted);
     if (Game->MessageRemaining>0)
@@ -135,8 +120,19 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     AComptoirCharacter* Player=Cast<AComptoirCharacter>(GetOwningPawn());
     AComptoirGameMode* Game=GetWorld()->GetAuthGameMode<AComptoirGameMode>();
     if (!Player || !Game || !Player->IsTabletOpen()) return;
-    if (BoxName==TEXT("tablet") || BoxName==TEXT("tablet_header")) Player->ToggleTablet();
+    if (BoxName==TEXT("tablet") || BoxName==TEXT("tablet_header") || BoxName==TEXT("return_bar")) Player->ToggleTablet();
     else if (BoxName==TEXT("service")) Game->Interact(EComptoirTarget::Sign);
-    else if (BoxName==TEXT("supply")) Game->Interact(EComptoirTarget::Stock);
+    else if (BoxName==TEXT("restock") && Game->Simulation.Reserve>0 && Game->Simulation.Beer<1000)
+        Game->Interact(EComptoirTarget::Stock);
+    else if (BoxName==TEXT("buy_stock") && Game->Simulation.Reserve==0)
+        Game->Interact(EComptoirTarget::Stock);
+    else if (BoxName==TEXT("take_order") && Game->Simulation.Phase==Comptoir::Customer::Order && Game->CanReachTabletTarget(EComptoirTarget::Customer))
+        Game->Interact(EComptoirTarget::Customer);
+    else if (BoxName==TEXT("pay_card") && Game->CanReachTabletTarget(EComptoirTarget::Till))
+        Game->Interact(EComptoirTarget::Till);
+    else if (BoxName==TEXT("tab_service")) TabletPage=0;
+    else if (BoxName==TEXT("tab_orders")) TabletPage=1;
+    else if (BoxName==TEXT("tab_register")) TabletPage=2;
+    else if (BoxName==TEXT("tab_reserve")) TabletPage=3;
     else if (BoxName==TEXT("save")) Game->Save(true);
 }

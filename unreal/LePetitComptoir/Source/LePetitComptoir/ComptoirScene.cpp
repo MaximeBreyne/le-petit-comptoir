@@ -50,6 +50,16 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
     if(!Document->TryGetObjectField(TEXT("collections"),Collections))return false;
     const TArray<TSharedPtr<FJsonValue>>* Items=nullptr;
     if(!(*Collections)->TryGetArrayField(Collection,Items))return false;
+    // These instance components are generated with this actor, never separate level actors.
+    const auto PreviousComponents=GetInstanceComponents();
+    for(UActorComponent* Component:PreviousComponents)
+    {
+        if(!Component)continue;
+        RemoveInstanceComponent(Component);
+        Component->DestroyComponent();
+    }
+    Geometry->ClearAllMeshSections();
+    GeometryRevision=0;
     TArray<Section> Sections;Sections.SetNum(16);
     for(const auto& Item:*Items)
     {
@@ -75,9 +85,9 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         {
             UBoxComponent* Box=NewObject<UBoxComponent>(this);
             AddInstanceComponent(Box);Box->SetupAttachment(Geometry);
-            Box->SetBoxExtent(FVector(S.Size.X,S.Size.Z,S.Size.Y)*50);
-            const FVector X=Vector(ComptoirGeometry::Direction(ComptoirGeometry::Rotate({1,0,0},S.Rotation)));
-            const FVector Y=Vector(ComptoirGeometry::Direction(ComptoirGeometry::Rotate({0,0,1},S.Rotation)));
+            Box->SetBoxExtent(FVector(S.Size.Z,S.Size.X,S.Size.Y)*50);
+            const FVector X=Vector(ComptoirGeometry::Direction(ComptoirGeometry::Rotate({0,0,1},S.Rotation)));
+            const FVector Y=Vector(ComptoirGeometry::Direction(ComptoirGeometry::Rotate({1,0,0},S.Rotation)));
             Box->SetRelativeLocation(Vector(ComptoirGeometry::Position(S.Position)));
             Box->SetRelativeRotation(FRotationMatrix::MakeFromXY(X,Y).Rotator());
             Box->SetCollisionProfileName(TEXT("BlockAll"));Box->RegisterComponent();
@@ -130,19 +140,20 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
             Light->SetAttenuationRadius(550);Light->SetSourceRadius(12);
             Light->SetCastShadows(Shadows);Light->RegisterComponent();
         };
-        for(int32 X:{300,600,900})Lamp(FVector(X,465,248),250,true);
-        Lamp(FVector(600,150,245),100,false);Lamp(FVector(600,760,250),80,false);
-        Lamp(FVector(230,-200,250),160,false);
+        for(int32 Y:{300,600,900})Lamp(FVector(465,Y,248),250,true);
+        Lamp(FVector(150,600,245),100,false);Lamp(FVector(760,600,250),80,false);
+        Lamp(FVector(-200,230,250),160,false);
         URectLightComponent* Frontage=NewObject<URectLightComponent>(this);
         AddInstanceComponent(Frontage);Frontage->SetupAttachment(Geometry);
-        Frontage->SetMobility(EComponentMobility::Movable);Frontage->SetRelativeLocation(FVector(600,970,180));
-        Frontage->SetRelativeRotation(FRotator(0,-90,0));Frontage->SetSourceWidth(1050);Frontage->SetSourceHeight(200);
+        Frontage->SetMobility(EComponentMobility::Movable);Frontage->SetRelativeLocation(FVector(970,600,180));
+        Frontage->SetRelativeRotation(FRotator(0,180,0));Frontage->SetSourceWidth(1050);Frontage->SetSourceHeight(200);
         Frontage->SetLightColor(FLinearColor(.78f,.87f,1.f));Frontage->SetIntensity(600);
         Frontage->SetAttenuationRadius(1400);Frontage->RegisterComponent();
         UDirectionalLightComponent* Daylight=NewObject<UDirectionalLightComponent>(this);
         AddInstanceComponent(Daylight);Daylight->SetupAttachment(Geometry);
-        Daylight->SetMobility(EComponentMobility::Movable);Daylight->SetRelativeRotation(FRotator(-55,-142,0));
+        Daylight->SetMobility(EComponentMobility::Movable);Daylight->SetRelativeRotation(FRotator(-55,-128,0));
         Daylight->SetLightColor(FLinearColor(.83f,.89f,1.f));Daylight->SetIntensity(2.5f);Daylight->RegisterComponent();
     }
+    GeometryRevision=3;
     return true;
 }

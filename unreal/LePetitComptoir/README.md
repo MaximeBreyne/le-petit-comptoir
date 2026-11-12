@@ -8,6 +8,9 @@ reprend les **5 230 éléments de la scène originale d'une nouvelle partie** : 
 comptoir, réserve, vitrines, rue, mobilier, bouteilles, équipements et enseignes.
 Les clients et les verres reprennent également leur géométrie d'origine. Le logo,
 la palette et la disposition compacte de l'interface sont repris du prototype.
+La tablette retrouve son boîtier paysage arrondi, son écran clair et sa navigation
+latérale : Service, À préparer, Caisse et Réserve sont utilisables. Les rubriques
+Bâtiment, Décoration, Licences et Équipe sont visibles mais désactivées.
 
 **La migration fonctionnelle reste partielle** : une bière, un client à la fois,
 paiement par carte, stocks, fermeture et sauvegarde. Les autres recettes, employés,
@@ -31,8 +34,11 @@ powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-
 Arrêter si une commande échoue. Le script recompile le module, crée les nouveaux
 matériaux, importe le logo existant et crée la carte **Content/Maps/ComptoirOriginal**.
 Ouvrir cette carte puis cliquer sur **Play**. Le décor est aussi présent dans l'éditeur
-avant Play. La nouvelle carte conserve l'ancienne carte `Bar` ; les assets existants
-ne sont pas écrasés. Les premiers matériaux peuvent demander une compilation de shaders.
+avant Play. Le script corrige aussi les axes du décor `ComptoirOriginal` déjà créé
+et les coordonnées utilisées par ses matériaux. Avant cette correction, une copie
+de la carte est conservée dans `Saved/Backups/BeforeAxisFix/`. Les autres acteurs de
+la carte et l'ancienne carte `Bar` sont conservés. Les matériaux peuvent demander
+une compilation de shaders. Il n'est pas nécessaire de supprimer la carte.
 
 ## Première installation sur Windows
 
@@ -66,11 +72,13 @@ fournis avec Unreal. Aucun plugin payant n'est nécessaire.
 
 Le départ est celui du jeu d'origine : derrière le comptoir, face à la vitrine.
 La tireuse est à gauche, les verres sur le meuble derrière vous, la caisse à gauche
-sur le comptoir et la réserve derrière la porte à gauche du meuble du fond.
+sur le comptoir. En vous retournant vers le meuble du fond, la porte de la réserve
+se trouve à droite, comme dans le jeu original.
 
 1. **ZQSD / WASD** : marcher. **Souris** : regarder. **Maj** : courir.
 2. **Tab** : ouvrir la tablette. Cliquer sur **Ouvrir le bar**, puis revenir au bar avec
-   **Tab** ou le bouton correspondant. Le panneau suspendu dans la porte vitrée fonctionne
+   **Tab** ou **Ranger**. Les onglets changent de page ; la prise de commande et
+   l'encaissement restent limités à la proximité du client/de la caisse. Le panneau suspendu dans la porte vitrée fonctionne
    aussi avec **E**. Le service continue pendant l'utilisation de la tablette.
 3. Regarder le client au comptoir puis **E** pour prendre sa commande.
 4. **E** sur le rangement des verres pour prendre une pinte.
@@ -116,7 +124,9 @@ convertis en assets individuels éditables comme des Blueprints.
 Le slot Unreal `LePetitComptoir_Unreal_Pilot_v1` reste indépendant du `localStorage`
 Electron. La partie est enregistrée toutes les cinq secondes et après les actions
 principales. Les anciennes sauvegardes du pilote conservent leur argent, stock et service ;
-leur position est replacée au départ du décor original. Les nouvelles sauvegardes
+leur position est replacée au départ du décor original. Les sauvegardes du décor
+inversé (révision 2) sont converties vers le nouveau repère (révision 3) : position et
+orientation sont conservées par rapport au mobilier. Les nouvelles sauvegardes
 mémorisent la position dans la salle ou la réserve.
 
 `Saved/SaveGames/` n'est pas envoyé à GitHub : les deux PC partagent le projet,
@@ -147,7 +157,8 @@ node unreal/LePetitComptoir/Scripts/export-original-scene.cjs
 
 Il contient les empreintes SHA-256 des trois sources originales. Cet export est committé :
 Node n'est pas nécessaire pour ouvrir le projet Unreal. Les matériaux et le logo sont
-créés par `Scripts/original_assets.py`. Les anciens matériaux/cartes ne sont pas remplacés.
+créés par `Scripts/original_assets.py`. La migration des axes ne modifie que la
+conversion de coordonnées dans les shaders générés et le décor procédural identifié.
 
 Depuis la racine du dépôt, avec Node et GCC/Clang :
 
@@ -155,12 +166,18 @@ Depuis la racine du dépôt, avec Node et GCC/Clang :
 node unreal/LePetitComptoir/Tests/original_scene_test.cjs
 g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/bar_simulation_test.cpp -o /tmp/comptoir-test
 /tmp/comptoir-test
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/tablet_layout_test.cpp -o /tmp/comptoir-tablet-test
+/tmp/comptoir-tablet-test
 ```
 
 Le premier test compare **446 676 positions et normales** de 5 422 formes (décor,
 clients et verres) à la sortie réelle du renderer JavaScript. Il vérifie la fraîcheur
-de l'export, le sol de la réserve et les collisions des objets solides. Le second teste
-service, stock, paiement unique, fermeture et sauvegardes.
+de l'export, le sol de la réserve et les collisions des objets solides. La projection
+à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
+Le second teste service, stock, paiement unique, fermeture et sauvegardes. Le troisième
+contrôle 140 mises en page de tablette : dimensions, zones cliquables sans chevauchement
+et disponibilité des actions. Le boîtier et les quatre pages sont inspectables via
+les commandes de dessin partagées avec Unreal ; ce contrôle ne remplace pas Play.
 
 À vérifier dans Unreal : compilation UHT/C++, compilation des matériaux, absence de
 surfaces noires, visibilité du logo et des enseignes, passage vers la réserve, service

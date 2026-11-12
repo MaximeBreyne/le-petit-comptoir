@@ -1,9 +1,11 @@
 """Run through UnrealEditor-Cmd -run=pythonscript, after compiling the Editor target.
 
-Create only missing assets. Existing maps/materials are never overwritten.
+Create missing assets and migrate the generated scene's coordinate convention.
 The original scene is present in the new map before Play starts.
 """
 from pathlib import Path
+from datetime import datetime, timezone
+import shutil
 import sys
 import unreal
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -36,15 +38,39 @@ def create_material():
 
 def create_map():
     asset_path = "/Game/Maps/ComptoirOriginal"
-    if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-        return
+    exists = unreal.EditorAssetLibrary.does_asset_exist(asset_path)
     unreal.EditorAssetLibrary.make_directory("/Game/Maps")
     editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    if exists:
+        if not editor.load_level(asset_path):
+            raise RuntimeError("Chargement de ComptoirOriginal impossible")
+        level_actors = actors.get_all_level_actors()
+        old_venues = [actor for actor in level_actors
+                      if actor.actor_has_tag("OriginalVenue") and actor.get_geometry_revision() < 3]
+        if old_venues:
+            backup = Path(unreal.Paths.project_saved_dir()) / "Backups" / "BeforeAxisFix"
+            backup.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+            shutil.copy2(Path(unreal.Paths.project_content_dir()) / "Maps/ComptoirOriginal.umap",
+                         backup / f"ComptoirOriginal-{stamp}.umap")
+        changed = False
+        for actor in level_actors:
+            if actor in old_venues:
+                if not actor.build("world", True):
+                    raise RuntimeError("Correction des axes du decor impossible")
+                changed = True
+            if old_venues and actor.get_actor_label() == "Depart derriere le comptoir":
+                actor.set_actor_location(unreal.Vector(155, 600, 100), False, False)
+                actor.set_actor_rotation(unreal.Rotator(pitch=-3.44, yaw=0, roll=0), False)
+                changed = True
+        if changed and not editor.save_current_level():
+            raise RuntimeError("Sauvegarde de la carte corrigee impossible")
+        return
     if not editor.new_level(asset_path):
         raise RuntimeError("Creation de la carte ComptoirOriginal impossible")
-    actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     start = actors.spawn_actor_from_class(
-        unreal.PlayerStart, unreal.Vector(600, 155, 100), unreal.Rotator(pitch=-3.44, yaw=90, roll=0)
+        unreal.PlayerStart, unreal.Vector(155, 600, 100), unreal.Rotator(pitch=-3.44, yaw=0, roll=0)
     )
     if start is None:
         raise RuntimeError("Creation du PlayerStart impossible")

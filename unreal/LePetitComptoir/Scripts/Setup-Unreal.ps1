@@ -30,7 +30,7 @@ Write-Host '1/3 Compilation C++ (Visual Studio avec Developpement de jeux en C++
 & $Build 'LePetitComptoirEditor' 'Win64' 'Development' "-Project=$Project" '-WaitMutex' '-NoHotReloadFromIDE'
 if ($LASTEXITCODE -ne 0) { throw "Compilation Unreal echouee (code $LASTEXITCODE). Consultez le journal ci-dessus." }
 
-Write-Host '2/3 Creation des assets manquants (aucun asset existant ne sera remplace)...'
+Write-Host '2/3 Preparation des assets et correction des axes du decor genere...'
 & $Commandlet $Project '-run=pythonscript' "-script=$Bootstrap" '-unattended' '-nop4' '-NullRHI' '-UTF8Output'
 if ($LASTEXITCODE -ne 0) { throw "Creation des assets echouee (code $LASTEXITCODE). Consultez Saved\Logs." }
 foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\Materials\M_Original_00.uasset', 'Content\Original\UI\T_ComptoirLogo.uasset')) {

@@ -7,7 +7,7 @@ struct ComptoirNoise
     float border(float2 p) { float2 f=frac(p); return min(min(f.x,1-f.x),min(f.y,1-f.y)); }
 };
 ComptoirNoise Noise;
-float3 world=World.xzy*.01, n=Normal.xzy;
+float3 world=World.yzx*.01, n=Normal.yzx;
 float2 uv=abs(n.y)>.65?world.xz:(abs(n.x)>.65?world.zy:world.xy);
 float footprint=max(length(ddx(uv)),length(ddy(uv)));
 float detail=1-smoothstep(.003,.018,footprint), variation=1;

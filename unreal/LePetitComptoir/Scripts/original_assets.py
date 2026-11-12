@@ -13,6 +13,21 @@ def create_original_assets():
     for index in range(16):
         name = f"M_Original_{index:02d}"
         if unreal.EditorAssetLibrary.does_asset_exist(f"{folder}/{name}"):
+            # Migrate only the coordinate conversion in our generated shader.
+            material = unreal.EditorAssetLibrary.load_asset(f"{folder}/{name}")
+            changed = False
+            for node in editing.get_material_expressions(material):
+                if isinstance(node, unreal.MaterialExpressionCustom):
+                    current = node.get_editor_property("code")
+                    old_axes = "float3 world=World.xzy*.01, n=Normal.xzy;"
+                    if "struct ComptoirNoise" in current and old_axes in current:
+                        node.set_editor_property("code", current.replace(
+                            old_axes, "float3 world=World.yzx*.01, n=Normal.yzx;"))
+                        changed = True
+            if changed:
+                editing.recompile_material(material)
+                if not unreal.EditorAssetLibrary.save_loaded_asset(material):
+                    raise RuntimeError(f"Mise a jour impossible : {name}")
             continue
         material = tools.create_asset(name, folder, unreal.Material, unreal.MaterialFactoryNew())
         if material is None:

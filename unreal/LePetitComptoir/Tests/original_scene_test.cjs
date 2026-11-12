@@ -24,7 +24,7 @@ try {
   assert.equal(native.length,count*7*8,'Vertex count must match');
   let maxPositionError=0,maxNormalError=0;
   for(let v=0;v<count;v++) {
-    for(const [axis,source] of [[0,0],[1,2],[2,1]]) {
+    for(const [axis,source] of [[0,2],[1,0],[2,1]]) {
       const difference=Math.abs(native.readDoubleLE((v*7+axis)*8)-reference[v*12+source]*100);
       maxPositionError=Math.max(maxPositionError,difference);
       assert.ok(difference<.005,`vertex ${v} axis ${axis}: ${difference} cm`);
@@ -33,11 +33,26 @@ try {
       assert.ok(error<1e-5,`normal ${v} axis ${axis}: ${error}`);
     }
   }
+  // Compare screen-right/up/depth, not just world coordinates. This catches the
+  // previous mirror: yaw zero in the original looks +Z with +X to screen-right.
+  for(const yaw of [0,.4,Math.PI/2,Math.PI,-1.2]) {
+    const pitch=-.06,cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+    for(let v=0;v<count;v+=97) {
+      const x=reference[v*12]-data.camera.x,y=reference[v*12+1]-data.camera.y,z=reference[v*12+2]-data.camera.z;
+      const referenceView=[x*cy-z*sy,y*cp-(x*sy+z*cy)*sp,y*sp+(x*sy+z*cy)*cp];
+      const nx=native.readDoubleLE(v*7*8)/100-data.camera.z;
+      const ny=native.readDoubleLE((v*7+1)*8)/100-data.camera.x;
+      const nz=native.readDoubleLE((v*7+2)*8)/100-data.camera.y;
+      const unrealView=[-nx*sy+ny*cy,-nx*cy*sp-ny*sy*sp+nz*cp,nx*cy*cp+ny*sy*cp+nz*sp];
+      for(let axis=0;axis<3;axis++)assert.ok(Math.abs(referenceView[axis]-unrealView[axis])<.0001,
+        `screen projection differs: yaw ${yaw}, vertex ${v}, axis ${axis}`);
+    }
+  }
   const floor=data.collections.world.find(s=>s.x===2.3&&s.y===-.11&&s.z===-2.1);
   assert.equal(floor.collision,true,'The reserve must have a walkable floor');
   for(const s of data.collections.world.filter(s=>s.solid||s.roomFloor))assert.equal(s.collision,true);
   assert.ok(data.collections.world.some(s=>s.label==='LE PETIT COMPTOIR'));
   assert.ok(data.collections.world.some(s=>s.exterior));
   assert.deepEqual(data.camera,{x:6,y:1.68,z:1.55,a:0,pitch:-.06});
-  console.log(`PASS: ${shapes.length} shapes / ${count} vertices match the original renderer; max position error ${maxPositionError.toFixed(6)} cm, max normal error ${maxNormalError.toExponential(2)}.`);
+  console.log(`PASS: ${shapes.length} shapes / ${count} vertices and 5 camera directions match the original renderer; max position error ${maxPositionError.toFixed(6)} cm, max normal error ${maxNormalError.toExponential(2)}.`);
 } finally { fs.rmSync(temp,{recursive:true,force:true}); }

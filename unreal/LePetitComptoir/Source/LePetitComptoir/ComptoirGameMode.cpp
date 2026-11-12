@@ -32,8 +32,8 @@ void AComptoirGameMode::BeginPlay()
     BuildRoom();
     if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
     {
-        Player->TeleportTo(FVector(600, 155, 92), FRotator(0, 90, 0), false, true);
-        if (AController* Controller = Player->GetController()) Controller->SetControlRotation(FRotator(-3.44, 90, 0));
+        Player->TeleportTo(FVector(155, 600, 92), FRotator(0, 0, 0), false, true);
+        if (AController* Controller = Player->GetController()) Controller->SetControlRotation(FRotator(-3.44, 0, 0));
     }
     Load();
     UpdateVisuals();
@@ -60,7 +60,11 @@ void AComptoirGameMode::BuildRoom()
 {
     bool HasVenue = false;
     for (TActorIterator<AComptoirScene> It(GetWorld()); It; ++It)
-        if (It->ActorHasTag(TEXT("OriginalVenue"))) { HasVenue = true; break; }
+        if (It->ActorHasTag(TEXT("OriginalVenue")))
+        {
+            HasVenue = It->GetGeometryRevision() >= 3 || It->Build(TEXT("world"), true);
+            break;
+        }
     if (!HasVenue)
     {
         AComptoirScene* Venue = GetWorld()->SpawnActor<AComptoirScene>();
@@ -80,18 +84,19 @@ void AComptoirGameMode::BuildRoom()
         }
         return Prop;
     };
-    Target(FVector(415,272,168), FVector(95,35,75), EComptoirTarget::Tap);
-    Target(FVector(700,85,130), FVector(125,45,65), EComptoirTarget::GlassRack);
-    Target(FVector(265,288,144), FVector(70,50,65), EComptoirTarget::Till);
-    Target(FVector(230,-350,130), FVector(350,70,180), EComptoirTarget::Stock);
-    ServiceSign = Make(FVector(678,976,191), FVector(102,1.2,48),
+    Target(FVector(272, 415, 168), FVector(35, 95, 75), EComptoirTarget::Tap);
+    Target(FVector(85, 700, 130), FVector(45, 125, 65), EComptoirTarget::GlassRack);
+    Target(FVector(288, 265, 144), FVector(50, 70, 65), EComptoirTarget::Till);
+    Target(FVector(-350, 230, 130), FVector(70, 350, 180), EComptoirTarget::Stock);
+    ServiceSign = Make(FVector(976, 678, 191), FVector(1.2, 102, 48),
         FLinearColor(.08f,.12f,.09f), EComptoirTarget::Sign);
     if (ServiceSign)
     {
-        ServiceSign->Label->SetWorldLocation(FVector(678,974,191));
+        ServiceSign->Label->SetWorldLocation(FVector(974, 678, 191));
         ServiceSign->Label->SetWorldSize(11);
+        ServiceSign->Label->SetWorldRotation(FRotator(0, 180, 0));
     }
-    Customer = Target(FVector(600,430,130), FVector(60,55,150), EComptoirTarget::Customer);
+    Customer = Target(FVector(430, 600, 130), FVector(55, 60, 150), EComptoirTarget::Customer);
     const auto Model = [&](const TCHAR* Collection)
     {
         AComptoirScene* Actor = GetWorld()->SpawnActor<AComptoirScene>();
@@ -102,9 +107,9 @@ void AComptoirGameMode::BuildRoom()
     CustomerStanding = Model(TEXT("customerStanding"));
     EmptyGlass = Model(TEXT("glass"));
     FullGlass = Model(TEXT("beer"));
-    if (EmptyGlass) EmptyGlass->SetActorLocation(FVector(415,272,113.3));
-    if (FullGlass) FullGlass->SetActorLocation(FVector(498,285,113.3));
-    BeerVisual = Make(FVector(415,272,115), FVector(13,13,1), FLinearColor(.69f,.38f,.07f));
+    if (EmptyGlass) EmptyGlass->SetActorLocation(FVector(272, 415, 113.3));
+    if (FullGlass) FullGlass->SetActorLocation(FVector(285, 498, 113.3));
+    BeerVisual = Make(FVector(272, 415, 115), FVector(13, 13, 1), FLinearColor(.69f,.38f,.07f));
     if (BeerVisual)
     {
         BeerVisual->Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
@@ -131,17 +136,17 @@ void AComptoirGameMode::UpdateVisuals()
     const bool Visible = Simulation.Phase != Comptoir::Customer::None;
     const bool Seated = Simulation.Phase == Comptoir::Customer::Order ||
         Simulation.Phase == Comptoir::Customer::Drink || Simulation.Phase == Comptoir::Customer::Drinking;
-    FVector Position(600,430,0);
+    FVector Position(430,600,0);
     if (Simulation.Phase == Comptoir::Customer::Walking)
     {
         const float Progress = 1.f - static_cast<float>(Simulation.CustomerRemaining / 3.0);
-        if (Progress < .2f) Position = FMath::Lerp(Position, FVector(600,500,0), Progress / .2f);
-        else if (Progress < .8f) Position = FMath::Lerp(FVector(600,500,0), FVector(245,500,0), (Progress-.2f)/.6f);
-        else Position = FMath::Lerp(FVector(245,500,0), FVector(245,415,0), (Progress-.8f)/.2f);
+        if (Progress < .2f) Position = FMath::Lerp(Position, FVector(500, 600, 0), Progress / .2f);
+        else if (Progress < .8f) Position = FMath::Lerp(FVector(500, 600, 0), FVector(500, 245, 0), (Progress-.2f)/.6f);
+        else Position = FMath::Lerp(FVector(500, 245, 0), FVector(415, 245, 0), (Progress-.8f)/.2f);
     }
     else if (Simulation.Phase == Comptoir::Customer::Payment || Simulation.Phase == Comptoir::Customer::Processing)
-        Position = FVector(245,415,0);
-    if (Customer) { Customer->SetActorEnableCollision(Visible); Customer->SetActorLocation(Position+FVector(0,0,130)); }
+        Position = FVector(415, 245, 0);
+    if (Customer) { Customer->SetActorEnableCollision(Visible); Customer->SetActorLocation(Position+FVector(0, 0, 130)); }
     if (CustomerSeated) { CustomerSeated->SetActorHiddenInGame(!Visible || !Seated); CustomerSeated->SetActorLocation(Position); }
     if (CustomerStanding) { CustomerStanding->SetActorHiddenInGame(!Visible || Seated); CustomerStanding->SetActorLocation(Position); }
     const bool Filling = Simulation.Held == Comptoir::Glass::Filling;
@@ -152,13 +157,24 @@ void AComptoirGameMode::UpdateVisuals()
         const double Height = FMath::Max(.1, Simulation.Amount / 50.0 * 25.5);
         BeerVisual->SetActorHiddenInGame(!Filling || Simulation.Amount <= 0);
         BeerVisual->Mesh->SetWorldScale3D(FVector(.13,.13,Height/100));
-        BeerVisual->SetActorLocation(FVector(415,272,114.5+Height/2));
+        BeerVisual->SetActorLocation(FVector(272,415,114.5+Height/2));
     }
     if (ServiceSign) ServiceSign->Label->SetText(FText::FromString(Simulation.Closing?
         TEXT("DERNIERE TOURNEE\nFIN DU SERVICE"):Simulation.Open?TEXT("OUVERT\nFERMER LE BAR"):TEXT("FERME\nOUVRIR LE BAR")));
 }
 
 void AComptoirGameMode::Notify(const FString& Text) { Message = Text; MessageRemaining = 7; }
+
+bool AComptoirGameMode::CanReachTabletTarget(EComptoirTarget Target) const
+{
+    const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+    if (!Player || Simulation.Bankrupt()) return false;
+    if (Target == EComptoirTarget::Customer && Customer && Simulation.Phase != Comptoir::Customer::None)
+        return FVector::Dist2D(Player->GetActorLocation(), Customer->GetActorLocation()) <= 300;
+    if (Target == EComptoirTarget::Till)
+        return FVector::Dist2D(Player->GetActorLocation(), FVector(288, 265, 144)) <= 300;
+    return false;
+}
 
 void AComptoirGameMode::Interact(EComptoirTarget Target)
 {
@@ -223,7 +239,7 @@ void AComptoirGameMode::Save(bool Feedback)
     if (!Data) return;
     const std::string Payload = Simulation.Serialize();
     Data->Simulation = UTF8_TO_TCHAR(Payload.c_str());
-    Data->LayoutRevision = 2;
+    Data->LayoutRevision = 3;
     if (const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
     {
         Data->PlayerLocation = Player->GetActorLocation();
@@ -251,16 +267,23 @@ void AComptoirGameMode::Load(bool Feedback)
         return;
     }
     bReadyToSave = true;
-    if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0); Player && Data->LayoutRevision == 2)
+    if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0); Player && (Data->LayoutRevision == 2 || Data->LayoutRevision == 3))
     {
-        const FVector P = Data->PlayerLocation;
-        const bool InRoom = P.X > 30 && P.X < 1170 && P.Y > 30 && P.Y < 960;
-        const bool InReserve = P.X > 30 && P.X < 430 && P.Y > -390 && P.Y < 0;
-        if (!P.ContainsNaN() && !Data->PlayerRotation.ContainsNaN() &&
+        FVector P = Data->PlayerLocation;
+        FRotator Rotation = Data->PlayerRotation;
+        if (Data->LayoutRevision == 2)
+        {
+            // Keep the saved place and facing direction when fixing the mirrored layout.
+            P = FVector(P.Y, P.X, P.Z);
+            Rotation.Yaw = FRotator::NormalizeAxis(90 - Rotation.Yaw);
+        }
+        const bool InRoom = P.X > 30 && P.X < 960 && P.Y > 30 && P.Y < 1170;
+        const bool InReserve = P.X > -390 && P.X < 0 && P.Y > 30 && P.Y < 430;
+        if (!P.ContainsNaN() && !Rotation.ContainsNaN() &&
             (InRoom || InReserve) && P.Z > 70 && P.Z < 180)
-            Player->TeleportTo(P, Data->PlayerRotation, false, false);
+            Player->TeleportTo(P, Rotation, false, false);
         if (AController* Controller = Player->GetController())
-            if (!Data->PlayerRotation.ContainsNaN()) Controller->SetControlRotation(Data->PlayerRotation);
+            if (!Rotation.ContainsNaN()) Controller->SetControlRotation(Rotation);
     }
     UpdateVisuals();
     if (Feedback) Notify(TEXT("Partie Unreal chargee."));
