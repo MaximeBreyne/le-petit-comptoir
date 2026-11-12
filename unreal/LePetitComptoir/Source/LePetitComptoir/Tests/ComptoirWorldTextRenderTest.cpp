@@ -33,6 +33,13 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     const TSharedRef<ComptoirRenderTest::FSceneTest> Command=MakeShared<ComptoirRenderTest::FSceneTest>();
     auto* Scene=&Command.Get();
     FPreviewScene& Preview=Scene->Preview;
+    // DefaultTextMaterialOpaque (and its generated copy) is lit. TextRender's
+    // front normal is +X; the generic preview light shines on its back. With a
+    // black environment, even the engine's valid font would look black.
+    Preview.SetLightDirection(FRotator(0,180,0));
+    Preview.SetLightBrightness(3.f);
+    Preview.SetLightColor(FColor::White);
+    Preview.SetSkyBrightness(0.f);
     constexpr int32 Width=1024,Height=256;
     auto* Target=Scene->Target.Get();
     Target->ClearColor=FLinearColor::Black;
@@ -97,6 +104,11 @@ bool FComptoirWorldTextRenderTest::RunTest(const FString&)
     TestTrue(TEXT("Label uses the generated font and matching material"),Label->Font.Get()==Font&&Label->GetMaterial(0)==Material);
     AddInfo(FString::Printf(TEXT("World text: font=%s, material=%s, local size=%s"),
         *Font->GetPathName(),*Material->GetPathName(),*Label->GetTextLocalSize().ToString()));
+    AddInfo(FString::Printf(TEXT("World text lighting: normal=%s, light direction=%s, front illumination=%.2f"),
+        *Label->GetForwardVector().ToString(),*Preview.GetLightDirection().Vector().ToString(),
+        FVector::DotProduct(Label->GetForwardVector(),-Preview.GetLightDirection().Vector())));
+    TestTrue(TEXT("Key light illuminates the text front"),
+        FVector::DotProduct(Label->GetForwardVector(),-Preview.GetLightDirection().Vector())>.9);
     Scene->Then([Label]{Label->SetVisibility(false);});
     Scene->WarmUp();
     Scene->Then([this,ReadVisiblePixels]

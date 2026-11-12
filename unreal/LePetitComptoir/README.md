@@ -480,8 +480,12 @@ capturer les trois modèles de bière et détruire leur scène dans une seule tr
 La scène, les composants, les matériaux et la cible de rendu restent maintenant en
 mémoire jusqu’à la dernière lecture. Le journal donne les numéros des trames utilisées.
 
-Les matériaux sont préparés une fois par scène avec `CacheShaders` puis
-`EnsureIsComplete`, sans relancer leur cache à chaque changement de niveau de bière.
+Les matériaux sont partagés entre les scènes de test. Après avoir terminé les tâches
+de chargement, la préparation conserve les shaders déjà utilisables sur le thread de
+rendu, y compris ceux préparés par un test précédent. Si le proxy utilise encore un
+matériau de secours, elle prépare les ressources pour le niveau graphique de la scène
+dans un `FMaterialUpdateContext`, afin de synchroniser les proxies et de recréer les
+états de rendu dépendants. Les identifiants des assets et leur cache disque sont conservés.
 Après les trames de préparation, le contrôle interroge le proxy sur le thread de rendu
 avec le niveau graphique de la scène. Il échoue si Unreal utilise un matériau de
 secours et conserve les erreurs de compilation. Il ne déduit plus ce résultat du seul
@@ -493,8 +497,13 @@ sans la paroi du verre et doivent conserver sa couleur dorée. Le verre complet 
 obligatoirement vérifié. Le texte 3D est porté par un acteur comme les panneaux du bar.
 `World-Empty.bmp` vérifie que la capture efface l’ancienne image du HUD ;
 `World-Euro.bmp` doit afficher le symbole €, et `World-DefaultFont.bmp` la lettre A
-avec la police standard du moteur. `World-Euro-Reverse.bmp` conserve le contrôle
-d’orientation. Les captures sont produites même lorsqu’un matériau échoue.
+avec la police standard du moteur. Ces deux matériaux de texte sont éclairés : le test
+place donc une lumière blanche face au texte (normale +X, lumière dirigée vers −X),
+avec une exposition fixe. Le journal vérifie cette orientation. La lumière générique
+de la scène de prévisualisation pouvait éclairer le dos du texte, le rendant noir
+sur le fond noir même avec une police et un matériau valides.
+`World-Euro-Reverse.bmp` conserve le contrôle d’orientation. Les captures sont produites
+même lorsqu’un matériau échoue. Cet éclairage de contrôle ne change pas celui du bar.
 
 Le séquencement est vérifiable sans Unreal :
 

@@ -20,6 +20,30 @@
 
 namespace ComptoirRenderTest
 {
+struct FMaterialRenderState
+{
+    bool bOwnMaterial=false;
+    FString RenderedName;
+};
+
+inline FMaterialRenderState ReadMaterialState(FPreviewScene& Preview,UMaterial* Material)
+{
+    FMaterialRenderState State;
+    const FMaterialRenderProxy* Proxy=Material?Material->GetRenderProxy():nullptr;
+    if(!Proxy)return State;
+    const auto FeatureLevel=Preview.GetScene()->GetFeatureLevel();
+    ENQUEUE_RENDER_COMMAND(ComptoirReadMaterialState)(
+        [Proxy,FeatureLevel,&State](FRHICommandListImmediate&)
+        {
+            const FMaterialRenderProxy* UsedProxy=nullptr;
+            const FMaterial& Rendered=Proxy->GetMaterialWithFallback(FeatureLevel,UsedProxy);
+            State.bOwnMaterial=&Rendered==Proxy->GetMaterialNoFallback(FeatureLevel);
+            State.RenderedName=Rendered.GetFriendlyName();
+        });
+    FlushRenderingCommands();
+    return State;
+}
+
 // The framework owns this command until the final latent readback. Keep the
 // preview, components, render target and materials alive beyond RunTest's stack.
 class FSceneTest final : public IAutomationLatentCommand
@@ -60,22 +84,44 @@ public:
     {
         UWorld* World=Preview.GetWorld();
         World->SendAllEndOfFrameUpdates();
-        UMaterialInterface::SubmitRemainingJobsForWorld(World,EMaterialShaderPrecompileMode::Synchronous);
+        TArray<UMaterial*> NewMaterials;
         for(UMaterial* Material:Materials)
         {
             if(!Material||PreparedMaterials.ContainsByPredicate(
                 [Material](const TStrongObjectPtr<UMaterial>& P){return P.Get()==Material;}))continue;
             PreparedMaterials.Emplace(Material);
-            Material->CacheShaders(EMaterialShaderPrecompileMode::Synchronous);
-            // Complete the material interface, including its render proxy's map.
-            // Waiting only for already submitted compilation jobs is insufficient.
-            Material->EnsureIsComplete();
+            NewMaterials.Add(Material);
         }
+        // Finish work started by asset loading before deciding whether a cache
+        // update is needed. Materials are shared between all preview worlds.
         FAssetCompilingManager::Get().FinishAllCompilation();
+        FlushRenderingCommands();
+        for(UMaterial* Material:NewMaterials)
+        {
+            if(ReadMaterialState(Preview,Material).bOwnMaterial)
+            {
+                UE_LOG(LogTemp,Display,TEXT("Comptoir material preparation: %s, reusing live shader map"),*Material->GetPathName());
+                continue;
+            }
+            UE_LOG(LogTemp,Display,TEXT("Comptoir material preparation: %s, caching for scene with render-state update"),*Material->GetPathName());
+            // This API changes resources used by existing proxies. Unreal
+            // requires FMaterialUpdateContext to synchronize and recreate them.
+            // Keep the existing asset ID and DDC; do not force a disk rebuild.
+            {
+                FMaterialUpdateContext UpdateContext(FMaterialUpdateContext::EOptions::Default,
+                    Preview.GetScene()->GetShaderPlatform());
+                UpdateContext.AddMaterial(Material);
+                Material->SetFeatureLevelToCompile(Preview.GetScene()->GetFeatureLevel(),true);
+                Material->CacheResourceShadersForRendering(false,EMaterialShaderPrecompileMode::Synchronous);
+                Material->EnsureIsComplete();
+                FAssetCompilingManager::Get().FinishAllCompilation();
+            } // Recreate dependent component/instance render state before capture.
+        }
+        FAssetCompilingManager::Get().FinishAllCompilation(); // Include dependent material instances.
         World->SendAllEndOfFrameUpdates();
         FlushRenderingCommands();
-        // WarmUp follows across real engine frames. Do not recache the same
-        // materials again between empty/half/full glass models.
+        // WarmUp follows across real engine frames. A later scene reuses these
+        // resources too; lifetime is not limited to this command's material list.
     }
 };
 
@@ -87,25 +133,14 @@ inline bool CheckMaterial(FAutomationTestBase& Test,FPreviewScene& Preview,UMate
     FMaterialResource* Resource=Material->GetMaterialResource(Platform);
     if(!Test.TestNotNull(Name+TEXT(" resource"),Resource))return false;
     for(const FString& Error:Resource->GetCompileErrors())Test.AddError(Name+TEXT(": ")+Error);
-    const FMaterialRenderProxy* Proxy=Material->GetRenderProxy();
-    if(!Test.TestNotNull(Name+TEXT(" render proxy"),Proxy))return false;
+    if(!Test.TestNotNull(Name+TEXT(" render proxy"),Material->GetRenderProxy()))return false;
     const auto FeatureLevel=Preview.GetScene()->GetFeatureLevel();
-    bool bOwnMaterial=false;
-    FString RenderedName;
     // Check what this scene actually draws, on the rendering thread. A flag on
     // the game-thread shader map alone does not identify the rendered material.
-    ENQUEUE_RENDER_COMMAND(ComptoirCheckMaterial)(
-        [Proxy,FeatureLevel,&bOwnMaterial,&RenderedName](FRHICommandListImmediate&)
-        {
-            const FMaterialRenderProxy* UsedProxy=nullptr;
-            const FMaterial& Rendered=Proxy->GetMaterialWithFallback(FeatureLevel,UsedProxy);
-            bOwnMaterial=&Rendered==Proxy->GetMaterialNoFallback(FeatureLevel);
-            RenderedName=Rendered.GetFriendlyName();
-        });
-    FlushRenderingCommands();
+    const FMaterialRenderState State=ReadMaterialState(Preview,Material);
     Test.AddInfo(FString::Printf(TEXT("%s: scene platform=%d, feature level=%d, rendered=%s, fallback=%s, compile errors=%d"),
-        *Name,int32(Platform),int32(FeatureLevel),*RenderedName,bOwnMaterial?TEXT("no"):TEXT("yes"),Resource->GetCompileErrors().Num()));
-    return Test.TestTrue(Name+TEXT(" renders without a fallback material"),bOwnMaterial)&&Resource->GetCompileErrors().IsEmpty();
+        *Name,int32(Platform),int32(FeatureLevel),*State.RenderedName,State.bOwnMaterial?TEXT("no"):TEXT("yes"),Resource->GetCompileErrors().Num()));
+    return Test.TestTrue(Name+TEXT(" renders without a fallback material"),State.bOwnMaterial)&&Resource->GetCompileErrors().IsEmpty();
 }
 }
 #endif
