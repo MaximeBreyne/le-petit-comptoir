@@ -20,6 +20,7 @@ def create_world_font():
         data = options.get_editor_property("data")
         for key, value in {
             "font_name": "Arial", "height": 32.0, "enable_bold": True,
+            "foreground_color": unreal.LinearColor(1, 1, 1, 1),
             "enable_antialiasing": True, "use_distance_field_alpha": True,
             "distance_field_scale_factor": 4, "include_ascii_range": True,
             "chars": "€ŒœŸ’‘–—…", "texture_page_width": 1024,
@@ -30,6 +31,11 @@ def create_world_font():
         font = tools.create_asset("F_ComptoirWorld", folder, unreal.Font, factory)
         if font is None or not assets.save_loaded_asset(font):
             raise RuntimeError("Creation de la police des panneaux impossible")
+
+    if not unreal.ComptoirScene.prepare_world_font():
+        unreal.log_warning("Police generee inutilisable : retour a la police Unreal pour conserver les textes.")
+    if not assets.save_loaded_asset(font):
+        raise RuntimeError("Sauvegarde de la police reparee impossible")
 
     # TextRender's UVs and the material must sample the SAME atlas. Merely
     # changing TextRender.Font leaves the default Roboto atlas in the shader.

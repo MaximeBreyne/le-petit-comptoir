@@ -2,19 +2,21 @@
 
 #include "CoreMinimal.h"
 #include "TabletLayout.h"
-#include "Widgets/SLeafWidget.h"
+#include "Widgets/SCompoundWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Styling/SlateBrush.h"
 
 DECLARE_DELEGATE_OneParam(FOnComptoirTabletAction, FName);
+DECLARE_DELEGATE_OneParam(FOnComptoirNameChanged, const FText&);
 
 // A screen-space Slate widget. Text is rasterized by Slate at the viewport DPI;
 // it never passes through the HUD bitmap font, a ScaleBox or a render texture.
-class SComptoirTablet final : public SLeafWidget
+class SComptoirTablet final : public SCompoundWidget
 {
 public:
     SLATE_BEGIN_ARGS(SComptoirTablet) {}
         SLATE_EVENT(FOnComptoirTabletAction, OnAction)
+        SLATE_EVENT(FOnComptoirNameChanged, OnNameChanged)
     SLATE_END_ARGS()
 
     void Construct(const FArguments& InArgs);
@@ -36,6 +38,8 @@ public:
 private:
     ComptoirTablet::State State;
     FOnComptoirTabletAction OnAction;
+    FOnComptoirNameChanged OnNameChanged;
+    TSharedPtr<class SEditableTextBox> NameInput;
     FSlateBrush LogoBrush;
     FVector2D MousePosition=FVector2D(-1,-1);
     bool bDrawText=true;

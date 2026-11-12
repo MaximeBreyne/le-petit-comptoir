@@ -60,7 +60,7 @@ int main(int Argc,char** Argv)
     State S;S.Cash=26000;S.Beer=1000;S.Reserve=500;S.Open=true;S.Phase=1;
     int Layouts=0;
     for(const auto& Size:std::vector<std::pair<float,float>>{{800,600},{1280,720},{1920,1080},{3440,1440},{2560,720}})
-    for(int P=0;P<4;++P)
+    for(int P=0;P<5;++P)
     for(int Phase=0;Phase<7;++Phase)
     {
         S.Active=static_cast<Page>(P);S.Phase=Phase;
@@ -84,7 +84,7 @@ int main(int Argc,char** Argv)
                 Hits.push_back(C);
             }
         }
-        for(const char* Key:{"tab_service","tab_orders","tab_register","tab_reserve","tablet"})assert(Has(L,Key));
+        for(const char* Key:{"tab_service","tab_orders","tab_register","tab_reserve","tab_developer","tablet"})assert(Has(L,Key));
         assert(HitTest(L,-1,-1).empty());
         assert(HitTest(L,L.X+200*L.Scale,L.Y+200*L.Scale).empty());
         assert(HitTest(L,L.X+90*L.Scale,L.Y+370*L.Scale).empty()); // Disabled Bâtiment.
@@ -101,10 +101,41 @@ int main(int Argc,char** Argv)
     S.Reserve=0;assert(!Has(Build(S,1280,800),"restock"));assert(Has(Build(S,1280,800),"buy_stock"));
     S.Delivery=5;assert(!Has(Build(S,1280,800),"buy_stock"));S.Delivery=0;
     S.Cash=1599;assert(!Has(Build(S,1280,800),"buy_stock"));
+    S.Active=Page::Developer;
+    assert(Has(Build(S,1280,800),"dev_toggle"));
+    assert(!Has(Build(S,1280,800),"dev_money_1000"));
+    S.Developer=true;assert(Has(Build(S,1280,800),"dev_money_1000"));
+    S.Open=false;assert(!Has(Build(S,1280,800),"dev_hour"));
+    S.Open=true;assert(Has(Build(S,1280,800),"dev_hour"));
+    S.Closing=true;assert(!Has(Build(S,1280,800),"dev_hour"));S.Closing=false;
+    for(const auto View:{ComptoirSession::Screen::Home,ComptoirSession::Screen::Pause,ComptoirSession::Screen::NewGame})
+    for(const auto& Size:std::vector<std::pair<float,float>>{{800,600},{1280,720},{1920,1080},{3440,1440}})
+    {
+        S.View=View;const auto L=Build(S,Size.first,Size.second);CheckReadability(L);
+        std::vector<Command> Interactive;
+        for(const auto& C:L.Commands)if(C.Type==Kind::Hit||C.Type==Kind::Input)
+        {
+            for(const auto& Other:Interactive)
+                assert(C.X+C.W<=Other.X||Other.X+Other.W<=C.X||C.Y+C.H<=Other.Y||Other.Y+Other.H<=C.Y);
+            if(C.Type==Kind::Hit)assert(HitTest(L,L.X+(C.X+C.W/2)*L.Scale,L.Y+(C.Y+C.H/2)*L.Scale)==C.Value);
+            Interactive.push_back(C);
+        }
+        assert(!Has(L,"tablet")&&!Has(L,"tab_developer"));
+    }
+    S.View=ComptoirSession::Screen::Home;S.CanContinue=false;
+    assert(!Has(Build(S,1280,800),"menu_continue"));
+    S.CanContinue=true;assert(Has(Build(S,1280,800),"menu_continue"));
+    S.View=ComptoirSession::Screen::NewGame;S.ValidName=false;
+    assert(!Has(Build(S,1280,800),"menu_confirm_new"));
+    S.ValidName=true;assert(Has(Build(S,1280,800),"menu_confirm_new"));
+    S.View=ComptoirSession::Screen::Playing;
     if(Argc==2)
     {
         S.Cash=26000;S.Reserve=500;S.Phase=1;S.Beer=900;S.Held=2;S.Amount=32;
-        for(int P=0;P<4;++P){S.Active=static_cast<Page>(P);Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(P)+".svg");}
+        for(int P=0;P<5;++P){S.Active=static_cast<Page>(P);Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(P)+".svg");}
+        int I=5;
+        for(const auto View:{ComptoirSession::Screen::Home,ComptoirSession::Screen::NewGame,ComptoirSession::Screen::Pause})
+        {S.View=View;Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(I++)+".svg");}
     }
     std::cout<<"PASS: "<<Layouts<<" tablet layouts fit; text contrast >= 4.5:1 and size >= 14; responsive hit testing and action availability are enforced.\n";
 }

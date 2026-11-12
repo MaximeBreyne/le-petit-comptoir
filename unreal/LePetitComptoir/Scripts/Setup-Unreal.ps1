@@ -2,7 +2,8 @@
 param(
     [string]$EngineRoot = 'C:\Program Files\Epic Games\UE_5.8',
     [switch]$OpenEditor,
-    [switch]$VerifyTablet
+    [switch]$VerifyTablet,
+    [switch]$VerifyUI
 )
 $ErrorActionPreference = 'Stop'
 $ProjectDirectory = Split-Path -Parent $PSScriptRoot
@@ -40,21 +41,26 @@ foreach ($Relative in @('Content\Maps\ComptoirOriginal.umap', 'Content\Original\
     }
 }
 
-if ($VerifyTablet) {
-    Write-Host 'Verification du rendu reel des textes de la tablette (GPU requis)...'
+if ($VerifyTablet -or $VerifyUI) {
+    Write-Host 'Verification du rendu reel des textes et interfaces (GPU requis)...'
+    $TestFilter = if ($VerifyUI) { 'LePetitComptoir' } else { 'LePetitComptoir.Tablet.RenderedText' }
     $ReportDirectory = Join-Path $ProjectDirectory ('Saved\Tests\TabletReport-' + [Guid]::NewGuid().ToString('N'))
     & $Commandlet $Project '-unattended' '-nop4' '-nosound' '-RenderOffscreen' '-UTF8Output' `
-        '-ExecCmds=Automation RunTests LePetitComptoir.Tablet.RenderedText' `
+        "-ExecCmds=Automation RunTests $TestFilter" `
         '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$ReportDirectory"
     if ($LASTEXITCODE -ne 0) { throw "Test de rendu de la tablette echoue. Rapport : $ReportDirectory" }
     $ReportFile = Join-Path $ReportDirectory 'index.json'
     if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent : $ReportFile" }
     $Report = Get-Content -LiteralPath $ReportFile -Raw | ConvertFrom-Json
-    $TabletTest = @($Report.tests | Where-Object { $_.fullTestPath -eq 'LePetitComptoir.Tablet.RenderedText' })
-    if ($TabletTest.Count -ne 1 -or $TabletTest[0].state -ne 'Success') {
-        throw "Le test de rendu n'a pas reussi. Rapport : $ReportFile"
+    $ExpectedTests = @('LePetitComptoir.Tablet.RenderedText')
+    if ($VerifyUI) { $ExpectedTests += @('LePetitComptoir.World.FontGlyphs', 'LePetitComptoir.World.RenderedText', 'LePetitComptoir.Session.SaveMetadata') }
+    foreach ($Expected in $ExpectedTests) {
+        $Result = @($Report.tests | Where-Object { $_.fullTestPath -eq $Expected })
+        if ($Result.Count -ne 1 -or $Result[0].state -ne 'Success') {
+            throw "Le test $Expected n'a pas reussi. Rapport : $ReportFile"
+        }
     }
-    Write-Host 'Textes visibles sur les quatre pages. Captures : Saved\Tests\Tablet\Tablet-0.bmp a Tablet-3.bmp'
+    Write-Host 'Textes verifies. Captures : Saved\Tests\Tablet et Saved\Tests\WorldText.'
 }
 
 Write-Host '3/3 Projet pret. Ouvrez LePetitComptoir.uproject puis Play dans Maps/ComptoirOriginal.'

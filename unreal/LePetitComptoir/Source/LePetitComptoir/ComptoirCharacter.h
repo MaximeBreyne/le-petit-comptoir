@@ -20,8 +20,10 @@ public:
     void ToggleTablet();
     void OpenTablet(int32 Page);
     bool IsInReserve() const;
+    void SetMenuBlocked(bool Blocked);
     UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> Camera;
 private:
+    bool bMenuBlocked = true;
     bool bPouring = false;
     bool bTabletOpen = false;
     void Forward(float Value);

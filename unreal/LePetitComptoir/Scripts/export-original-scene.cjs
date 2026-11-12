@@ -32,7 +32,7 @@ function exportScene() {
   scene.glass(scene.geometry(beer), 'beer', 0, 0, 0, 1);
   // Preserve original dimensions, angles, tapered cylinders, side colors and labels.
   const keys = ['x','y','z','w','h','d','c','mat','solid','roomFloor','round','shape','rx','ry','rz',
-    'topRadius','bottomRadius','sideColor','label','labelFace','labelColor','exterior','streetFloor','assembly'];
+    'topRadius','bottomRadius','sideColor','label','labelFace','labelColor','exterior','streetFloor','assembly','venueName'];
   const clean = items => items.map(item => ({
     ...Object.fromEntries(keys.filter(k => item[k] !== undefined).map(k => [k,item[k]])),
     // The browser also constrained walking with walkSurfaceHeight. Unreal needs

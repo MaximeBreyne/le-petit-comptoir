@@ -9,7 +9,7 @@ comptoir, réserve, vitrines, rue, mobilier, bouteilles, équipements et enseign
 Les clients et les verres reprennent également leur géométrie d'origine. Le logo,
 la palette et la disposition compacte de l'interface sont repris du prototype.
 La tablette retrouve son boîtier paysage arrondi, son écran clair et sa navigation
-latérale : Service, À préparer, Caisse et Réserve sont utilisables. Les rubriques
+latérale : Service, À préparer, Caisse, Réserve et Développeur sont utilisables. Les rubriques
 Bâtiment, Décoration, Licences et Équipe sont visibles mais désactivées.
 La tablette est un widget **Slate ajouté directement au viewport**. Les caractères
 sont rasterisés à leur taille d'affichage, avec le DPI de la fenêtre ; les icônes et
@@ -42,7 +42,7 @@ matériaux, importe le logo existant et crée la carte **Content/Maps/ComptoirOr
 Ouvrir cette carte puis cliquer sur **Play**. Le décor est aussi présent dans l'éditeur
 avant Play. Le script met à jour le décor `ComptoirOriginal` déjà créé : porte, sols de la rue,
 réfrigérateur et police des panneaux, avec les accents et le symbole €. Avant la
-migration, une copie de la carte est conservée dans `Saved/Backups/BeforeStreetUpdate/`.
+migration, une copie de la carte est conservée dans `Saved/Backups/BeforeTextRepair/`.
 La correction des anciens axes n’est rejouée que pour les cartes qui en ont besoin. Les autres acteurs de
 la carte et l'ancienne carte `Bar` sont conservés. Les matériaux peuvent demander
 une compilation de shaders. Il n'est pas nécessaire de supprimer la carte.
@@ -56,10 +56,10 @@ powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-
 
 Cette option exécute `LePetitComptoir.Tablet.RenderedText` dans Unreal avant d'ouvrir
 l'éditeur. Le test compare les pixels réellement rendus avec et sans texte sur les
-quatre pages ; il échoue si les caractères ou les titres ne sont pas visibles.
-Il enregistre les captures `Saved/Tests/Tablet/Tablet-0.bmp` à `Tablet-3.bmp` et un
+cinq pages et les trois menus ; il échoue si les caractères ou les titres ne sont pas visibles.
+Il enregistre les captures `Saved/Tests/Tablet/Tablet-0.bmp` à `Tablet-7.bmp` et un
 rapport dans `Saved/Tests/TabletReport-…`. Il vérifie la présence des textes, pas leur
-netteté visuelle : vérifier aussi la tablette en Play, les quatre onglets, les clics,
+netteté visuelle : vérifier aussi la tablette en Play, les cinq onglets, les clics,
 le retour au jeu avec Tab et le redimensionnement de la fenêtre. Sans cette option,
 le fonctionnement habituel du script reste identique.
 
@@ -82,14 +82,42 @@ le fonctionnement habituel du script reste identique.
 3. Fermer Unreal, puis lancer le script présenté ci-dessus depuis le dossier contenant
    `README.md` et `unreal`. Pour un moteur installé ailleurs, ajouter par exemple
    `-EngineRoot 'D:\Epic Games\UE_5.8'`.
-4. Ouvrir **Content/Maps/ComptoirOriginal** puis **Play**. Cliquer dans la vue pour capturer
-   la souris. Les ouvertures suivantes se font avec `LePetitComptoir.uproject`.
+4. Ouvrir **Content/Maps/ComptoirOriginal** puis **Play**. Choisir **Continuer** ou
+   **Nouvelle partie** dans l’accueil. Les ouvertures suivantes se font avec `LePetitComptoir.uproject`.
 
 Le script utilise `ExecutionPolicy Bypass` uniquement pour ce processus PowerShell.
 Il vérifie la version du moteur et s'arrête en cas d'échec. `EngineAssociation` vaut
 `5.8`, comme pour une installation Launcher ; utiliser **5.8.4** sur les deux postes.
 Les plugins Python, Editor Scripting Utilities et Procedural Mesh Component sont ceux
 fournis avec Unreal. Aucun plugin payant n'est nécessaire.
+
+## Accueil, nom du bar et développeur
+
+Le jeu ouvre désormais l’accueil, en Play dans l’éditeur comme en lancement autonome.
+Le bar reste figé et aucune sauvegarde n’est écrite avant de commencer ou continuer.
+**Continuer** est actif uniquement si la sauvegarde est lisible. **Nouvelle partie**
+ouvre une saisie du nom du bar (1 à 32 caractères, accents acceptés). La validation
+remplace la sauvegarde automatique existante ; le formulaire le signale et permet
+**Annuler**. Les anciennes sauvegardes conservent le nom **Le Petit Comptoir**.
+
+Le nom choisi apparaît sur la devanture, sur l’enseigne du fond, dans la tablette et
+le HUD. Il suit la sauvegarde, sans modifier le nom du projet Unreal. **P** ouvre
+un menu de pause avec Reprendre, Sauvegarder, Retour à l’accueil et Retour au bureau.
+Le retour à l’accueil et la sortie sauvegardent d’abord la partie ; en cas d’échec,
+le menu reste ouvert. Dans PIE, Échap reste la commande Unreal d’arrêt du jeu.
+
+**Tab → Développeur → Activer** donne accès à :
+
+- argent de test : +100 €, +1 000 € ou +10 000 € ;
+- compteur de clients : +25 ou +100, sans encaissement ;
+- remplissage du comptoir (1 000 cl) et de la réserve (500 cl), livraison incluse ;
+- gel/reprise de l’horloge : clients, versement et livraisons continuent ;
+- avance d’une heure, uniquement pendant un service ouvert avant la dernière tournée.
+
+L’activation, l’horloge et les modifications sont enregistrées **dans cette partie**.
+Désactiver le mode rétablit l’horloge normale, sans annuler l’argent ou les stocks
+ajoutés. Une nouvelle partie démarre avec le mode désactivé. Les compteurs de test
+ne débloquent pas les fonctionnalités du prototype qui ne sont pas encore portées.
 
 ## Repères et commandes
 
@@ -122,7 +150,7 @@ La fermeture est bloquée si vous êtes dans le passage. Six passants marchent s
 les trottoirs ; deux voitures parcourent la chaussée et s’arrêtent devant le joueur.
 La promenade reste limitée au pâté de maisons devant le bar.
 
-**P** : pause/reprise. **R** en visant la tireuse : ranger/jeter le verre sans remboursement.
+**P** : menu de pause/reprise. **R** en visant la tireuse : ranger/jeter le verre sans remboursement.
 **X** en visant un client non encore servi : refuser la commande. **F5** : sauvegarder.
 **F9** : charger. Dans l'éditeur, **Échap** arrête Play.
 
@@ -202,6 +230,8 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/tabl
 /tmp/comptoir-tablet-test
 g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/world_layout_test.cpp -o /tmp/comptoir-world-test
 /tmp/comptoir-world-test
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/session_flow_test.cpp -o /tmp/comptoir-session-test
+/tmp/comptoir-session-test
 ```
 
 Le premier test compare **562 344 positions et normales** de 5 662 formes (décor,
@@ -210,12 +240,12 @@ de l'export, les sols, le passage de la porte, le dégagement du réfrigérateur
 et les collisions des objets solides. La projection
 à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
 Le second teste service, stock, paiement unique, fermeture et sauvegardes. Le troisième
-contrôle 140 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
+contrôle 175 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
 disponibilité des actions, conversion des coordonnées des clics, taille de texte
 minimale dans le repère de la tablette et contraste texte/fond d'au moins 4,5:1.
 Le quatrième vérifie les zones de réserve, les positions de sauvegarde dans la rue,
 la sécurité de fermeture des portes et l’arrêt des voitures dans les deux sens.
-Le boîtier et les quatre pages sont inspectables via
+Le boîtier et les cinq pages sont inspectables via
 les commandes de dessin partagées avec Unreal ; ce contrôle ne remplace pas Play.
 Le test natif `LePetitComptoir.Tablet.RenderedText` complète ces contrôles par un
 rendu Slate réel. Il est disponible dans l'éditeur ou via `-VerifyTablet` ci-dessus,
@@ -231,3 +261,32 @@ dans la réserve, sauvegarde/reprise depuis la rue, puis compilation UHT/C++, co
 surfaces noires, visibilité du logo et des enseignes, passage vers la réserve, service
 complet, netteté des textes, tablette/retour souris, sauvegarde/reprise et comportement sur le deuxième PC.
 Ces points nécessitent une exécution du moteur et ne sont pas couverts par les tests hors moteur.
+
+## Réparation et contrôle des textes
+
+La préparation impose maintenant le cache **Offline** et recalcule les métriques de
+la police du décor/HUD avant de compiler son matériau. Le décor de révision 4 est
+reconstruit en révision 5 pour recalculer aussi les dimensions des textes déjà créés.
+La taille des textes HUD ne peut plus tomber à zéro si la petite police d’Unreal ne
+fournit pas de hauteur. Si l’atlas généré reste invalide, les panneaux utilisent la
+police intégrée à Unreal ; dans ce mode de secours, € est écrit EUR pour rester lisible.
+La tablette et les menus continuent à utiliser leur police Slate indépendante.
+
+Pour contrôler les pixels réellement rendus sur le PC Unreal :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-Unreal.ps1 -VerifyUI -OpenEditor
+```
+
+Cette option contrôle la tablette (5 pages), l’accueil, la création et la pause,
+les glyphes de la police, le symbole € rendu par le HUD et un panneau 3D, ainsi que
+la sauvegarde en mémoire du nom et du mode développeur. Les captures sont dans
+`Saved/Tests/Tablet/` et `Saved/Tests/WorldText/`. Le script s’arrête si un test manque
+ou échoue. Aucun test ne remplace une inspection du nom en devanture et de la saisie
+avec clavier/souris dans Play. Ces contrôles GPU ne fonctionnent pas avec `-NullRHI`.
+
+Le test portable supplémentaire `Tests/session_flow_test.cpp` vérifie que l’accueil
+et le formulaire de création ne lancent ni simulation ni sauvegarde. Les tests du
+modèle couvrent aussi les anciennes sauvegardes v1 et les outils développeur v2.
+Les trois sauvegardes manuelles et les réglages complets de l’ancienne interface web
+ne sont pas encore portés dans ce menu natif.

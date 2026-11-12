@@ -1,4 +1,5 @@
 #include "ComptoirProp.h"
+#include "ComptoirText.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
@@ -28,10 +29,6 @@ AComptoirProp::AComptoirProp()
 void AComptoirProp::Configure(const FVector& Size, const FLinearColor& Color, EComptoirTarget InTarget, const FString& Caption)
 {
     Target = InTarget;
-    if(UFont* Font=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld")))
-        Label->SetFont(Font);
-    if(UMaterialInterface* Text=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Original/Materials/M_ComptoirText.M_ComptoirText")))
-        Label->SetTextMaterial(Text);
     Mesh->SetWorldScale3D(Size / 100.0);
     if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_Bar.M_Bar")))
     {
@@ -39,7 +36,7 @@ void AComptoirProp::Configure(const FVector& Size, const FLinearColor& Color, EC
         Material->SetVectorParameterValue(TEXT("Tint"), Color);
         Mesh->SetMaterial(0, Material);
     }
-    Label->SetText(FText::FromString(Caption));
+    ComptoirText::Configure(Label,Caption);
     Label->SetWorldLocation(GetActorLocation() + FVector(0, -Size.Y * .5 - 2, Size.Z * .5 + 20));
     Label->SetWorldRotation(FRotator(0, -90, 0));
 }

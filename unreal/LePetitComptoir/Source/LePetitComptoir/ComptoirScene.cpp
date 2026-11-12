@@ -1,4 +1,5 @@
 #include "ComptoirScene.h"
+#include "ComptoirText.h"
 #include "OriginalGeometry.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
@@ -75,11 +76,10 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         RemoveInstanceComponent(Component);
         Component->DestroyComponent();
     }
+    VenueLabels.Reset();VenueLabelSizes.Reset();
     Geometry->ClearAllMeshSections();
     GeometryRevision=0;
     TArray<Section> Sections;Sections.SetNum(16);
-    UFont* WorldFont=nullptr;
-    UMaterialInterface* TextMaterial=nullptr;
     for(const auto& Item:*Items)
     {
         const auto O=Item->AsObject();if(!O.IsValid())continue;
@@ -114,16 +114,6 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         const FString Caption=String(O,TEXT("label"));
         if(!Caption.IsEmpty())
         {
-            if(!WorldFont)
-            {
-                WorldFont=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld"));
-                TextMaterial=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Original/Materials/M_ComptoirText.M_ComptoirText"));
-                const int32 Euro=WorldFont?int32(WorldFont->RemapChar(TCHAR(0x20ac))):-1;
-                if(!WorldFont||!TextMaterial||Euro==UFont::NULLCHARACTER||
-                   !WorldFont->Characters.IsValidIndex(Euro)||WorldFont->Characters[Euro].USize<=0||
-                   WorldFont->Characters[Euro].VSize<=0||WorldFont->Characters[Euro].TextureIndex!=0)
-                {UE_LOG(LogTemp,Error,TEXT("World font with euro glyph missing. Run Setup-Unreal.ps1."));return false;}
-            }
             const FString Face=String(O,TEXT("labelFace"),TEXT("front"));
             ComptoirGeometry::Vec Offset{0,0,-1},Normal{0,0,-1},Up{0,1,0};
             double Width=S.Size.X,Height=S.Size.Y;
@@ -136,8 +126,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
             const FVector U=Vector(ComptoirGeometry::Direction(ComptoirGeometry::Rotate(Up,S.Rotation)));
             UTextRenderComponent* Label=NewObject<UTextRenderComponent>(this);
             AddInstanceComponent(Label);Label->SetupAttachment(Geometry);
-            Label->SetFont(WorldFont);Label->SetTextMaterial(TextMaterial);
-            Label->SetText(FText::FromString(Caption));Label->SetHorizontalAlignment(EHTA_Center);
+            ComptoirText::Configure(Label,Caption);Label->SetHorizontalAlignment(EHTA_Center);
             Label->SetVerticalAlignment(EVRTA_TextCenter);
             TArray<FString> Lines;Caption.ParseIntoArrayLines(Lines);int32 Longest=1;
             for(const FString& Line:Lines)Longest=FMath::Max(Longest,Line.Len());
@@ -146,6 +135,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
             Label->SetRelativeLocation(Vector(ComptoirGeometry::Point(S,Offset))+N*.12);
             Label->SetRelativeRotation(FRotationMatrix::MakeFromXZ(N,U).Rotator());
             Label->SetCollisionEnabled(ECollisionEnabled::NoCollision);Label->RegisterComponent();
+            if(Flag(O,TEXT("venueName"))){VenueLabels.Add(Label);VenueLabelSizes.Add(FVector2D(Width,Height));}
         }
     }
     for(int32 I=0;I<Sections.Num();++I)
@@ -195,7 +185,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         Daylight->SetMobility(EComponentMobility::Movable);Daylight->SetRelativeRotation(FRotator(-55,-128,0));
         Daylight->SetLightColor(FLinearColor(.83f,.89f,1.f));Daylight->SetIntensity(2.5f);Daylight->RegisterComponent();
     }
-    GeometryRevision=4;
+    GeometryRevision=5;
     return true;
 }
 
@@ -203,4 +193,27 @@ void AComptoirScene::SetAmbientModel()
 {
     // The street contains only a few moving meshes; avoid per-limb shadow passes.
     Geometry->SetCastShadow(false);
+}
+
+bool AComptoirScene::PrepareWorldFont()
+{
+    UFont* Font=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld"));
+    if(!Font)return false;
+    // Imported glyph rectangles alone do not select the offline rendering path.
+    Font->FontCacheType=EFontCacheType::Offline;
+    Font->CacheCharacterCountAndMaxCharHeight();
+    Font->MarkPackageDirty();
+    return ComptoirText::IsUsable(Font);
+}
+
+void AComptoirScene::SetVenueName(const FString& Name)
+{
+    for(int32 I=0;I<VenueLabels.Num();++I)
+    {
+        UTextRenderComponent* Label=VenueLabels[I];
+        if(!IsValid(Label)||!VenueLabelSizes.IsValidIndex(I))continue;
+        ComptoirText::Configure(Label,Name);
+        const FVector2D Size=VenueLabelSizes[I];
+        ComptoirText::FitToPanel(Label,Size.X*90,Size.Y*80);
+    }
 }

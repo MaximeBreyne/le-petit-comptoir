@@ -27,6 +27,8 @@ public:
     int Sold = 0;
     bool Open = false;
     bool Closing = false;
+    bool Developer = false;
+    bool ClockPaused = false;
     double Time = 1020;
     double SpawnRemaining = 1;
     double CustomerRemaining = 0;
@@ -36,6 +38,34 @@ public:
     Glass Held = Glass::None;
 
     bool Bankrupt() const { return Cash < 0; }
+    void SetDeveloper(bool Enabled) { Developer=Enabled; if(!Enabled)ClockPaused=false; }
+    bool AddTestMoney(int Euros)
+    {
+        if(!Developer||Euros<1||Euros>1000000||Euros>(100000000-Cash)/100)return false;
+        Cash+=Euros*100;return true;
+    }
+    bool AddTestProgress(int Clients)
+    {
+        if(!Developer||Clients<1||Clients>1000||Sold>10000000-Clients)return false;
+        Sold+=Clients;return true;
+    }
+    bool FillTestStocks()
+    {
+        if(!Developer)return false;
+        Beer=1000;Reserve=500;DeliveryRemaining=0;return true;
+    }
+    bool ToggleTestClock()
+    {
+        if(!Developer)return false;
+        ClockPaused=!ClockPaused;return true;
+    }
+    bool AdvanceTestHour()
+    {
+        if(!Developer||!Open||Closing||Bankrupt())return false;
+        Time=std::min(1680.0,Time+60);
+        if(Time>=1680){Closing=true;FinishIfReady();}
+        return true;
+    }
     bool ToggleService()
     {
         if (Bankrupt() || Closing) return false;
@@ -125,7 +155,7 @@ public:
             if (DeliveryRemaining == 0) Reserve += 500;
         }
         if (!Open) return;
-        Time = std::min(1680.0, Time + Seconds * 0.5);
+        if(!Developer||!ClockPaused)Time = std::min(1680.0, Time + Seconds * 0.5);
         if (Time >= 1680) Closing = true;
         if (Phase == Customer::None && !Closing)
         {
@@ -153,10 +183,11 @@ public:
     {
         std::ostringstream Out;
         Out.imbue(std::locale::classic());
-        Out << std::setprecision(17) << 1 << ' ' << Cash << ' ' << Beer << ' ' << Reserve << ' '
+        Out << std::setprecision(17) << 2 << ' ' << Cash << ' ' << Beer << ' ' << Reserve << ' '
             << Day << ' ' << Sold << ' ' << Open << ' ' << Closing << ' ' << Time << ' '
             << SpawnRemaining << ' ' << CustomerRemaining << ' ' << DeliveryRemaining << ' '
-            << Amount << ' ' << static_cast<int>(Phase) << ' ' << static_cast<int>(Held);
+            << Amount << ' ' << static_cast<int>(Phase) << ' ' << static_cast<int>(Held)
+            << ' ' << Developer << ' ' << ClockPaused;
         return Out.str();
     }
     bool Restore(const std::string& Text)
@@ -169,8 +200,9 @@ public:
         if (!(In >> Version >> Candidate.Cash >> Candidate.Beer >> Candidate.Reserve >> Candidate.Day
             >> Candidate.Sold >> Candidate.Open >> Candidate.Closing >> Candidate.Time >> Candidate.SpawnRemaining
             >> Candidate.CustomerRemaining >> Candidate.DeliveryRemaining >> Candidate.Amount >> PhaseValue >> GlassValue)) return false;
+        if(Version==2 && !(In >> Candidate.Developer >> Candidate.ClockPaused))return false;
         In >> std::ws;
-        if (!In.eof() || Version != 1 || PhaseValue < 0 || PhaseValue > 6 || GlassValue < 0 || GlassValue > 3) return false;
+        if (!In.eof() || (Version != 1 && Version != 2) || PhaseValue < 0 || PhaseValue > 6 || GlassValue < 0 || GlassValue > 3) return false;
         Candidate.Phase = static_cast<Customer>(PhaseValue);
         Candidate.Held = static_cast<Glass>(GlassValue);
         if (!Candidate.Valid()) return false;
@@ -197,6 +229,7 @@ private:
         if ((Held == Glass::None || Held == Glass::Empty) && Amount != 0) return false;
         if (Held == Glass::Full && Amount != 50) return false;
         if (DeliveryRemaining > 0 && Reserve != 0) return false;
+        if (ClockPaused && !Developer) return false;
         if ((Phase == Customer::None || Phase == Customer::Order || Phase == Customer::Drink || Phase == Customer::Payment) && CustomerRemaining != 0) return false;
         if ((Phase == Customer::Walking || Phase == Customer::Processing) && CustomerRemaining > 3) return false;
         return true;

@@ -40,9 +40,12 @@ bool FComptoirTabletRenderTest::RunTest(const FString&)
     const FString Output=FPaths::ProjectSavedDir()/TEXT("Tests/Tablet");
     IFileManager::Get().MakeDirectory(*Output,true);
 
-    for(int32 Page=0;Page<4;++Page)
+    for(int32 Page=0;Page<8;++Page)
     {
-        State.Active=static_cast<ComptoirTablet::Page>(Page);
+        State.Developer=true;
+        State.Active=static_cast<ComptoirTablet::Page>(FMath::Min(Page,4));
+        State.View=Page<5?ComptoirSession::Screen::Playing:Page==5?ComptoirSession::Screen::Home:
+            Page==6?ComptoirSession::Screen::NewGame:ComptoirSession::Screen::Pause;
         Widget->SetState(State,nullptr);
         const auto Render=[&](bool bText,TArray<FColor>& Pixels)
         {
@@ -65,7 +68,7 @@ bool FComptoirTabletRenderTest::RunTest(const FString&)
             if(FMath::Abs(int32(A.R)-B.R)+FMath::Abs(int32(A.G)-B.G)+FMath::Abs(int32(A.B)-B.B)<30)continue;
             ++Changed;
             const float LX=(X-Layout.X)/Layout.Scale,LY=(Y-Layout.Y)/Layout.Scale;
-            if(LX>=214&&LX<600&&LY>=155&&LY<200)++Title;
+            if(Page<5?(LX>=214&&LX<600&&LY>=155&&LY<200):(LX>=58&&LX<512&&LY>=155&&LY<270))++Title;
         }
         TestTrue(FString::Printf(TEXT("Page %d: visible text pixels"),Page),Changed>1000);
         TestTrue(FString::Printf(TEXT("Page %d: visible title glyphs"),Page),Title>100);

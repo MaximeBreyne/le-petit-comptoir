@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "BarSimulation.h"
+#include "SessionFlow.h"
 #include "ComptoirProp.h"
 #include "ComptoirGameMode.generated.h"
 
@@ -22,12 +23,25 @@ public:
     float MessageRemaining = 0;
     void Interact(EComptoirTarget Target);
     void Pour(float DeltaSeconds);
-    void Save(bool Feedback = false);
-    void Load(bool Feedback = false);
+    bool Save(bool Feedback = false);
+    bool Load(bool Feedback = false);
+    ComptoirSession::Flow Session;
+    FString BarName=TEXT("Le Petit Comptoir");
+    FString PendingBarName=TEXT("Le Petit Comptoir");
+    FString SaveSummary;
+    bool IsBarNameValid(const FString& Name) const;
+    void MenuAction(FName Action);
+    void DeveloperAction(FName Action);
+    void TogglePauseMenu();
     void Notify(const FString& Text);
     FString Prompt(EComptoirTarget Target) const;
     bool CanReachTabletTarget(EComptoirTarget Target) const;
 private:
+    UPROPERTY() TObjectPtr<class ACameraActor> HomeCamera;
+    void RefreshContinue();
+    void ApplyMenuState();
+    void ApplyBarName();
+    void StartNewSession();
     UPROPERTY() TObjectPtr<AComptoirProp> Customer;
     UPROPERTY() TObjectPtr<AComptoirProp> BeerVisual;
     UPROPERTY() TObjectPtr<AComptoirProp> ServiceSign;

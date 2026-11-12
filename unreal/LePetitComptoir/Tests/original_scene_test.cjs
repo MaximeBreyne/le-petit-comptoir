@@ -27,6 +27,8 @@ for(const s of fridge) {
   assert.ok(s.x-s.w/2>10.415,'Fridge must clear the adjacent cabinet');
   assert.ok(s.z+s.d/2<1.13,'Fridge shelves and handle must not protrude into the aisle');
 }
+assert.equal(data.collections.world.filter(s=>s.venueName).length,2,'Name appears on both frontage and back-bar sign');
+assert.ok(data.collections.world.some(s=>s.venueName&&s.z>9.9&&s.labelFace==='back'),'Frontage name must face the street');
 assert.ok(data.collections.world.some(s=>s.label?.includes('5 €')),'Menu must retain euro characters');
 for(let i=0;i<3;i++)for(const part of ['body','legLeft','legRight','armLeft','armRight'])
   assert.ok(data.collections[`ped${i}_${part}`].length>0,`Missing pedestrian ${i} ${part}`);

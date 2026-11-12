@@ -46,13 +46,13 @@ void AComptoirCharacter::SetupPlayerInputComponent(UInputComponent* Input)
     Input->BindAction(TEXT("Tablet"), IE_Pressed, this, &AComptoirCharacter::ToggleTablet);
 }
 
-void AComptoirCharacter::Forward(float Value) { if (!bTabletOpen) AddMovementInput(GetActorForwardVector(), FMath::Clamp(Value, -1.f, 1.f)); }
-void AComptoirCharacter::Right(float Value) { if (!bTabletOpen) AddMovementInput(GetActorRightVector(), FMath::Clamp(Value, -1.f, 1.f)); }
-void AComptoirCharacter::Turn(float Value) { if (!bTabletOpen) AddControllerYawInput(Value * .7f); }
-void AComptoirCharacter::Look(float Value) { if (!bTabletOpen) AddControllerPitchInput(Value * .7f); }
+void AComptoirCharacter::Forward(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddMovementInput(GetActorForwardVector(), FMath::Clamp(Value, -1.f, 1.f)); }
+void AComptoirCharacter::Right(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddMovementInput(GetActorRightVector(), FMath::Clamp(Value, -1.f, 1.f)); }
+void AComptoirCharacter::Turn(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddControllerYawInput(Value * .7f); }
+void AComptoirCharacter::Look(float Value) { if (!bMenuBlocked&&!bTabletOpen) AddControllerPitchInput(Value * .7f); }
 void AComptoirCharacter::StartSprint() { GetCharacterMovement()->MaxWalkSpeed = 400; }
 void AComptoirCharacter::StopSprint() { GetCharacterMovement()->MaxWalkSpeed = 220; }
-void AComptoirCharacter::StartPour() { bPouring = !bTabletOpen; }
+void AComptoirCharacter::StartPour() { bPouring = !bMenuBlocked&&!bTabletOpen; }
 void AComptoirCharacter::StopPour() { bPouring = false; }
 
 AComptoirProp* AComptoirCharacter::FocusedProp() const
@@ -67,7 +67,7 @@ AComptoirProp* AComptoirCharacter::FocusedProp() const
 
 void AComptoirCharacter::Interact()
 {
-    if (bTabletOpen) return;
+    if (bMenuBlocked||bTabletOpen) return;
     if (IsInReserve()) { OpenTablet(3); return; }
     if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())
         if (const AComptoirProp* Prop = FocusedProp())
@@ -85,7 +85,7 @@ bool AComptoirCharacter::IsInReserve() const
 
 void AComptoirCharacter::OpenTablet(int32 Page)
 {
-    if (UGameplayStatics::IsGamePaused(this)) return;
+    if (bMenuBlocked||UGameplayStatics::IsGamePaused(this)) return;
     if (!bTabletOpen) ToggleTablet();
     if (APlayerController* PC=Cast<APlayerController>(GetController()))
         if (AComptoirHUD* HUD=Cast<AComptoirHUD>(PC->GetHUD())) HUD->SelectTabletPage(Page);
@@ -109,14 +109,28 @@ void AComptoirCharacter::Tick(float DeltaSeconds)
 
 void AComptoirCharacter::PauseGame()
 {
-    if (bTabletOpen) ToggleTablet();
-    bPouring = false;
-    StopSprint();
-    UGameplayStatics::SetGamePaused(this, !UGameplayStatics::IsGamePaused(this));
+    if(AComptoirGameMode* Game=GetWorld()->GetAuthGameMode<AComptoirGameMode>())Game->TogglePauseMenu();
+}
+void AComptoirCharacter::SetMenuBlocked(bool Blocked)
+{
+    bMenuBlocked=Blocked;bTabletOpen=false;bPouring=false;StopSprint();
+    GetCharacterMovement()->StopMovementImmediately();
+    if(APlayerController* Player=Cast<APlayerController>(GetController()))
+    {
+        Player->ResetIgnoreMoveInput();Player->ResetIgnoreLookInput();
+        Player->SetIgnoreMoveInput(Blocked);Player->SetIgnoreLookInput(Blocked);
+        Player->bShowMouseCursor=Blocked;Player->bEnableClickEvents=Blocked;
+        if(Blocked)
+        {
+            FInputModeGameAndUI Mode;Mode.SetHideCursorDuringCapture(false);
+            Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);Player->SetInputMode(Mode);
+        }
+        else Player->SetInputMode(FInputModeGameOnly());
+    }
 }
 void AComptoirCharacter::ToggleTablet()
 {
-    if (UGameplayStatics::IsGamePaused(this)) return;
+    if (bMenuBlocked||UGameplayStatics::IsGamePaused(this)) return;
     bTabletOpen = !bTabletOpen;
     bPouring = false;
     StopSprint();
@@ -138,16 +152,18 @@ void AComptoirCharacter::ToggleTablet()
 }
 void AComptoirCharacter::SaveGame()
 {
+    if(bMenuBlocked)return;
     if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>()) Game->Save(true);
 }
 void AComptoirCharacter::LoadGame()
 {
+    if(bMenuBlocked)return;
     bPouring = false;
     if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>()) Game->Load(true);
 }
 void AComptoirCharacter::Discard()
 {
-    if (bTabletOpen) return;
+    if (bMenuBlocked||bTabletOpen) return;
     bPouring = false;
     if (const AComptoirProp* Prop = FocusedProp())
         if (Prop->Target == EComptoirTarget::Tap)
@@ -156,7 +172,7 @@ void AComptoirCharacter::Discard()
 }
 void AComptoirCharacter::Dismiss()
 {
-    if (bTabletOpen) return;
+    if (bMenuBlocked||bTabletOpen) return;
     if (const AComptoirProp* Prop = FocusedProp())
         if (Prop->Target == EComptoirTarget::Customer)
             if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())

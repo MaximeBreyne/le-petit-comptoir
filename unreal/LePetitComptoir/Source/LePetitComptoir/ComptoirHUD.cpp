@@ -1,4 +1,5 @@
 #include "ComptoirHUD.h"
+#include "ComptoirText.h"
 #include "ComptoirCharacter.h"
 #include "ComptoirGameMode.h"
 #include "ComptoirProp.h"
@@ -15,20 +16,21 @@ void AComptoirHUD::DrawHUD()
     const AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>();
     const AComptoirCharacter* Player = Cast<AComptoirCharacter>(GetOwningPawn());
     if (!Canvas || !Game || !Player) { HideTablet(); return; }
-    if (Player->IsTabletOpen()) { UpdateTablet(*Game); return; }
+    if (Game->Session.MenuVisible()||Player->IsTabletOpen()) { UpdateTablet(*Game); return; }
     HideTablet();
     const auto& S = Game->Simulation;
     const float Scale = FMath::Clamp(Canvas->SizeX / 1440.f, .65f, 1.2f);
     const float W = Canvas->SizeX / Scale, H = Canvas->SizeY / Scale;
     const FLinearColor Cream(.97f,.95f,.91f), Gold(.90f,.74f,.47f), Muted(.70f,.77f,.71f);
     const FLinearColor Panel(.075f,.13f,.12f,.94f), Border(.65f,.70f,.60f,.28f);
-    if(!WorldFont)WorldFont=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld"));
+    if(!WorldFont)WorldFont=ComptoirText::WorldFont();
     const UFont* SmallFont=GEngine?GEngine->GetSmallFont():nullptr;
-    const float FontScale=WorldFont&&SmallFont?SmallFont->GetMaxCharHeight()/FMath::Max(1.f,WorldFont->GetMaxCharHeight()):1.f;
+    const float ReferenceHeight=SmallFont?FMath::Max(14.f,SmallFont->GetMaxCharHeight()):14.f;
+    const float FontScale=WorldFont?ReferenceHeight/FMath::Max(1.f,WorldFont->GetMaxCharHeight()):1.f;
     const auto Rect = [&](float X,float Y,float Width,float Height,FLinearColor Color)
         { DrawRect(Color,X*Scale,Y*Scale,Width*Scale,Height*Scale); };
     const auto Text = [&](const FString& Value,float X,float Y,float Size,FLinearColor Color)
-        { DrawText(Value,Color,X*Scale,Y*Scale,WorldFont.Get(),Size*Scale*FontScale); };
+        { DrawText(WorldFont?Value:Value.Replace(TEXT("€"),TEXT("EUR")),Color,X*Scale,Y*Scale,WorldFont.Get(),Size*Scale*FontScale); };
     const auto Card = [&](float X,float Y,float Width,float Height)
     {
         Rect(X,Y,Width,Height,Panel);Rect(X,Y,Width,1,Border);Rect(X,Y+Height-1,Width,1,Border);
@@ -48,7 +50,7 @@ void AComptoirHUD::DrawHUD()
     }
     if (!BrandLogo) BrandLogo=LoadObject<UTexture2D>(nullptr,TEXT("/Game/Original/UI/T_ComptoirLogo.T_ComptoirLogo"));
     if (BrandLogo) DrawTextureSimple(BrandLogo,23*Scale,17*Scale,44.f/128.f*Scale);
-    Text(TEXT("LE PETIT COMPTOIR"),80,20,1.15f,Cream);
+    Text(Game->BarName,80,20,1.15f,Cream);
     Text(TEXT("BAR DE QUARTIER · DEPUIS AUJOURD’HUI"),80,43,.67f,Gold);
     const int Minutes=static_cast<int>(S.Time)%1440;
     Text(FString::Printf(TEXT("Soir %d"),S.Day),W-510,30,.95f,Cream);
@@ -127,7 +129,10 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     Super::NotifyHitBoxClick(BoxName);
     AComptoirCharacter* Player=Cast<AComptoirCharacter>(GetOwningPawn());
     AComptoirGameMode* Game=GetWorld()->GetAuthGameMode<AComptoirGameMode>();
-    if (!Player || !Game || !Player->IsTabletOpen()) return;
+    if(!Player||!Game)return;
+    if(Game->Session.MenuVisible()){Game->MenuAction(BoxName);return;}
+    if(!Player->IsTabletOpen())return;
+    if(BoxName.ToString().StartsWith(TEXT("dev_"))){Game->DeveloperAction(BoxName);return;}
     if (BoxName==TEXT("tablet") || BoxName==TEXT("tablet_header") || BoxName==TEXT("return_bar")) Player->ToggleTablet();
     else if (BoxName==TEXT("service")) Game->Interact(EComptoirTarget::Sign);
     else if (BoxName==TEXT("restock") && Game->Simulation.Reserve>0 && Game->Simulation.Beer<1000)
@@ -142,6 +147,13 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     else if (BoxName==TEXT("tab_orders")) TabletPage=1;
     else if (BoxName==TEXT("tab_register")) TabletPage=2;
     else if (BoxName==TEXT("tab_reserve")) TabletPage=3;
+    else if(BoxName==TEXT("tab_developer"))TabletPage=4;
     else if (BoxName==TEXT("save")) Game->Save(true);
     if (!Player->IsTabletOpen()) HideTablet();
+}
+
+void AComptoirHUD::SetPendingBarName(const FText& Name)
+{
+    if(AComptoirGameMode* Game=GetWorld()->GetAuthGameMode<AComptoirGameMode>())
+        if(Game->Session.View==ComptoirSession::Screen::NewGame)Game->PendingBarName=Name.ToString();
 }

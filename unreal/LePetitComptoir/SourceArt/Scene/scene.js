@@ -533,7 +533,7 @@ const BarScene=(()=>{
   c(3.9,.614,-2.53,.62,.026,.62,'#9bad9d',M.metal);
   b(3.9,.78,-2.53,.1,.3,.1,'#6c8174',M.metal);
   b(3.9,.93,-2.53,.48,.05,.1,'#879b89',M.metal);
-  b(6,3.13,9.98,12,.55,.2,wall.plaster,M.plaster,noShadow);
+  b(6,3.13,9.98,12,.55,.2,wall.plaster,M.plaster,{...noShadow,label:'LE PETIT COMPTOIR',labelFace:'back',labelColor:'#203c2c',venueName:true});
   for(const x of [.12,4.25,7.75,11.88])b(x,1.6,9.96,.18,3.2,.2,'#273a38',M.metal,{...solid,...noShadow});
   for(const x of [2.16,9.84]){
    b(x,.35,9.97,4,.7,.2,wall.panel,M.wood,solid);
@@ -580,7 +580,7 @@ const BarScene=(()=>{
    }
   }
   preparationFixtures(items);
-  b(6,3.02,.82,5.15,.34,.06,'#293a33',M.wood,{label:'LE PETIT COMPTOIR',labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f0dfb9',castShadow:false});
+  b(6,3.02,.82,5.15,.34,.06,'#293a33',M.wood,{label:'LE PETIT COMPTOIR',venueName:true,labelFace:'back',labelFont:'Georgia, serif',labelColor:'#f0dfb9',castShadow:false});
   // A narrow service counter with timber slats and brass foot rail.
   b(6,.5,3.02,8.8,1,.9,'#3f3329',M.wood,solid);
   b(6,1.045,3.03,9.04,.09,1.12,'#42453e',M.stone,solid);

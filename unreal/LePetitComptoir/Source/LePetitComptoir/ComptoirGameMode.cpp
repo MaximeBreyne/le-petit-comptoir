@@ -4,6 +4,8 @@
 #include "ComptoirSave.h"
 #include "ComptoirScene.h"
 #include "ComptoirStreetLife.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "WorldLayout.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
@@ -37,9 +39,11 @@ void AComptoirGameMode::BeginPlay()
         Player->TeleportTo(FVector(155, 600, 92), FRotator(0, 0, 0), false, true);
         if (AController* Controller = Player->GetController()) Controller->SetControlRotation(FRotator(-3.44, 0, 0));
     }
-    Load();
+    HomeCamera=GetWorld()->SpawnActor<ACameraActor>(FVector(850,1050,172),FRotator(-2.58,224.03,0));
+    if(HomeCamera)HomeCamera->GetCameraComponent()->SetFieldOfView(107.51f);
+    RefreshContinue();
     UpdateVisuals();
-    if (bReadyToSave) Notify(TEXT("Bienvenue ! E pour interagir, P pour mettre en pause."));
+    ApplyMenuState();
 }
 
 void AComptoirGameMode::EndPlay(const EEndPlayReason::Type Reason)
@@ -64,7 +68,7 @@ void AComptoirGameMode::BuildRoom()
     for (TActorIterator<AComptoirScene> It(GetWorld()); It; ++It)
         if (It->ActorHasTag(TEXT("OriginalVenue")))
         {
-            HasVenue = It->GetGeometryRevision() >= 4 || It->Build(TEXT("world"), true);
+            HasVenue = It->GetGeometryRevision() >= 5 || It->Build(TEXT("world"), true);
             break;
         }
     if (!HasVenue)
@@ -128,6 +132,7 @@ void AComptoirGameMode::BuildRoom()
 void AComptoirGameMode::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if(!Session.CanSimulate())return;
     const APawn* Player=UGameplayStatics::GetPlayerPawn(this,0);
     if(!bDoorOpen&&DoorAngle>0&&Player)
     {
@@ -199,6 +204,7 @@ bool AComptoirGameMode::CanReachTabletTarget(EComptoirTarget Target) const
 
 void AComptoirGameMode::Interact(EComptoirTarget Target)
 {
+    if(!Session.CanSimulate())return;
     bool Changed = false;
     switch (Target)
     {
@@ -226,6 +232,7 @@ void AComptoirGameMode::Interact(EComptoirTarget Target)
 
 void AComptoirGameMode::Pour(float DeltaSeconds)
 {
+    if(!Session.CanSimulate())return;
     const auto Before = Simulation.Held;
     if (!Simulation.Pour(DeltaSeconds)) return;
     if (Before != Simulation.Held) Save();
@@ -261,14 +268,15 @@ FString AComptoirGameMode::Prompt(EComptoirTarget Target) const
     }
 }
 
-void AComptoirGameMode::Save(bool Feedback)
+bool AComptoirGameMode::Save(bool Feedback)
 {
-    if (!bReadyToSave) return;
+    if (!bReadyToSave||!Session.CanSave()) return false;
     UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::CreateSaveGameObject(UComptoirSave::StaticClass()));
-    if (!Data) return;
+    if (!Data) return false;
     const std::string Payload = Simulation.Serialize();
     Data->Simulation = UTF8_TO_TCHAR(Payload.c_str());
     Data->LayoutRevision = 3;
+    Data->BarName=BarName;
     if (const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
     {
         Data->PlayerLocation = Player->GetActorLocation();
@@ -277,15 +285,15 @@ void AComptoirGameMode::Save(bool Feedback)
     const bool Saved = UGameplayStatics::SaveGameToSlot(Data, GComptoirSaveSlotName, 0);
     if (!Saved) Notify(TEXT("Echec de sauvegarde : verifiez l'espace disque."));
     else if (Feedback) Notify(TEXT("Partie Unreal sauvegardee."));
+    return Saved;
 }
 
-void AComptoirGameMode::Load(bool Feedback)
+bool AComptoirGameMode::Load(bool Feedback)
 {
     if (!UGameplayStatics::DoesSaveGameExist(GComptoirSaveSlotName, 0))
     {
-        bReadyToSave = true;
         if (Feedback) Notify(TEXT("Aucune sauvegarde Unreal."));
-        return;
+        return false;
     }
     UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::LoadGameFromSlot(GComptoirSaveSlotName, 0));
     if (!Data || !Simulation.Restore(TCHAR_TO_UTF8(*Data->Simulation)))
@@ -293,9 +301,11 @@ void AComptoirGameMode::Load(bool Feedback)
         // Do not overwrite a corrupt or unsupported save on the next autosave.
         bReadyToSave = false;
         Notify(TEXT("Sauvegarde illisible : sauvegarde automatique suspendue. Voir README."));
-        return;
+        return false;
     }
     bReadyToSave = true;
+    BarName=IsBarNameValid(Data->BarName)?Data->BarName.TrimStartAndEnd():TEXT("Le Petit Comptoir");
+    ApplyBarName();
     if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0); Player && (Data->LayoutRevision == 2 || Data->LayoutRevision == 3))
     {
         FVector P = Data->PlayerLocation;
@@ -313,4 +323,5 @@ void AComptoirGameMode::Load(bool Feedback)
     }
     UpdateVisuals();
     if (Feedback) Notify(TEXT("Partie Unreal chargee."));
+    return true;
 }

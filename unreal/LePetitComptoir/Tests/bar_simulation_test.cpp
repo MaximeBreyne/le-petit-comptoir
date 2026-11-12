@@ -124,5 +124,35 @@ int main()
     assert(Overshoot.PayCard()); Overshoot.Tick(10);
     assert(Overshoot.Sold == 1 && Overshoot.Cash == 26500);
 
-    std::cout << "PASS: service, single payment, closing, supply, save/restore, validation and timing\n";
+    // Developer changes are opt-in and persisted per save, with bounded inputs.
+    Game Dev;
+    assert(!Dev.AddTestMoney(1000)&&!Dev.AddTestProgress(25)&&!Dev.FillTestStocks());
+    assert(!Dev.ToggleTestClock()&&!Dev.AdvanceTestHour());
+    Dev.SetDeveloper(true);
+    assert(Dev.AddTestMoney(1000)&&Dev.Cash==126000&&Dev.Sold==0);
+    assert(!Dev.AddTestMoney(0)&&!Dev.AddTestMoney(-1)&&!Dev.AddTestMoney(1000001));
+    assert(Dev.AddTestProgress(25)&&Dev.Sold==25&&Dev.Cash==126000);
+    assert(!Dev.AddTestProgress(0)&&!Dev.AddTestProgress(1001));
+    Dev.Reserve=0;assert(Dev.Supply());const int PaidCash=Dev.Cash;
+    assert(Dev.FillTestStocks()&&Dev.Beer==1000&&Dev.Reserve==500&&Dev.DeliveryRemaining==0);
+    Dev.Tick(20);assert(Dev.Reserve==500&&Dev.Cash==PaidCash);
+    assert(Dev.ToggleTestClock()&&Dev.ClockPaused);
+    assert(!Dev.AdvanceTestHour());
+    assert(Dev.ToggleService());Dev.Tick(1);
+    assert(Dev.Time==1020&&Dev.Phase==Customer::Order);
+    assert(Dev.AdvanceTestHour()&&Dev.Time==1080);
+    Game DevLoaded;assert(DevLoaded.Restore(Dev.Serialize()));
+    assert(DevLoaded.Developer&&DevLoaded.ClockPaused&&DevLoaded.Sold==25);
+    DevLoaded.SetDeveloper(false);assert(!DevLoaded.ClockPaused);
+    DevLoaded.Tick(2);assert(DevLoaded.Time==1081);
+    // Version-one saves remain loadable; no developer state is inferred.
+    Game Legacy;assert(Legacy.Restore("1 26000 1000 500 1 0 0 0 1020 1 0 0 0 0 0"));
+    assert(!Legacy.Developer&&!Legacy.ClockPaused);
+    Game InvalidDev;InvalidDev.ClockPaused=true;
+    assert(!Legacy.Restore(InvalidDev.Serialize()));
+    Dev.Time=1679;assert(Dev.AdvanceTestHour()&&Dev.Closing&&Dev.Phase==Customer::Order);
+    assert(!Dev.AdvanceTestHour());assert(Dev.Dismiss()&&!Dev.Open&&Dev.Day==2);
+    Dev.Cash=100000000;assert(!Dev.AddTestMoney(1));
+    Dev.Sold=10000000;assert(!Dev.AddTestProgress(1));
+    std::cout << "PASS: service, supplies, save compatibility, developer limits, per-save state and clock control\n";
 }

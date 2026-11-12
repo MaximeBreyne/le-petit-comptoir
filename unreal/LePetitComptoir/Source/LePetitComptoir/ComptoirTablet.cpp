@@ -15,13 +15,18 @@ void AComptoirHUD::UpdateTablet(const AComptoirGameMode& Game)
     if(!TabletWidget.IsValid())
     {
         SAssignNew(TabletWidget,SComptoirTablet)
-            .OnAction(FOnComptoirTabletAction::CreateUObject(this,&AComptoirHUD::NotifyHitBoxClick));
+            .OnAction(FOnComptoirTabletAction::CreateUObject(this,&AComptoirHUD::NotifyHitBoxClick))
+            .OnNameChanged(FOnComptoirNameChanged::CreateUObject(this,&AComptoirHUD::SetPendingBarName));
         Viewport->AddViewportWidgetContent(TabletWidget.ToSharedRef(),20);
         TabletViewport=Viewport;
     }
     const auto& S=Game.Simulation;
     State Data;
-    Data.Active=static_cast<Page>(FMath::Clamp(TabletPage,0,3));
+    Data.Active=static_cast<Page>(FMath::Clamp(TabletPage,0,4));
+    Data.View=Game.Session.View;Data.CanContinue=Game.Session.CanContinue;Data.HasSave=Game.Session.HasSave;
+    Data.SaveSummary=TCHAR_TO_UTF8(*Game.SaveSummary);Data.BarName=TCHAR_TO_UTF8(*Game.BarName);
+    Data.PendingName=TCHAR_TO_UTF8(*Game.PendingBarName);Data.ValidName=Game.IsBarNameValid(Game.PendingBarName);
+    Data.Developer=S.Developer;Data.ClockPaused=S.ClockPaused;
     Data.Cash=S.Cash;Data.Beer=S.Beer;Data.Reserve=S.Reserve;Data.Sold=S.Sold;Data.Day=S.Day;
     Data.Phase=static_cast<int>(S.Phase);Data.Held=static_cast<int>(S.Held);
     Data.Time=S.Time;Data.Amount=S.Amount;Data.Delivery=S.DeliveryRemaining;Data.Remaining=S.CustomerRemaining;

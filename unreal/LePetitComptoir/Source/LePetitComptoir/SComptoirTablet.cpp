@@ -1,4 +1,6 @@
 #include "SComptoirTablet.h"
+#include "Widgets/Layout/SConstraintCanvas.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Brushes/SlateColorBrush.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Engine/Texture2D.h"
@@ -15,6 +17,29 @@
 void SComptoirTablet::Construct(const FArguments& InArgs)
 {
     OnAction=InArgs._OnAction;
+    OnNameChanged=InArgs._OnNameChanged;
+    ChildSlot
+    [
+        SNew(SConstraintCanvas)
+        +SConstraintCanvas::Slot()
+        .Offset_Lambda([this]()
+        {
+            const FVector2D Size=GetCachedGeometry().GetLocalSize();
+            const auto L=ComptoirTablet::Build(State,Size.X>0?Size.X:1120,Size.Y>0?Size.Y:720);
+            return FMargin(L.X+58*L.Scale,L.Y+369*L.Scale,454*L.Scale,46*L.Scale);
+        })
+        [
+            SAssignNew(NameInput,SEditableTextBox)
+            .Visibility_Lambda([this](){return State.View==ComptoirSession::Screen::NewGame?EVisibility::Visible:EVisibility::Collapsed;})
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"),18))
+            .Padding(FMargin(12,6)).SelectAllTextWhenFocused(true).ClearKeyboardFocusOnCommit(false)
+            .OnTextChanged_Lambda([this](const FText& Text){OnNameChanged.ExecuteIfBound(Text);})
+            .OnTextCommitted_Lambda([this](const FText&,ETextCommit::Type Commit)
+            {
+                if(Commit==ETextCommit::OnEnter&&State.ValidName)OnAction.ExecuteIfBound(TEXT("menu_confirm_new"));
+            })
+        ]
+    ];
     LogoBrush.DrawAs=ESlateBrushDrawType::Image;
     LogoBrush.ImageType=ESlateBrushImageType::FullColor;
     LogoBrush.ImageSize=FVector2f(128,128);
@@ -25,7 +50,13 @@ void SComptoirTablet::Construct(const FArguments& InArgs)
 
 void SComptoirTablet::SetState(const ComptoirTablet::State& InState, UTexture2D* Logo)
 {
+    const bool EnteringName=State.View!=InState.View&&InState.View==ComptoirSession::Screen::NewGame;
     State=InState;
+    if(EnteringName&&NameInput.IsValid())
+    {
+        NameInput->SetText(FText::FromString(UTF8_TO_TCHAR(State.PendingName.c_str())));
+        FSlateApplication::Get().SetKeyboardFocus(NameInput,EFocusCause::SetDirectly);
+    }
     LogoBrush.SetResourceObject(Logo); // The HUD holds the texture via UPROPERTY.
     Invalidate(EInvalidateWidgetReason::Paint);
 }
@@ -35,9 +66,9 @@ FVector2D SComptoirTablet::ComputeDesiredSize(float) const
     return FVector2D(1120,720);
 }
 
-int32 SComptoirTablet::OnPaint(const FPaintArgs&, const FGeometry& Geometry,
-    const FSlateRect&, FSlateWindowElementList& Elements, int32 LayerId,
-    const FWidgetStyle& WidgetStyle, bool) const
+int32 SComptoirTablet::OnPaint(const FPaintArgs& Args, const FGeometry& Geometry,
+    const FSlateRect& CullingRect, FSlateWindowElementList& Elements, int32 LayerId,
+    const FWidgetStyle& WidgetStyle, bool bParentEnabled) const
 {
     using namespace ComptoirTablet;
     const FVector2D Size=Geometry.GetLocalSize();
@@ -114,7 +145,7 @@ int32 SComptoirTablet::OnPaint(const FPaintArgs&, const FGeometry& Geometry,
             default: break;
         }
     }
-    return Layer;
+    return SCompoundWidget::OnPaint(Args,Geometry,CullingRect,Elements,Layer,WidgetStyle,bParentEnabled);
 }
 
 FReply SComptoirTablet::OnMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& Event)
@@ -139,5 +170,5 @@ void SComptoirTablet::OnMouseLeave(const FPointerEvent& Event)
 {
     MousePosition=FVector2D(-1,-1);
     Invalidate(EInvalidateWidgetReason::Paint);
-    SLeafWidget::OnMouseLeave(Event);
+    SCompoundWidget::OnMouseLeave(Event);
 }
