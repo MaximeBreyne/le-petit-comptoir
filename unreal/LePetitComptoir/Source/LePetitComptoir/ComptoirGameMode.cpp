@@ -82,7 +82,7 @@ void AComptoirGameMode::BuildRoom()
     for (TActorIterator<AComptoirScene> It(GetWorld()); It; ++It)
         if (It->ActorHasTag(TEXT("OriginalVenue")))
         {
-            HasVenue = It->GetGeometryRevision() >= 10 || It->Build(TEXT("world"), true);
+            HasVenue = It->GetGeometryRevision() >= 11 || It->Build(TEXT("world"), true);
             break;
         }
     if (!HasVenue)

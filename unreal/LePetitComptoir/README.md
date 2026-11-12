@@ -417,7 +417,7 @@ les petits défauts, la fluidité ni la lisibilité en mouvement.
 
 ### Exposition et ambiance du bar
 
-La révision 10 du décor conserve les puissances réduites de la vitrine, du comptoir
+La révision 11 du décor conserve les puissances réduites de la vitrine, du comptoir
 et des étagères ainsi que le halo réduit des lampes. Cinq sources diffuses de faible
 puissance éclairent l'allée de service et les tables, sans reflets spéculaires ni
 ombres supplémentaires : elles compensent l'absence de rebonds lumineux calculés
@@ -427,6 +427,13 @@ conserve les ombres de son éclairage de travail. L'exposition manuelle passe de
 partagent cette valeur. Le réglage **Luminosité : 100 %** utilise cette base ; les
 préférences existantes ajustent cette base sans la remettre à zéro à chaque image.
 Les interfaces Slate conservent leur luminosité.
+
+Le plafonnier de la réserve passe de 800 à 550 lumens pour limiter la saturation
+des étagères claires. Cette correction suit le contrôle GPU de la révision 10 :
+compilation réussie, 17 matériaux rendus sans substitution ni erreur de shader,
+cinq vues conformes, mais 11,19 % de zones presque blanches et 2,11 % de pixels
+saturés dans la réserve. Les seuils du test graphique restent identiques ; le
+nouveau rendu de cette pièce doit être recontrôlé sous Unreal.
 
 `Setup-Unreal.ps1` remplace les composants générés de l'ancienne révision après
 sauvegarde de la carte dans `Saved/Backups/BeforeVisualUpgrade/`. Le lancement du

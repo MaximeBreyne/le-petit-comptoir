@@ -35,7 +35,8 @@ inline void Build(AActor* Owner,USceneComponent* Root)
     for(int32 Y:{300,600,900})
         Area(FVector(73,Y,172),FRotator(-65,0,0),250,3,140,3100,false,200);
     Area(FVector(200,600,310),FRotator(-90,0,0),680,80,600,3200,true,450);
-    Area(FVector(-210,230,325),FRotator(-90,0,0),115,44,800,4000,true,430);
+    // The compact reserve has pale walls and shelves close to this fixture.
+    Area(FVector(-210,230,325),FRotator(-90,0,0),115,44,550,4000,true,430);
     Area(FVector(62,1110,196),FRotator(-90,0,0),75,32,90,4400,false,180);
     // Daylight is a gentle fill, not a second room-wide key light. Limit its
     // reach so it does not bleach the counter and rear wall from the storefront.
