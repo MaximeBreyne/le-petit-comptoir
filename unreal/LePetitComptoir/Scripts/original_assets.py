@@ -31,7 +31,12 @@ def create_original_assets():
 
         def connect(source, output, target, pin):
             if not editing.connect_material_expressions(source, output, target, pin):
-                raise RuntimeError(f"Connexion impossible : {name}/{pin}")
+                outputs = list(editing.get_material_expression_output_names(source))
+                inputs = list(editing.get_material_expression_input_names(target))
+                raise RuntimeError(
+                    f"Connexion impossible : {name}/{pin}; sortie demandee={output!r}, "
+                    f"sorties disponibles={outputs!r}, entrees disponibles={inputs!r}"
+                )
 
         def result(node, prop):
             if not editing.connect_material_property(node, "", prop):
@@ -50,7 +55,8 @@ def create_original_assets():
         surface.set_editor_property("inputs", inputs)
         surface.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
         surface.set_editor_property("code", f"const int Surface = {index};\n" + code)
-        connect(tint, "RGB", surface, "Tint")
+        # Select the first color output; its channel label is not an API pin name.
+        connect(tint, "", surface, "Tint")
         connect(position, "", surface, "World")
         connect(normal, "", surface, "Normal")
         result(surface, unreal.MaterialProperty.MP_BASE_COLOR)
