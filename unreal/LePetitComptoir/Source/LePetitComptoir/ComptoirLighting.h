@@ -41,6 +41,19 @@ inline void Build(AActor* Owner,USceneComponent* Root)
     // reach so it does not bleach the counter and rear wall from the storefront.
     Area(FVector(984,600,202),FRotator(0,180,0),1050,200,700,6000,true,1000);
     Area(FVector(1040,600,344),FRotator(-65,180,0),850,12,300,3000,false,500);
+    // The procedural venue has no baked/Lumen bounce lighting. Low-power,
+    // diffuse-only fills keep the service aisle and seating readable between
+    // the fixtures, without adding bright specular spots to brass and glass.
+    const auto Fill=[&](FVector Position,float Lumens,float Radius)
+    {
+        auto* L=Component<UPointLightComponent>(Owner,Root);
+        L->SetRelativeLocation(Position);L->SetIntensityUnits(ELightUnits::Lumens);
+        L->SetIntensity(Lumens);L->SetUseTemperature(true);L->SetTemperature(3800);
+        L->SetAttenuationRadius(Radius);L->SetSourceRadius(45);
+        L->SetSpecularScale(0.f);L->SetCastShadows(false);L->RegisterComponent();
+    };
+    for(int32 Y:{300,600,900})Fill(FVector(165,Y,210),75,350);
+    for(int32 Y:{230,970})Fill(FVector(720,Y,190),90,420);
     for(int32 Y:{-200,1000,2200})
     {
         auto* L=Component<UPointLightComponent>(Owner,Root);
@@ -57,7 +70,7 @@ inline void Build(AActor* Owner,USceneComponent* Root)
     Atmosphere->RegisterComponent();
     auto* Sky=Component<USkyLightComponent>(Owner,Root);
     Sky->SetRelativeLocation(FVector(1400,600,400));Sky->CubemapResolution=64;
-    Sky->SetIntensity(.4f);Sky->SetRealTimeCapture(true);Sky->RegisterComponent();
+    Sky->SetIntensity(.5f);Sky->SetRealTimeCapture(true);Sky->RegisterComponent();
 
     auto* Post=Component<UPostProcessComponent>(Owner,Root);Post->bUnbound=true;
     Post->Priority=-1; // User-authored postprocess volumes can override the baseline.

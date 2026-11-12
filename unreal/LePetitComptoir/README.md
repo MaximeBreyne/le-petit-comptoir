@@ -409,7 +409,7 @@ le décor généré de la carte existante, la préparation copie la carte dans
 Les sauvegardes de partie et le nom du bar sont inchangés.
 
 Le contrôle `LePetitComptoir.Graphics.MaterialsAndViews`, inclus dans `-VerifyUI`,
-vérifie les erreurs de compilation des matériaux et génère cinq vues en 1280 × 720
+vérifie les erreurs de compilation des matériaux et génère six vues en 1280 × 720
 sous `Saved/Tests/Graphics/`. Il détecte un rendu entièrement sombre, uniforme ou
 largement surexposé. Pour ne lancer que ce contrôle, utiliser `-VerifyGraphics`.
 Les captures doivent aussi être regardées : ces seuils ne jugent pas l'esthétique,
@@ -417,10 +417,13 @@ les petits défauts, la fluidité ni la lisibilité en mouvement.
 
 ### Exposition et ambiance du bar
 
-La révision 9 du décor réduit les lumières d'appoint de la vitrine, du comptoir et
-des étagères, ainsi que la lumière ambiante et le halo des lampes. Le comptoir
-projette désormais des ombres sous son éclairage de travail. L'exposition manuelle
-est réglée à −2 EV de compensation : le volume du décor et la caméra du joueur
+La révision 10 du décor conserve les puissances réduites de la vitrine, du comptoir
+et des étagères ainsi que le halo réduit des lampes. Cinq sources diffuses de faible
+puissance éclairent l'allée de service et les tables, sans reflets spéculaires ni
+ombres supplémentaires : elles compensent l'absence de rebonds lumineux calculés
+dans ce décor procédural. La lumière ambiante est légèrement relevée. Le comptoir
+conserve les ombres de son éclairage de travail. L'exposition manuelle passe de
+−2 à −1,25 EV de compensation : le volume du décor et la caméra du joueur
 partagent cette valeur. Le réglage **Luminosité : 100 %** utilise cette base ; les
 préférences existantes ajustent cette base sans la remettre à zéro à chaque image.
 Les interfaces Slate conservent leur luminosité.
@@ -431,11 +434,12 @@ jeu actualise aussi un ancien décor encore présent en mémoire. Aucun effaceme
 de sauvegarde de partie n'est nécessaire.
 
 Le contrôle graphique utilise les réglages de la caméra réelle après son `Tick`
-et ajoute `BehindBar.bmp`, face à la vitrine comme au démarrage. Il mesure les
+et comprend `BehindBar.bmp`, face à la vitrine comme au démarrage, ainsi que
+`BackBar.bmp`, vers les étagères et le réfrigérateur. Il mesure les
 zones presque blanches (luminance supérieure à 245/255, moins de 10 % de l'image)
 et les pixels saturés sur les trois canaux (moins de 2 %), tout en contrôlant que
 la scène reste visible. Les anciens rendus trop clairs de la salle, du service et
-de la réserve dépassent ces limites. La compilation Unreal et les cinq nouvelles
+de la réserve dépassent ces limites. La compilation Unreal et les six nouvelles
 captures doivent être vérifiées sur un PC équipé du moteur ; les réglages seuls
 ne constituent pas une validation visuelle.
 

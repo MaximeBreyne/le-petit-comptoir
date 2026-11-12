@@ -71,7 +71,8 @@ bool FComptoirGraphicsTest::RunTest(const FString&)
         {TEXT("Service"),{145,600,168},{285,420,135}},
         {TEXT("Street"),{1530,1100,180},{980,600,210}},
         {TEXT("Reserve"),{-80,100,168},{-370,240,145}},
-        {TEXT("BehindBar"),{155,600,170},{1155,600,110},107.51f}};
+        {TEXT("BehindBar"),{155,600,170},{1155,600,110},107.51f},
+        {TEXT("BackBar"),{165,350,170},{65,850,180},90.f}};
     bool bFirstView=true;
     for(const View& V:Views)
     {

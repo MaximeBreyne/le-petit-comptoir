@@ -6,7 +6,7 @@ namespace ComptoirExposure
 {
 // Fixed exposure for the venue's lights in lumens. Keep the camera and the
 // generated level on the same baseline: camera overrides replace volume values.
-constexpr float BaselineBias=-2.f;
+constexpr float BaselineBias=-1.25f;
 
 inline void Apply(FPostProcessSettings& Settings,float BrightnessPercent=100.f)
 {
