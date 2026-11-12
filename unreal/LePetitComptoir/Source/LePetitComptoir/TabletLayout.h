@@ -48,21 +48,24 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
     L.Scale=std::max(.01f,std::min({1.2f,(Width-32)/1120.f,(Height-32)/720.f}));
     L.X=(Width-1120*L.Scale)/2;L.Y=(Height-720*L.Scale)/2;
     const float MX=(MouseX-L.X)/L.Scale,MY=(MouseY-L.Y)/L.Scale;
-    constexpr std::uint32_t Muted=0x718069,Green=0x284f3d,Paper=0xf9f8f0,Rule=0xd4d9c8;
+    constexpr std::uint32_t Muted=0x4b5b46,Green=0x284f3d,Paper=0xf9f8f0,Rule=0xd4d9c8;
     const auto Rect=[&](float X,float Y,float W,float H,std::uint32_t C,float R=0.f)
     {L.Commands.push_back({R>0?Kind::Rounded:Kind::Rect,X,Y,W,H,R,0,C,{}});};
     const auto Text=[&](std::string V,float X,float Y,float Font=13.f,std::uint32_t C=0x213e31,float MaxWidth=0.f)
-    {L.Commands.push_back({Kind::Text,X,Y,MaxWidth,0,0,Font,C,std::move(V)});};
+    {
+        const float ReadableSize=std::max(14.f,Font+4.f);
+        L.Commands.push_back({Kind::Text,X,Y,MaxWidth,0,0,ReadableSize,C,std::move(V)});
+    };
     const auto Line=[&](float X,float Y,float EndX,float EndY,std::uint32_t C)
     {L.Commands.push_back({Kind::Line,X,Y,EndX,EndY,0,0,C,{}});};
     const auto Card=[&](float X,float Y,float W,float H)
     {Rect(X,Y,W,H,Rule,9);Rect(X+1,Y+1,W-2,H-2,Paper,8);};
     const auto Button=[&](const std::string& Id,const std::string& Caption,float X,float Y,float W,bool Enabled=true)
     {
-        const bool Hover=Enabled&&MX>=X&&MX<=X+W&&MY>=Y&&MY<=Y+35;
-        Rect(X,Y,W,35,Enabled?(Hover?0x3a644b:0x2c523e):0xd8ddcf,5);
-        Text(Caption,X+12,Y+10,12,Enabled?0xf5f0df:0x8c9584);
-        if(Enabled)L.Commands.push_back({Kind::Hit,X,Y,W,35,0,0,0,Id});
+        const bool Hover=Enabled&&MX>=X&&MX<=X+W&&MY>=Y&&MY<=Y+42;
+        Rect(X,Y,W,42,Enabled?(Hover?0x3a644b:0x2c523e):0xd8ddcf,5);
+        Text(Caption,X+12,Y+12,12,Enabled?0xf5f0df:0x526048,W-24);
+        if(Enabled)L.Commands.push_back({Kind::Hit,X,Y,W,42,0,0,0,Id});
     };
     const auto Icon=[&](int Index,float X,float Y,std::uint32_t C)
     {
@@ -83,9 +86,9 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
     Rect(556,4,8,5,0x040806,2);
     L.Commands.push_back({Kind::Logo,37,36,42,42,0,0,0,{}});
     Text("LE PETIT COMPTOIR",91,38,14,0xede8d8);Text("TABLETTE DE GESTION",91,61,10,0xb8c6b4);
-    Rect(700,48,6,6,S.Open?0x92c49b:0xafa58c,3);
-    Text(S.Closing?"Dernière tournée":S.Open?"Ouvert":"Fermé",718,45,12,0xc8cabc);
-    Text(Money(S.Cash),854,39,23,0xe9c27c,115);Button("tablet","Ranger [Tab]",982,34,104);
+    Rect(604,48,6,6,S.Open?0x92c49b:0xafa58c,3);
+    Text(S.Closing?"Dernière tournée":S.Open?"Ouvert":"Fermé",620,45,12,0xe1e6d8);
+    Text(Money(S.Cash),784,34,23,0xe9c27c,150);Button("tablet","Ranger [Tab]",950,32,136);
     Rect(13,104,173,553,0xe1e4d9);Rect(185,104,1,553,0xcbd4c4);
     const char* Names[]={"Service","À préparer","Caisse","Réserve","Bâtiment","Décoration","Licences","Équipe"};
     const char* Keys[]={"tab_service","tab_orders","tab_register","tab_reserve"};
@@ -94,15 +97,15 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         const float Y=128+I*54.f;const bool Active=I==static_cast<int>(S.Active),Enabled=I<4;
         const bool Hover=Enabled&&MX>=25&&MX<=174&&MY>=Y&&MY<=Y+47;
         if(Active||Hover)Rect(25,Y,149,47,Active?Green:0xd3dacc,7);
-        const std::uint32_t Color=Active?0xf2e6ca:Enabled?0x56685b:0x9aa28e;
-        Icon(I,36,Y+12,Color);Text(Names[I],70,Y+(Enabled?17:10),13,Color);
-        if(!Enabled)Text("À venir",70,Y+29,9,0x9aa28e);
+        const std::uint32_t Color=Active?0xf2e6ca:Enabled?0x344e3e:0x53604d;
+        Icon(I,36,Y+12,Color);Text(Names[I],70,Y+(Enabled?14:7),13,Color,96);
+        if(!Enabled)Text("À venir",70,Y+28,9,0x53604d);
         else L.Commands.push_back({Kind::Hit,25,Y,149,47,0,0,0,Keys[I]});
     }
-    Text("Votre bar,",37,605,11,0x73816e);Text("à portée de main.",37,622,11,0x73816e);
+    Text("Votre bar,",37,602,11,Muted);Text("à portée de main.",37,623,11,Muted);
     const char* Eyebrows[]={"LA SALLE ET LES COMMANDES","LES BOISSONS COMMANDÉES","ENCAISSEMENTS & TERMINAL","STOCKS & FOURNISSEUR"};
     const int P=std::clamp(static_cast<int>(S.Active),0,3);
-    Text(Eyebrows[P],214,131,10,0x7a775b);Text(Names[P],214,155,30);
+    Text(Eyebrows[P],214,131,10,0x5e5d43);Text(Names[P],214,155,30);
     const int Minutes=static_cast<int>(S.Time)%1440;
     const std::string Clock=std::to_string(Minutes/60)+":"+(Minutes%60<10?"0":"")+std::to_string(Minutes%60);
     Rect(904,148,174,31,0xe6e8dc,15);Text("Soir "+std::to_string(S.Day)+"  ·  "+Clock,920,157,12,Muted);
@@ -118,7 +121,7 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         Card(508,300,276,77);Text("Clients présents",524,315,12,Muted);Text(S.Phase==0?"0 / 1":"1 / 1",524,339,23);
         Card(802,300,276,77);Text("Frais de fermeture",818,315,12,Muted);Text("35,00 € / soir",818,339,23);
         Text("Au comptoir",214,401,17);Card(214,435,864,172);
-        Text("Comptoir · Client",232,453,17);Text(Phase,815,457,13,0x857042);
+        Text("Comptoir · Client",232,453,17);Text(Phase,815,457,13,0x6b542a);
         Text(S.Phase==0?"Le prochain client prendra place ici.":S.Phase==1?"Approchez-vous pour lui demander ce qu’il souhaite.":"Bière pression · 50 cl · 5,00 €",232,489,14);
         Text(S.Phase==1?(S.NearCustomer?"Vous êtes à portée du client.":"Rejoignez ce client pour prendre sa commande."):"Préparez et servez les boissons derrière le bar.",232,521,12,Muted);
         if(S.Phase==1)Button("take_order","Prendre la commande",232,553,205,S.NearCustomer&&!S.Bankrupt);
@@ -130,7 +133,7 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         Text("Prenez un verre au rangement, puis dosez la boisson à la tireuse.",214,236,13,Muted);
         const bool Ordered=S.Phase==2;
         Card(214,279,864,233);Rect(234,300,57,65,0xeae7d5,9);Icon(1,251,319,0x967936);
-        Text("TIREUSE",310,301,10,0x8a886e);Text("Bière pression",310,325,22);Text("5,00 €",990,319,20,0x857042);
+        Text("TIREUSE",310,301,10,0x615f45);Text("Bière pression",310,325,22);Text("5,00 €",970,319,20,0x6b542a,88);
         Text(Ordered?"Une bière attendue au comptoir":S.Phase==1?"La commande n’a pas encore été prise":"Aucune commande à préparer",234,385,15);
         Line(234,415,1058,415,Rule);
         Text("INGRÉDIENT",234,436,10,Muted);Text("Bière · 50 cl",234,458,14);
@@ -141,12 +144,12 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         Rect(214,566,598,6,0xd8ddcf,3);const float Fill=598*static_cast<float>(std::clamp(S.Amount/50.,0.,1.));
         if(Fill>0)Rect(214,566,Fill,6,0xb5a16d,3);
         Text(std::to_string(static_cast<int>(S.Amount))+" / 50 cl",214,587,12,Muted);
-        Button("return_bar","Revenir au bar pour préparer",830,548,248);
+        Button("return_bar","Préparer au bar",830,548,248);
     }
     else if(S.Active==Page::Register)
     {
         Rect(214,210,864,56,S.NearTill?0xdfe7d6:0xe9e2cf,4);
-        Text(S.NearTill?"Vous êtes devant la caisse.":"Rejoignez la caisse derrière le bar pour encaisser.",231,230,14,S.NearTill?0x466443:0x7b6844);
+        Text(S.NearTill?"Vous êtes devant la caisse.":"Rejoignez la caisse derrière le bar pour encaisser.",231,230,14,S.NearTill?0x466443:0x695632);
         Card(214,286,422,91);Text("Trésorerie",232,303,12,Muted);Text(Money(S.Cash),232,330,27);
         Card(654,286,424,91);Text("Clients encaissés",672,303,12,Muted);Text(std::to_string(S.Sold),672,330,27);
         Card(214,399,864,188);Icon(2,235,423,Green);Text("Terminal de paiement",277,423,18);
@@ -170,8 +173,8 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         Button("buy_stock","Commander · 16,00 €",853,374,204,S.Reserve==0&&S.Delivery<=0&&S.Cash>=1600&&!S.Bankrupt);
         Line(233,427,1057,427,Rule);Text("La livraison arrive dans la réserve après 10 secondes de jeu.",233,452,13,Muted);
         Rect(214,514,864,79,0xe9e2cf,4);
-        Text("Préparez le prochain service",232,530,16,0x7b6844);
-        Text("Réapprovisionnez le comptoir avant que le stock de bière soit épuisé.",232,559,13,0x7b6844);
+        Text("Préparez le prochain service",232,530,16,0x695632);
+        Text("Réapprovisionnez le comptoir avant que le stock de bière soit épuisé.",232,559,13,0x695632);
     }
     Rect(13,657,1094,44,0xe6e7dd,19);Rect(13,657,1094,22,0xe6e7dd);Rect(13,657,1094,1,0xd6dbcd);
     Text(S.Feedback.empty()?"Le service continue pendant la consultation.":S.Feedback,36,674,11,0x3c6142,830);

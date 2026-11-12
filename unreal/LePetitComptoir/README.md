@@ -11,6 +11,9 @@ la palette et la disposition compacte de l'interface sont repris du prototype.
 La tablette retrouve son boîtier paysage arrondi, son écran clair et sa navigation
 latérale : Service, À préparer, Caisse et Réserve sont utilisables. Les rubriques
 Bâtiment, Décoration, Licences et Équipe sont visibles mais désactivées.
+Les caractères sont rasterisés à leur taille d'affichage avec une police Slate,
+sans agrandir une police bitmap. Les textes secondaires sont agrandis et assombris,
+et les boutons disposent de davantage de hauteur pour faciliter la lecture.
 
 **La migration fonctionnelle reste partielle** : une bière, un client à la fois,
 paiement par carte, stocks, fermeture et sauvegarde. Les autres recettes, employés,
@@ -175,11 +178,12 @@ clients et verres) à la sortie réelle du renderer JavaScript. Il vérifie la f
 de l'export, le sol de la réserve et les collisions des objets solides. La projection
 à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
 Le second teste service, stock, paiement unique, fermeture et sauvegardes. Le troisième
-contrôle 140 mises en page de tablette : dimensions, zones cliquables sans chevauchement
-et disponibilité des actions. Le boîtier et les quatre pages sont inspectables via
+contrôle 140 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
+disponibilité des actions, taille de texte minimale dans le repère de la tablette et
+contraste texte/fond d'au moins 4,5:1. Le boîtier et les quatre pages sont inspectables via
 les commandes de dessin partagées avec Unreal ; ce contrôle ne remplace pas Play.
 
 À vérifier dans Unreal : compilation UHT/C++, compilation des matériaux, absence de
 surfaces noires, visibilité du logo et des enseignes, passage vers la réserve, service
-complet, tablette/retour souris, sauvegarde/reprise et comportement sur le deuxième PC.
+complet, netteté des textes, tablette/retour souris, sauvegarde/reprise et comportement sur le deuxième PC.
 Ces points nécessitent une exécution du moteur et ne sont pas couverts par les tests hors moteur.
