@@ -1,4 +1,8 @@
 """Offline distance-field font and matching material for 3D signs (Windows)."""
+from datetime import datetime, timezone
+import hashlib
+from pathlib import Path
+import shutil
 import unreal
 
 
@@ -10,9 +14,16 @@ def create_world_font():
     font_path = f"{folder}/F_ComptoirWorld"
     assets.make_directory(folder)
     font = assets.load_asset(font_path) if assets.does_asset_exist(font_path) else None
-    if font is None:
-        # TextRender needs an offline atlas, including the currency glyph. A
-        # runtime Slate font cannot replace it. Arial is supplied with Windows.
+    # Chars is a whitelist, not an addition to include_ascii_range. The previous
+    # currency-only list produced empty rectangles for letters/digits/accents.
+    # Include printable ASCII and Latin-1 explicitly, then French punctuation.
+    characters = "".join(chr(code) for code in range(32, 127))
+    characters += "".join(chr(code) for code in range(160, 256)) + "€ŒœŸ’‘–—…"
+    signature = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    current = font is not None and unreal.ComptoirScene.prepare_world_font()
+    rebuild = (not current or
+               assets.get_metadata_tag(font, "Comptoir.FontVersion") != signature)
+    if rebuild:
         factory = unreal.TrueTypeFontFactory()
         factory.set_editor_property("create_new", True)
         factory.set_editor_property("edit_after_new", False)
@@ -23,19 +34,35 @@ def create_world_font():
             "foreground_color": unreal.LinearColor(1, 1, 1, 1),
             "enable_antialiasing": True, "use_distance_field_alpha": True,
             "distance_field_scale_factor": 4, "include_ascii_range": True,
-            "chars": "€ŒœŸ’‘–—…", "texture_page_width": 1024,
+            "chars": characters, "texture_page_width": 1024,
             "texture_page_max_height": 1024,
         }.items():
             data.set_editor_property(key, value)
         options.set_editor_property("data", data)
-        font = tools.create_asset("F_ComptoirWorld", folder, unreal.Font, factory)
-        if font is None or not assets.save_loaded_asset(font):
-            raise RuntimeError("Creation de la police des panneaux impossible")
-
-    if not unreal.ComptoirScene.prepare_world_font():
-        unreal.log_warning("Police generee inutilisable : retour a la police Unreal pour conserver les textes.")
-    if not assets.save_loaded_asset(font):
-        raise RuntimeError("Sauvegarde de la police reparee impossible")
+        if font is None:
+            font = tools.create_asset("F_ComptoirWorld", folder, unreal.Font, factory)
+            if font is None:
+                raise RuntimeError("Creation de la police des panneaux impossible")
+        else:
+            # Keep an on-disk copy before changing the generated asset in place.
+            source = Path(unreal.Paths.project_content_dir()) / "Original/Fonts/F_ComptoirWorld"
+            backup = Path(unreal.Paths.project_saved_dir()) / "Backups/BeforeFontRepair"
+            backup.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+            for extension in (".uasset", ".uexp", ".ubulk"):
+                original = source.with_suffix(extension)
+                if original.is_file():
+                    shutil.copy2(original, backup / f"F_ComptoirWorld-{stamp}{extension}")
+            font.set_editor_property("import_options", data)
+            if not unreal.ComptoirScene.reimport_world_font():
+                raise RuntimeError("Reimport de la police impossible : lettres, chiffres, accents et € doivent etre presents. Ancien fichier conserve dans Saved/Backups/BeforeFontRepair.")
+            font = assets.load_asset(font_path)
+        if not unreal.ComptoirScene.prepare_world_font():
+            raise RuntimeError("Atlas de police incomplet apres import : verifier les glyphes et la page de texture dans le journal.")
+        assets.set_metadata_tag(font, "Comptoir.FontVersion", signature)
+        if not assets.save_loaded_asset(font):
+            raise RuntimeError("Sauvegarde de la police reparee impossible")
+        unreal.log("Police des panneaux reconstruite : lettres, chiffres, accents et euro.")
 
     # TextRender's UVs and the material must sample the SAME atlas. Merely
     # changing TextRender.Font leaves the default Roboto atlas in the shader.

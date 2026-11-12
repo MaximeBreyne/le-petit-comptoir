@@ -23,6 +23,8 @@ public:
     void SetVenueName(const FString& Name);
     UFUNCTION(BlueprintCallable, Category="Comptoir")
     static bool PrepareWorldFont();
+    UFUNCTION(BlueprintCallable, Category="Comptoir")
+    static bool ReimportWorldFont();
 private:
     FString CurrentCollection;
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> Geometry;

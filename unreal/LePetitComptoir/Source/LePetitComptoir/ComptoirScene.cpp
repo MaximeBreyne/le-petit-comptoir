@@ -14,6 +14,10 @@
 #include "Math/RotationMatrix.h"
 #include "Engine/Font.h"
 #include "HAL/FileManager.h"
+#if WITH_EDITOR
+#include "Factories/TrueTypeFontFactory.h"
+#include "UObject/StrongObjectPtr.h"
+#endif
 
 namespace ComptoirSceneData
 {
@@ -180,7 +184,7 @@ bool AComptoirScene::Build(const FString& Collection,bool bWithCollision)
         Boundary(FVector(1880,500,150),FVector(10,3010,200));
         ComptoirLighting::Build(this,Geometry);
     }
-    GeometryRevision=7;
+    GeometryRevision=8;
     CurrentCollection=Collection;
     return true;
 }
@@ -203,7 +207,43 @@ bool AComptoirScene::PrepareWorldFont()
     Font->FontCacheType=EFontCacheType::Offline;
     Font->CacheCharacterCountAndMaxCharHeight();
     Font->MarkPackageDirty();
-    return ComptoirText::IsUsable(Font);
+    const bool bUsable=ComptoirText::IsUsable(Font);
+    if(!bUsable)
+    {
+        UE_LOG(LogTemp,Warning,TEXT("World font: %d atlas pages, maximum character height %.1f."),
+            Font->Textures.Num(),double(Font->GetMaxCharHeight()));
+        FString Missing;
+        for(TCHAR Character:ComptoirText::RequiredGlyphs())
+        {
+            const int32 Index=Font->RemapChar(Character);
+            if(Index==UFont::NULLCHARACTER||!Font->Characters.IsValidIndex(Index)||
+                Font->Characters[Index].USize<=0||Font->Characters[Index].VSize<=0||Font->Characters[Index].TextureIndex!=0)
+                Missing+=FString::Printf(TEXT(" U+%04X"),uint32(Character));
+        }
+        UE_LOG(LogTemp,Warning,TEXT("World font missing/invalid glyphs:%s"),*Missing);
+    }
+    return bUsable;
+}
+
+bool AComptoirScene::ReimportWorldFont()
+{
+#if WITH_EDITOR
+    UFont* Font=LoadObject<UFont>(nullptr,TEXT("/Game/Original/Fonts/F_ComptoirWorld.F_ComptoirWorld"));
+    if(!Font)return false;
+    Font->FontCacheType=EFontCacheType::Offline;
+    // Reuse the existing asset and its references. Python supplies the complete
+    // import character set and backs up the package before this editor-only call.
+    TStrongObjectPtr<UTrueTypeFontFactory> Factory(NewObject<UTrueTypeFontFactory>());
+    Factory->SetAutomatedReimport(true);
+    if(Factory->Reimport(Font)!=EReimportResult::Succeeded)
+    {
+        UE_LOG(LogTemp,Error,TEXT("Reimport of F_ComptoirWorld failed."));
+        return false;
+    }
+    return PrepareWorldFont();
+#else
+    return false;
+#endif
 }
 
 void AComptoirScene::SetVenueName(const FString& Name)

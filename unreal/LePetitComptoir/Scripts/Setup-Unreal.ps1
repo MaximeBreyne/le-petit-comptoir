@@ -49,12 +49,27 @@ if ($VerifyTablet -or $VerifyUI -or $VerifyGraphics) {
     & $Commandlet $Project '-unattended' '-nop4' '-nosound' '-RenderOffscreen' '-UTF8Output' `
         "-ExecCmds=Automation RunTests $TestFilter" `
         '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$ReportDirectory"
-    if ($LASTEXITCODE -ne 0) { throw "Test de rendu echoue. Rapport : $ReportDirectory" }
+    $RenderExitCode = $LASTEXITCODE
     $ReportFile = Join-Path $ReportDirectory 'index.json'
-    if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent : $ReportFile" }
+    if (-not (Test-Path -LiteralPath $ReportFile)) { throw "Rapport de test absent (code Unreal $RenderExitCode) : $ReportFile. Consultez Saved\Logs." }
     $Report = Get-Content -LiteralPath $ReportFile -Raw | ConvertFrom-Json
     $Failures = @($Report.tests | Where-Object { $_.state -ne 'Success' })
-    if ($Failures.Count -gt 0) { throw "Un test de rendu n'a pas reussi. Rapport : $ReportFile" }
+    if ($Failures.Count -gt 0) {
+        $Details = @()
+        foreach ($Failure in $Failures) {
+            $Details += "$($Failure.fullTestPath) : $($Failure.state)"
+            foreach ($Entry in @($Failure.entries)) {
+                if ($Entry.event.type -in @('Error', 'Warning', 'Info')) {
+                    $Details += "  [$($Entry.event.type)] $($Entry.event.message)"
+                }
+            }
+        }
+        $SummaryFile = Join-Path $ReportDirectory 'failures.txt'
+        $Details | Set-Content -LiteralPath $SummaryFile -Encoding UTF8
+        $Details | ForEach-Object { Write-Host $_ }
+        throw "Tests de rendu en echec. Details : $SummaryFile. Rapport complet : $ReportFile"
+    }
+    if ($RenderExitCode -ne 0) { throw "Unreal s'est termine en erreur (code $RenderExitCode). Rapport : $ReportFile. Consultez Saved\Logs." }
     $ExpectedTests = @()
     if ($VerifyTablet -or $VerifyUI) { $ExpectedTests += 'LePetitComptoir.Tablet.RenderedText' }
     if ($VerifyGraphics -or $VerifyUI) { $ExpectedTests += 'LePetitComptoir.Graphics.MaterialsAndViews' }

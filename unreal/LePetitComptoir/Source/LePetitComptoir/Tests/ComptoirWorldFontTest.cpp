@@ -14,7 +14,7 @@ bool FComptoirWorldFontTest::RunTest(const FString&)
     TestTrue(TEXT("Offline cache, nonzero metrics, valid atlas and glyphs"),ComptoirText::IsUsable(Font));
     TestNotNull(TEXT("Matching atlas material"),LoadObject<UMaterialInterface>(nullptr,
         TEXT("/Game/Original/Materials/M_ComptoirText.M_ComptoirText")));
-    for(const TCHAR Character:FString(TEXT("€éèêëàâäùûüôöîïçÉÈÊÀÂÇŒœ0123456789")))
+    for(const TCHAR Character:ComptoirText::RequiredGlyphs())
     {
         const int32 Index=Font->RemapChar(Character);
         const FString Name=FString::Printf(TEXT("Glyph U+%04X"),uint32(Character));

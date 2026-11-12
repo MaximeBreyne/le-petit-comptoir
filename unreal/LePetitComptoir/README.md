@@ -443,6 +443,30 @@ les étiquettes de ses trois rangées. Les bouteilles sont désormais des acteur
 qui suivent le stock de la partie. La carte murale affiche les six boissons servies.
 La préparation sauvegarde la carte précédente dans `Saved/Backups/BeforeVisualUpgrade/`.
 
+## Réparation des panneaux — décor révision 8
+
+Le générateur de police fournit désormais une liste complète de lettres, chiffres,
+accents et ponctuation, avec le symbole €. La précédente liste limitée aux caractères
+spéciaux pouvait produire des glyphes vides. `Setup-Unreal.ps1` réimporte la police à
+son chemin existant si elle est incomplète ou si son générateur change. Avant cette
+opération, ses fichiers sont copiés dans `Saved/Backups/BeforeFontRepair/`.
+Une police valide et à jour est réutilisée. La préparation s’arrête si la nouvelle
+police reste invalide. La révision 8 du décor actualise aussi les panneaux qui avaient
+enregistré la police de secours, avec la sauvegarde de carte décrite ci-dessus.
+
+Les tests GPU de bière et de texte 3D attendent la compilation des matériaux et
+préparent plusieurs images avec l’exposition manuelle utilisée dans le bar. Le test
+de bière conserve son seuil de pixels dorés et ajoute un verre vide de contrôle ;
+les captures `Beer-0.bmp`, `Beer-4.bmp` et `Beer-8.bmp` sont dans `Saved/Tests/Drinks/`.
+Cette préparation des tests ne change pas les matériaux de boisson du jeu.
+
+En cas d’échec de `-VerifyUI`, les messages détaillés sont affichés dans le terminal
+et écrits dans `failures.txt`, à côté de `index.json` dans le dossier du rapport indiqué.
+Le test portable `python3 unreal/LePetitComptoir/Tests/font_generation_test.py`, lancé
+depuis la racine du dépôt, contrôle la couverture des textes de la scène, la réparation
+d’une ancienne police, sa sauvegarde et la gestion d’un échec de réimportation avec
+une API simulée. Il ne remplace pas la compilation C++ ni l’import et le rendu sous Unreal.
+
 ## Prétest Windows hors de l’éditeur
 
 1. Préparer le projet avec le script, puis enregistrer la carte **ComptoirOriginal**.

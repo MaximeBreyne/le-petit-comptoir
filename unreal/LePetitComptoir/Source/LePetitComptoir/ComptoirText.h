@@ -7,11 +7,16 @@
 
 namespace ComptoirText
 {
+inline const FString& RequiredGlyphs()
+{
+    static const FString Glyphs=TEXT("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789€éèêëàâäùûüôöîïçÉÈÊËÀÂÄÙÛÜÔÖÎÏÇŒœŸ’‘–—…");
+    return Glyphs;
+}
 inline bool IsUsable(const UFont* Font)
 {
     if(!Font||Font->FontCacheType!=EFontCacheType::Offline||Font->GetMaxCharHeight()<=0||
        Font->Textures.Num()!=1||!Font->Textures[0])return false;
-    for(const TCHAR C:FString(TEXT("Ag09€éèàç")))
+    for(const TCHAR C:RequiredGlyphs())
     {
         const int32 I=Font->RemapChar(C);
         if(I==UFont::NULLCHARACTER||!Font->Characters.IsValidIndex(I))return false;
