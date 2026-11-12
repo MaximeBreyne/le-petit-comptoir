@@ -133,7 +133,7 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     if(Player->IsGlassPickerOpen())
     {
         if(BoxName==TEXT("glass_close")){Player->SetGlassPicker(false);HideTablet();return;}
-        for(int I=0;I<3;++I)if(BoxName==FName(*FString::Printf(TEXT("glass_%d"),I)))Game->ChooseGlass(I);
+        for(int I=0;I<Comptoir::DrinkCount;++I)if(BoxName==FName(*FString::Printf(TEXT("glass_%d"),I)))Game->ChooseGlass(I);
         if(!Player->IsGlassPickerOpen())HideTablet();
         return;
     }
@@ -142,7 +142,7 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     for(int I=0;I<Comptoir::Game::MaxCustomers;++I)
         if(BoxName==FName(*FString::Printf(TEXT("customer_%d"),I)))
         {if(Game->CanReachTabletTarget(EComptoirTarget::Customer,I))Game->Interact(EComptoirTarget::Customer,I);return;}
-    for(int I=0;I<3;++I)
+    for(int I=0;I<Comptoir::DrinkCount;++I)
         if(BoxName==FName(*FString::Printf(TEXT("supply_%d"),I)))
         {if(Game->Simulation.Supply(static_cast<Comptoir::Recipe>(I))){Game->Notify(TEXT("Stock mis à jour."));Game->Save();}return;}
     for(int I=0;I<Comptoir::Game::TrayCapacity;++I)

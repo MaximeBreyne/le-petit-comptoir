@@ -3,7 +3,10 @@
 Jeu 3D de gestion de bar pour PC, en C++ avec **Unreal Engine 5.8.4**.
 Le développement se poursuit sur la branche **`migration/unreal`**.
 Le service permet trois clients simultanés, un plateau de quatre boissons et le choix
-du contenant pour la bière, le vin rouge ou l’espresso.
+du contenant pour la bière, le vin rouge ou l’espresso. Le réfrigérateur contient
+l’eau pétillante, le cola et le tonic avec un stock visible et utilisable.
+L’accueil reprend la présentation de `dev`, avec trois sauvegardes manuelles
+et des réglages graphiques et de souris natifs.
 
 ## Ouvrir le projet
 

@@ -45,7 +45,7 @@ void Preview(const Layout& L,const std::string& File)
     {
         std::ostringstream Color;Color<<'#'<<std::hex<<std::setw(6)<<std::setfill('0')<<C.Color;
         if(C.Type==Kind::Rect||C.Type==Kind::Rounded)
-            Out<<"<rect x='"<<C.X<<"' y='"<<C.Y<<"' width='"<<C.W<<"' height='"<<C.H<<"' rx='"<<C.Radius<<"' fill='"<<Color.str()<<"'/>";
+            Out<<"<rect x='"<<C.X<<"' y='"<<C.Y<<"' width='"<<C.W<<"' height='"<<C.H<<"' rx='"<<C.Radius<<"' fill='"<<Color.str()<<"' opacity='"<<C.Opacity<<"'/>";
         else if(C.Type==Kind::Line)
             Out<<"<path d='M "<<C.X<<' '<<C.Y<<" L "<<C.W<<' '<<C.H<<"' fill='none' stroke='"<<Color.str()<<"' stroke-width='1.5'/>";
         else if(C.Type==Kind::Text)
@@ -156,7 +156,7 @@ int main(int Argc,char** Argv)
     S.Tray={{0,1,2,0}};assert(!Has(Build(S,1280,800),"glass_2"));S.GlassPicker=false;
     if(Argc==2)
     {
-        S.Cash=26000;S.Reserve={{500,75,20}};S.Stock={{900,135,39}};S.Held=0;S.Amount=0;
+        S.Cash=26000;S.Reserve={{500,75,20,12,12,12}};S.Stock={{900,135,39,10,11,9}};S.Held=0;S.Amount=0;
         for(int I=0;I<3;++I)S.Guests[I]={I+1,I,2,0,true};
         for(int P=0;P<5;++P){S.Active=static_cast<Page>(P);Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(P)+".svg");}
         int I=5;
@@ -164,5 +164,30 @@ int main(int Argc,char** Argv)
         {S.View=View;Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(I++)+".svg");}
     }
     if(Argc==2){S.View=ComptoirSession::Screen::Playing;S.GlassPicker=true;S.Tray={{-1,-1,-1,-1}};Preview(Build(S,1280,800),std::string(Argv[1])+"8.svg");}
+    // Cold orders must show their own name/price on service, orders and register.
+    S.GlassPicker=false;S.View=ComptoirSession::Screen::Playing;
+    for(const auto PageValue:{Page::Service,Page::Orders,Page::Register})
+    for(int R=3;R<Comptoir::DrinkCount;++R)
+    {
+        S.Active=PageValue;S.Guests={};S.Guests[0]={1,R,PageValue==Page::Register?5:2,0,true};
+        const auto ColdLayout=Build(S,1280,800);bool Correct=false;
+        for(const auto& C:ColdLayout.Commands)if(C.Type==Kind::Text&&C.Value.find(Comptoir::Drinks[R].Name)!=std::string::npos&&C.Value.find(Money(Comptoir::Drinks[R].Price))!=std::string::npos)Correct=true;
+        assert(Correct);
+    }
+    int MenuPreview=9;
+    S.Settings={{"Élevée","60","Fenêtré","1.00","75°","100 %","Non"}};
+    S.Confirmation="Charger cette partie ?";S.Slots[0]="Chez Élise · Soir 3 · 520,00 € · 12/11/2026 18:50";
+    for(const auto Screen:{ComptoirSession::Screen::Load,ComptoirSession::Screen::Save,ComptoirSession::Screen::Settings,ComptoirSession::Screen::Confirm})
+    {
+        S.View=Screen;S.ValidSlots={{true,false,true,false}};const auto L=Build(S,1280,800);CheckReadability(L);
+        if(Argc==2)Preview(L,std::string(Argv[1])+std::to_string(MenuPreview++)+".svg");
+        if(Screen==ComptoirSession::Screen::Load)assert(Has(L,"slot_0")&&Has(L,"slot_2")&&!Has(L,"slot_1"));
+        if(Screen==ComptoirSession::Screen::Save)assert(!Has(L,"slot_0")&&Has(L,"slot_1")&&Has(L,"slot_3"));
+        if(Screen==ComptoirSession::Screen::Settings)assert(Has(L,"setting_quality")&&Has(L,"setting_invert"));
+    }
+    S.View=ComptoirSession::Screen::Playing;S.GlassPicker=true;S.ColdPicker=true;S.NearFridge=true;S.Held=0;S.Bankrupt=false;S.Tray={{-1,-1,-1,-1}};
+    assert(Has(Build(S,1280,800),"glass_3")&&Has(Build(S,1280,800),"glass_5")&&!Has(Build(S,1280,800),"glass_0"));
+    if(Argc==2)Preview(Build(S,1280,800),std::string(Argv[1])+"13.svg");
+    S.NearFridge=false;assert(!Has(Build(S,1280,800),"glass_3"));
     std::cout<<"PASS: "<<Layouts<<" tablet layouts fit; text contrast >= 4.5:1 and size >= 14; responsive hit testing and action availability are enforced.\n";
 }

@@ -24,12 +24,16 @@ public:
     void Interact(EComptoirTarget Target, int32 CustomerSlot=-1);
     void ChooseGlass(int32 RecipeIndex);
     void Pour(EComptoirTarget Target, float DeltaSeconds);
-    bool Save(bool Feedback = false);
-    bool Load(bool Feedback = false);
+    bool Save(bool Feedback = false,int32 Slot=0);
+    bool Load(bool Feedback = false,int32 Slot=0);
     ComptoirSession::Flow Session;
     FString BarName=TEXT("Le Petit Comptoir");
     FString PendingBarName=TEXT("Le Petit Comptoir");
     FString SaveSummary;
+    FString SlotSummaries[4];bool SlotValid[4]={false,false,false,false};
+    FString Confirmation;int32 PendingSlot=-1;bool bPendingLoad=false;
+    float Sensitivity=1,FieldOfView=75,Brightness=100;bool bInvertY=false;
+    void RefreshSlots();void LoadPreferences();void SettingsAction(FName Action);
     bool IsBarNameValid(const FString& Name) const;
     void MenuAction(FName Action);
     void DeveloperAction(FName Action);
@@ -50,6 +54,7 @@ private:
     UPROPERTY() TArray<TObjectPtr<AComptoirScene>> CustomerDrinks;
     UPROPERTY() TArray<TObjectPtr<AComptoirScene>> TrayVisuals;
     UPROPERTY() TObjectPtr<AComptoirScene> PreparationVisual;
+    UPROPERTY() TArray<TObjectPtr<AComptoirScene>> FridgeVisuals;
     UPROPERTY() TObjectPtr<AComptoirScene> DoorLeft;
     UPROPERTY() TObjectPtr<AComptoirScene> DoorRight;
     bool bDoorOpen=false;

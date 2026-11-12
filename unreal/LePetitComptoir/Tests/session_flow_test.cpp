@@ -18,6 +18,7 @@ int main()
     assert(Game.ToggleService());
     F.Pause();assert(F.View==Screen::Pause&&!F.CanSimulate()&&F.CanSave());
     F.Resume();assert(F.CanSimulate());
+    F.Open(Screen::Load);assert(!F.CanSimulate()&&F.CanSave());F.Back();assert(F.View==Screen::Pause);
     F.Home();assert(!F.CanSave()&&!F.CanSimulate());
     F.Resume();assert(F.View==Screen::Home&&!F.HasSession);
     std::cout<<"PASS: home/new/pause/resume transitions and save/simulation gating\n";

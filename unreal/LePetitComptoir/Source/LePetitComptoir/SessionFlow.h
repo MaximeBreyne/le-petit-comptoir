@@ -2,10 +2,13 @@
 
 namespace ComptoirSession
 {
-enum class Screen { Playing, Home, Pause, NewGame };
+enum class Screen { Playing, Home, Pause, NewGame, Load, Save, Settings, Confirm };
 struct Flow
 {
     Screen View=Screen::Home;
+    Screen ReturnView=Screen::Home;
+    void Open(Screen Next){ReturnView=HasSession?Screen::Pause:Screen::Home;View=Next;}
+    void Back(){View=ReturnView;}
     bool HasSession=false,HasSave=false,CanContinue=false;
     bool MenuVisible() const { return View!=Screen::Playing; }
     bool CanSimulate() const { return HasSession&&!MenuVisible(); }

@@ -51,7 +51,7 @@ int main()
     Wrong.Stock[0]=49;assert(Wrong.TakeGlass(Recipe::Beer)&&!Wrong.Pour(Recipe::Beer,1));
     assert(Wrong.Discard());
 
-    for(int I=0;I<3;++I)
+    for(int I=0;I<DrinkCount;++I)
     {
         const auto R=static_cast<Recipe>(I);Game Supply;Supply.Reserve[I]=0;Supply.Stock[I]=0;
         assert(Supply.Supply(R)&&Supply.Cash==26000-Drinks[I].PackCost&&!Supply.Supply(R));
@@ -63,8 +63,27 @@ int main()
         assert(Supply.Supply(R)&&Supply.Stock[I]==Drinks[I].Capacity&&Supply.Reserve[I]==Drinks[I].Pack-1);
     }
     Game Parallel;for(int I=0;I<3;++I){Parallel.Reserve[I]=0;assert(Parallel.Supply(static_cast<Recipe>(I)));}
-    assert(Parallel.Cash==23200);Parallel.Tick(10);assert((Parallel.Reserve==std::array<int,3>{{500,75,20}}));
+    assert(Parallel.Cash==23200);Parallel.Tick(10);assert((Parallel.Reserve==std::array<int,DrinkCount>{{500,75,20,12,12,12}}));
 
+    for(int I=3;I<DrinkCount;++I){Game Cold;const auto R=static_cast<Recipe>(I);
+        assert(IsCold(R)&&Cold.TakeGlass(R));assert(!Cold.Pour(Recipe::Beer,4));
+        assert(Cold.Pour(R,1)&&Cold.Stock[I]==11);Game Reload;assert(Reload.Restore(Cold.Serialize()));
+        assert(Reload.Pour(R,4)&&Reload.Stock[I]==11&&Reload.FinishDrink(R));
+        assert(Reload.ReadyCount(R)==1&&Reload.Supply(R)&&Reload.Stock[I]==12&&Reload.Reserve[I]==11);
+    }
+    // An actual three-drink v3 payload migrates with its progress and new fridge defaults.
+    Game V3;assert(V3.Restore("3 26000 1 0 0 0 0 0 1020 1 1 0 0 0 1000 500 0 150 75 0 40 20 0 0 0 0 0 0 0 0 0 0 0 0 0 -1 -1 -1 -1"));
+    assert(V3.Cash==26000&&V3.Stock[3]==12&&V3.Reserve[5]==12);
+    assert(V3.Restore("3 28400 3 7 1 0 0 0 1100 8 9 2 1 5 900 250 0 120 0 4 38 20 0 5 0 6 2 6 1 2 0 8 2 5 0 1 0 -1 -1"));
+    assert(V3.CustomerCount()==3&&V3.ProcessingSlot()==0&&V3.TrayCount()==2&&V3.Vessel==Recipe::Wine&&V3.Amount==5);
+    V3.Tick(2);assert(V3.Cash==28900&&V3.Sold==8&&V3.Delivery[1]==2);
+    assert(V3.Pour(Recipe::Wine,2)&&V3.Stock[1]==120&&V3.FinishDrink(Recipe::Wine)&&V3.ReadyCount(Recipe::Wine)==2);
+    Game ColdOrders;ColdOrders.NextCustomerId=4;assert(ColdOrders.ToggleService());ColdOrders.Tick(1);ColdOrders.Tick(16);ColdOrders.Tick(16);
+    for(int I=0;I<3;++I){assert(ColdOrders.Guests[I].Requested==static_cast<Recipe>(I+3));assert(ColdOrders.InteractCustomer(I));Prepare(ColdOrders,static_cast<Recipe>(I+3));}
+    for(int I=2;I>=0;--I)assert(ColdOrders.InteractCustomer(I));
+    assert(ColdOrders.ToggleService());ColdOrders.Tick(8);ColdOrders.Tick(3);
+    for(int I=0;I<3;++I){assert(ColdOrders.PayCard());ColdOrders.Tick(3);}
+    assert(ColdOrders.Sold==3&&ColdOrders.Cash==23500&&!ColdOrders.Open); // 3 + 3.50 + 3.50 - 35 euros.
     // Migrate old single-customer saves without losing a beer or repeating payment.
     Game Legacy;
     assert(Legacy.Restore("1 26000 950 500 1 0 1 0 1020 0 0 0 50 2 3"));
@@ -109,7 +128,7 @@ int main()
     Game Stress;std::mt19937 Random(93467);Stress.SetDeveloper(true);Stress.ToggleTestClock();
     for(int Step=0;Step<20000;++Step)
     {
-        const int I=Random()%3;const auto R=static_cast<Recipe>(I);
+        const int I=Random()%3;const auto R=static_cast<Recipe>(Random()%DrinkCount);
         switch(Random()%12)
         {
             case 0:Stress.ToggleService();break;case 1:Stress.Tick(Random()%18+1);break;
@@ -121,5 +140,5 @@ int main()
         }
         Game RoundTrip;assert(RoundTrip.Restore(Stress.Serialize())&&RoundTrip.Serialize()==Stress.Serialize());
     }
-    std::cout<<"PASS: concurrent orders, correct glasses, four-place tray, per-recipe stocks, payment queue, v1/v2 migration and 20000 mixed save round trips\n";
+    std::cout<<"PASS: concurrent orders, correct glasses, four-place tray, per-recipe stocks, payment queue, v1/v2/v3 migration, cold drink service and 20000 mixed save round trips\n";
 }

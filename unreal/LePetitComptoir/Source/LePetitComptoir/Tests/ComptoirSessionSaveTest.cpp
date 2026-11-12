@@ -16,11 +16,12 @@ bool FComptoirSessionSaveTest::RunTest(const FString&)
     TestFalse(TEXT("Overlong bar name"),Rules->IsBarNameValid(FString::ChrN(33,TCHAR('A'))));
     TestTrue(TEXT("Name at length limit"),Rules->IsBarNameValid(FString::ChrN(32,TCHAR('A'))));
     UComptoirSave* Original=NewObject<UComptoirSave>();
-    Original->BarName=TEXT("Chez Élise");
+    Original->BarName=TEXT("Chez Élise");Original->SavedAt=TEXT("12/11/2026 18:50");
     Comptoir::Game Game;Game.SetDeveloper(true);Game.ToggleTestClock();Game.AddTestMoney(1000);
     Game.ToggleService();Game.Tick(1);Game.Tick(16);Game.Tick(16);
     Game.InteractCustomer(0);Game.InteractCustomer(1);Game.InteractCustomer(2);
     Game.TakeGlass(Comptoir::Recipe::Wine);Game.Pour(Comptoir::Recipe::Wine,4);Game.FinishDrink(Comptoir::Recipe::Wine);
+    Game.TakeGlass(Comptoir::Recipe::Cola);Game.Pour(Comptoir::Recipe::Cola,4);Game.FinishDrink(Comptoir::Recipe::Cola);
     Original->Simulation=UTF8_TO_TCHAR(Game.Serialize().c_str());
     TArray<uint8> Bytes;
     if(!TestTrue(TEXT("Serialize into memory without touching player saves"),UGameplayStatics::SaveGameToMemory(Original,Bytes)))return false;
@@ -30,6 +31,14 @@ bool FComptoirSessionSaveTest::RunTest(const FString&)
     Comptoir::Game Restored;TestTrue(TEXT("Restore simulation"),Restored.Restore(TCHAR_TO_UTF8(*Loaded->Simulation)));
     TestTrue(TEXT("Developer settings stay with the save"),Restored.Developer&&Restored.ClockPaused&&Restored.Cash==126000);
     TestTrue(TEXT("Independent orders and ready drinks survive Unreal save"),Restored.CustomerCount()==3&&Restored.ReadyCount(Comptoir::Recipe::Wine)==1&&Restored.PendingCount(Comptoir::Recipe::Coffee)==1);
+    TestEqual(TEXT("Manual save date survives serialization"),Loaded->SavedAt,Original->SavedAt);
+    TestTrue(TEXT("Cold drink stock and tray survive Unreal save"),Restored.Stock[4]==11&&Restored.ReadyCount(Comptoir::Recipe::Cola)==1);
+    UComptoirPreferences* Preferences=NewObject<UComptoirPreferences>();
+    Preferences->Sensitivity=1.75f;Preferences->FieldOfView=85;Preferences->Brightness=115;Preferences->InvertY=true;
+    if(!TestTrue(TEXT("Serialize independent preferences"),UGameplayStatics::SaveGameToMemory(Preferences,Bytes)))return false;
+    const UComptoirPreferences* Reloaded=Cast<UComptoirPreferences>(UGameplayStatics::LoadGameFromMemory(Bytes));
+    if(!TestNotNull(TEXT("Deserialize preferences"),Reloaded))return false;
+    TestTrue(TEXT("Camera preferences survive reload"),Reloaded->Sensitivity==1.75f&&Reloaded->FieldOfView==85&&Reloaded->Brightness==115&&Reloaded->InvertY);
     return !HasAnyErrors();
 }
 #endif

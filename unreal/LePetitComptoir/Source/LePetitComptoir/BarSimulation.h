@@ -31,8 +31,8 @@ public:
     Recipe Vessel=Recipe::Beer;
     std::array<Guest,MaxCustomers> Guests{};
     std::array<int,TrayCapacity> Tray{{-1,-1,-1,-1}};
-    std::array<int,3> Stock{{1000,150,40}},Reserve{{500,75,20}};
-    std::array<double,3> Delivery{{0,0,0}};
+    std::array<int,DrinkCount> Stock{{1000,150,40,12,12,12}},Reserve{{500,75,20,12,12,12}};
+    std::array<double,DrinkCount> Delivery{};
 
     bool Bankrupt() const {return Cash<0;}
     int CustomerCount() const {int N=0;for(const auto& C:Guests)N+=C.Phase!=Customer::None;return N;}
@@ -62,7 +62,7 @@ public:
     bool FillTestStocks()
     {
         if(!Developer)return false;
-        for(int I=0;I<3;++I){Stock[I]=Drinks[I].Capacity;Reserve[I]=Drinks[I].Pack;Delivery[I]=0;}return true;
+        for(int I=0;I<DrinkCount;++I){Stock[I]=Drinks[I].Capacity;Reserve[I]=Drinks[I].Pack;Delivery[I]=0;}return true;
     }
     bool ToggleTestClock(){if(!Developer)return false;ClockPaused=!ClockPaused;return true;}
     bool AdvanceTestHour()
@@ -142,7 +142,7 @@ public:
     void Tick(double Seconds)
     {
         if(!std::isfinite(Seconds)||Seconds<=0||Bankrupt())return;
-        for(int I=0;I<3;++I)if(Delivery[I]>0)
+        for(int I=0;I<DrinkCount;++I)if(Delivery[I]>0)
         {Delivery[I]=std::max(0.0,Delivery[I]-Seconds);if(Delivery[I]==0)Reserve[I]+=Drinks[I].Pack;}
         if(!Open)return;
         if(!Developer||!ClockPaused)Time=std::min(1680.0,Time+Seconds*.5);
@@ -165,7 +165,7 @@ public:
             if(SpawnRemaining==0&&CustomerCount()<MaxCustomers&&NextCustomerId<10000000)
             {
                 for(auto& C:Guests)if(C.Phase==Customer::None)
-                {C={NextCustomerId,static_cast<Recipe>((NextCustomerId-1)%3),Customer::Order,0};++NextCustomerId;SpawnRemaining=16;break;}
+                {C={NextCustomerId,static_cast<Recipe>((NextCustomerId-1)%DrinkCount),Customer::Order,0};++NextCustomerId;SpawnRemaining=16;break;}
             }
         }
         FinishIfReady();
@@ -173,9 +173,9 @@ public:
     std::string Serialize() const
     {
         std::ostringstream Out;Out.imbue(std::locale::classic());
-        Out<<std::setprecision(17)<<3<<' '<<Cash<<' '<<Day<<' '<<Sold<<' '<<Open<<' '<<Closing<<' '<<Developer<<' '<<ClockPaused
+        Out<<std::setprecision(17)<<4<<' '<<Cash<<' '<<Day<<' '<<Sold<<' '<<Open<<' '<<Closing<<' '<<Developer<<' '<<ClockPaused
             <<' '<<Time<<' '<<SpawnRemaining<<' '<<NextCustomerId<<' '<<static_cast<int>(Held)<<' '<<static_cast<int>(Vessel)<<' '<<Amount;
-        for(int I=0;I<3;++I)Out<<' '<<Stock[I]<<' '<<Reserve[I]<<' '<<Delivery[I];
+        for(int I=0;I<DrinkCount;++I)Out<<' '<<Stock[I]<<' '<<Reserve[I]<<' '<<Delivery[I];
         for(const auto& C:Guests)Out<<' '<<C.Id<<' '<<static_cast<int>(C.Requested)<<' '<<static_cast<int>(C.Phase)<<' '<<C.Remaining;
         for(int R:Tray)Out<<' '<<R;
         return Out.str();
@@ -196,17 +196,17 @@ public:
             else if(Remaining!=0)return false;
             if(HeldValue==3){if(C.Amount!=50)return false;C.Tray[0]=0;HeldValue=0;C.Amount=0;}
         }
-        else if(Version==3)
+        else if(Version==3||Version==4)
         {
             if(!(In>>C.Cash>>C.Day>>C.Sold>>C.Open>>C.Closing>>C.Developer>>C.ClockPaused>>C.Time>>C.SpawnRemaining
                 >>C.NextCustomerId>>HeldValue>>VesselValue>>C.Amount))return false;
-            for(int I=0;I<3;++I)if(!(In>>C.Stock[I]>>C.Reserve[I]>>C.Delivery[I]))return false;
+            for(int I=0;I<(Version==3?3:DrinkCount);++I)if(!(In>>C.Stock[I]>>C.Reserve[I]>>C.Delivery[I]))return false;
             for(auto& Guest:C.Guests)
             {
                 int R=0,P=0;if(!(In>>Guest.Id>>R>>P>>Guest.Remaining)||!ValidRecipe(R)||P<0||P>6)return false;
                 Guest.Requested=static_cast<Recipe>(R);Guest.Phase=static_cast<Customer>(P);
             }
-            for(int& R:C.Tray)if(!(In>>R)||R< -1||R>2)return false;
+            for(int& R:C.Tray)if(!(In>>R)||R< -1||(R>=0&&!ValidRecipe(R)))return false;
         }
         else return false;
         if(HeldValue<0||HeldValue>2||!ValidRecipe(VesselValue))return false;
@@ -227,7 +227,7 @@ private:
             ||!Range(SpawnRemaining,0,16)||!Range(NextCustomerId,1,10000000)||!Range(Amount,0,Drink(Vessel).Target))return false;
         if((!Open&&(Closing||CustomerCount()>0))||(Bankrupt()&&Open)||(ClockPaused&&!Developer))return false;
         if((Held==Glass::None||Held==Glass::Empty)&&Amount!=0)return false;
-        for(int I=0;I<3;++I)
+        for(int I=0;I<DrinkCount;++I)
             if(!Range(Stock[I],0,Drinks[I].Capacity)||!Range(Reserve[I],0,Drinks[I].Pack)||!Range(Delivery[I],0,10)
                 ||(Delivery[I]>0&&Reserve[I]!=0))return false;
         int Processing=0;

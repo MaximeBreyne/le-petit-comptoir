@@ -4,7 +4,7 @@ Projet natif C++ pour **Unreal Engine 5.8.4 sur Windows**. Les seules sources Ja
 référence de géométrie, dans `SourceArt/Scene/`. Le jeu fonctionne nativement sous Unreal.
 
 Le décor du premier pilote était une approximation trop simplifiée. Cette version
-reprend les **5 228 éléments de la scène originale d'une nouvelle partie** : salle,
+reprend le décor original d’une nouvelle partie et ses détails supplémentaires : salle,
 comptoir, réserve, vitrines, rue, mobilier, bouteilles, équipements et enseignes.
 Les clients et les verres reprennent également leur géométrie d'origine. Le logo,
 la palette et la disposition compacte de l'interface sont repris du prototype.
@@ -18,7 +18,7 @@ plus par la police bitmap du HUD ni par une texture agrandie. Les tailles agrand
 les contrastes renforcés et les boutons plus hauts sont conservés. Les clics utilisent
 la géométrie du widget, y compris lorsque la fenêtre est redimensionnée.
 
-**La migration fonctionnelle reste partielle** : bière, vin rouge et espresso, trois
+**La migration fonctionnelle reste partielle** : bière, vin rouge, espresso, eau pétillante, cola et tonic, trois
 clients simultanés au comptoir, plateau de quatre boissons, choix du contenant,
 paiement par carte, stocks, fermeture et sauvegarde. Les cocktails, employés,
 extensions et réglages complets du prototype ne sont pas encore portés. La géométrie est vérifiée par comparaison avec le moteur original ;
@@ -102,7 +102,7 @@ remplace la sauvegarde automatique existante ; le formulaire le signale et perme
 
 Le nom choisi apparaît sur la devanture, sur l’enseigne du fond, dans la tablette et
 le HUD. Il suit la sauvegarde, sans modifier le nom du projet Unreal. **P** ouvre
-un menu de pause avec Reprendre, Sauvegarder, Retour à l’accueil et Retour au bureau.
+un menu de pause avec Reprendre, Sauvegarder, Charger, Réglages, Retour à l’accueil et Retour au bureau.
 Le retour à l’accueil et la sortie sauvegardent d’abord la partie ; en cas d’échec,
 le menu reste ouvert. Dans PIE, Échap reste la commande Unreal d’arrêt du jeu.
 
@@ -110,7 +110,7 @@ le menu reste ouvert. Dans PIE, Échap reste la commande Unreal d’arrêt du je
 
 - argent de test : +100 €, +1 000 € ou +10 000 € ;
 - compteur de clients : +25 ou +100, sans encaissement ;
-- remplissage des stocks de bière, vin et café au comptoir et en réserve, livraisons incluses ;
+- remplissage des six stocks au comptoir, au réfrigérateur et en réserve, livraisons incluses ;
 - gel/reprise de l’horloge : clients, versement et livraisons continuent ;
 - avance d’une heure, uniquement pendant un service ouvert avant la dernière tournée.
 
@@ -148,6 +148,16 @@ se trouve à droite, comme dans le jeu original.
    | Bière blonde | Pinte | Tireuse | 50 cl | 5 € |
    | Vin rouge | Verre à vin | Bouteille VIN du meuble arrière | 15 cl | 6 € |
    | Espresso | Tasse | Machine à café | 25 ml, soit 1 dose | 3 € |
+   | Eau pétillante | Verre à soft | Réfrigérateur | 25 cl, soit 1 bouteille | 3 € |
+   | Cola | Verre à soft | Réfrigérateur | 25 cl, soit 1 bouteille | 3,50 € |
+   | Tonic | Verre à soft | Réfrigérateur | 25 cl, soit 1 bouteille | 3,50 € |
+
+   **E sur le réfrigérateur derrière le bar** ouvre le choix des trois boissons fraîches.
+   Choisir la boisson, viser à nouveau le réfrigérateur, maintenir le clic gauche pour
+   remplir le verre puis **E** pour le poser sur le plateau. Chaque rangée contient
+   au maximum 12 bouteilles étiquetées ; elles diminuent avec le stock et reviennent
+   au réapprovisionnement. Les modèles ne sont reconstruits que si ce nombre change.
+   La bière pression reste à la tireuse, le vin sur l’étagère et l’espresso à la machine.
 
 6. Le **plateau contient quatre boissons**. **E sur un client** sert uniquement la
    boisson qu’il a commandée ; les autres restent disponibles. Le service peut se faire
@@ -156,9 +166,10 @@ se trouve à droite, comme dans le jeu original.
 7. Chaque client rejoint la caisse après consommation. **E sur la caisse** lance le
    règlement du prochain client prêt à payer : montant propre à sa boisson, crédité
    après trois secondes. Le terminal traite **un paiement à la fois**.
-8. L’onglet **Réserve** gère les stocks séparément : bière, vin et café. La réserve
+8. L’onglet **Réserve** gère les six stocks séparément. La réserve
    physique ouvre cet onglet avec **E** ou **Tab**. Lots livrés après dix secondes :
-   **500 cl de bière pour 16 €**, **75 cl de vin pour 7 €**, **20 doses de café pour 5 €**.
+   **500 cl de bière pour 16 €**, **75 cl de vin pour 7 €**, **20 doses de café pour 5 €**,
+   **12 eaux pour 6 €**, **12 colas pour 9 €** ou **12 tonics pour 9 €**.
    Le stock est déduit une seule fois au début du versement ; jeter ne rembourse pas.
 9. Le panneau ou la tablette lance la dernière tournée. La fermeture attend **tous**
    les clients, prélève **35 € une seule fois** et prépare le soir suivant.
@@ -205,12 +216,19 @@ inversé (révision 2) sont converties vers le nouveau repère (révision 3) : p
 orientation sont conservées par rapport au mobilier. Les nouvelles sauvegardes
 mémorisent la position dans la salle, la réserve ou la portion de rue accessible.
 
-Le format de simulation **v3** conserve chaque commande, le plateau, le contenant,
-le dosage et les trois stocks/livraisons. Les formats v1 et v2 restent lisibles : le
-client existant reste à sa place centrale, une ancienne bière prête rejoint le plateau,
-et un versement ou paiement en cours reprend sans double débit/crédit. Les nouvelles
-réserves de vin et de café reçoivent leurs quantités initiales. Une sauvegarde v3 ne
-peut pas être ouverte avec l’ancien code : synchroniser les deux PC avant de continuer.
+Le format de simulation **v4** conserve chaque commande, le plateau, le contenant,
+le dosage et les six stocks/livraisons. Les formats v1, v2 et v3 restent lisibles :
+les commandes et préparations existantes sont conservées sans double débit/crédit.
+Les anciennes parties reçoivent les stocks initiaux des boissons fraîches :
+12 bouteilles de chaque boisson au réfrigérateur et 12 en réserve.
+Une sauvegarde v4 ne peut pas être ouverte avec l’ancien code : synchroniser les deux PC.
+
+Les trois emplacements manuels `LePetitComptoir_Manual_1` à `_3` sont séparés de
+l’autosauvegarde. **P → Sauvegarder** affiche ces emplacements ; remplacer un fichier
+existant demande confirmation. **Charger** affiche l’autosauvegarde et les trois
+emplacements, avec le nom du bar, le soir, la trésorerie et la date lorsqu’elle existe.
+Charger pendant une partie demande confirmation. Une nouvelle partie ne touche pas
+aux sauvegardes manuelles. Les sauvegardes web/Electron de `dev` ne sont pas importées.
 
 `Saved/SaveGames/` n'est pas envoyé à GitHub : les deux PC partagent le projet,
 pas automatiquement la partie en cours. En cas de sauvegarde invalide, les écritures
@@ -260,12 +278,12 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic unreal/LePetitComptoir/Tests/sess
 /tmp/comptoir-session-test
 ```
 
-Le premier test compare **958 548 positions et normales** de 9 083 formes (décor,
+Le premier test compare **1 203 432 positions et normales** de 11 955 formes (décor,
 clients, verres, portes et animation de rue) à la sortie réelle du renderer JavaScript. Il vérifie la fraîcheur
 de l'export, les sols, le passage de la porte, le dégagement du réfrigérateur
 et les collisions des objets solides. La projection
 à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
-Le second teste commandes simultanées, contenants, plateau, stocks, file de paiement, fermeture, migration v1/v2 et 20 000 séquences d’actions/sauvegardes. Le troisième
+Le second teste commandes simultanées, contenants, plateau, stocks, file de paiement, fermeture, migration v1/v2/v3 et 20 000 séquences d’actions/sauvegardes. Le troisième
 contrôle 175 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
 disponibilité des actions, conversion des coordonnées des clics, taille de texte
 minimale dans le repère de la tablette et contraste texte/fond d'au moins 4,5:1.
@@ -304,7 +322,8 @@ Pour contrôler les pixels réellement rendus sur le PC Unreal :
 powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-Unreal.ps1 -VerifyUI -OpenEditor
 ```
 
-Cette option contrôle la tablette (5 pages), l’accueil, la création, la pause et le choix du verre,
+Cette option contrôle la tablette (5 pages), l’accueil, la création, la pause, les sauvegardes,
+les réglages, la confirmation, le choix du verre et le réfrigérateur,
 les glyphes de la police, le symbole € rendu par le HUD et un panneau 3D, ainsi que
 la sauvegarde en mémoire du nom, du mode développeur et des commandes multiples.
 Elle vérifie aussi les pixels dorés d’une bière à moitié remplie et pleine dans une scène de rendu. Les captures sont dans
@@ -315,8 +334,17 @@ avec clavier/souris dans Play. Ces contrôles GPU ne fonctionnent pas avec `-Nul
 Le test portable supplémentaire `Tests/session_flow_test.cpp` vérifie que l’accueil
 et le formulaire de création ne lancent ni simulation ni sauvegarde. Les tests du
 modèle couvrent aussi les anciennes sauvegardes v1 et les outils développeur v2.
-Les trois sauvegardes manuelles et les réglages complets de l’ancienne interface web
-ne sont pas encore portés dans ce menu natif.
+L’accueil et la pause reprennent le thème, les textes et les actions de `dev`
+(commit `726b07c2ee378e488dda6bf67e6f4f6ae6afdbe0`, `dist/menus.js` et `dist/menus.css`).
+La présentation est adaptée à Slate : fond charbon, titres dorés, bar visible à droite,
+action principale et confirmations. Les trois sauvegardes manuelles sont natives.
+**Réglages** fonctionne à l’accueil et en pause : qualité, limite 30/60/120 images/s,
+affichage fenêtré ou plein écran fenêtré, sensibilité, champ de vision vertical,
+luminosité et inversion verticale. Les réglages de caméra se voient en reprenant le jeu.
+Ces préférences sont persistées séparément des parties, sur chaque PC. Le mode
+fenêtré/plein écran se vérifie dans une fenêtre autonome ou le jeu empaqueté.
+L’audio, les raccourcis personnalisables et la manette de l’ancienne interface restent
+à porter ; aucun réglage sans effet n’est proposé.
 
 
 ## Rendu des boissons
@@ -356,8 +384,10 @@ le liquide gardent leur émission dédiée ; la mousse de bière est plus mate.
 Les coordonnées de texture sont attachées aux objets pour suivre leurs mouvements.
 Les détails fins s'atténuent avec la distance pour limiter le scintillement.
 Les formes extérieures au-delà de 40 m du centre du bar gardent leur géométrie légère.
-Les 9 083 formes de toutes les variantes réunies représentent 1 650 564 sommets ;
-ce total n'est pas le nombre de sommets visibles simultanément. Le décor reste
+Les 11 955 formes de toutes les variantes réunies représentent 2 069 592 sommets ;
+ce total n'est pas le nombre de sommets visibles simultanément. Le contrôle d’une
+borne haute de la scène active reste sous 2 millions (1 787 436 sommets, avec toutes
+les boissons comptées à chaque place et les deux poses des clients par prudence). Le décor reste
 regroupé par matériau et n'est pas retessellé à chaque image. Les détails ne créent
 aucune collision et ne recouvrent ni les verres en préparation ni le plateau.
 
@@ -403,3 +433,27 @@ procéduraux existants, lissés, et ne sont pas des humains scannés ou des Meta
 Cette amélioration ne remplace pas une future passe de modèles artistiques dédiés.
 La compilation C++ Unreal, les contrôles GPU, l'inspection des quatre captures et
 la mesure des performances doivent être faits sur les PC équipés du moteur.
+
+
+## Réfrigérateur et menu — décor révision 7
+
+Après cette mise à jour, relancer `Setup-Unreal.ps1` : le décor généré passe en
+révision 7 pour retirer les bouteilles décoratives fixes du réfrigérateur et ajouter
+les étiquettes de ses trois rangées. Les bouteilles sont désormais des acteurs natifs
+qui suivent le stock de la partie. La carte murale affiche les six boissons servies.
+La préparation sauvegarde la carte précédente dans `Saved/Backups/BeforeVisualUpgrade/`.
+
+## Prétest Windows hors de l’éditeur
+
+1. Préparer le projet avec le script, puis enregistrer la carte **ComptoirOriginal**.
+2. Dans **Plateformes**, choisir **Développement**, puis **Empaqueter le projet → Windows**
+   (architecture x64 pour un PC Intel/AMD, si le choix apparaît).
+3. Choisir un dossier de sortie hors du dépôt, par exemple `C:\Jeux\LePetitComptoir-Pretest`.
+4. Une fois l’empaquetage terminé, lancer `LePetitComptoir.exe` dans le dossier produit.
+   Pour un autre testeur, transmettre le dossier complet compressé en ZIP, pas seulement
+   l’exécutable. Unreal Editor n’est pas nécessaire pour jouer au jeu empaqueté.
+
+Contrôler dans cette version : nouvelle partie et nom du bar, continuer, trois sauvegardes
+manuelles et confirmations, réglages après redémarrage, stock du frigo vide puis rempli,
+commandes simultanées des six boissons, paiement, rue et réserve. Cette compilation et
+ces vérifications doivent être réalisées sur le poste équipé d’Unreal.

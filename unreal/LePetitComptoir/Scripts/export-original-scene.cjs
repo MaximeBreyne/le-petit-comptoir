@@ -19,6 +19,12 @@ function exportScene() {
   vm.runInContext('ComptoirFinishes', context).add(world);
   const seated = [], standing = [], glass = [], beer = [];
   const models = {};
+  for(const [r,key] of ['water','cola','tonic'].entries())for(let count=0;count<=12;count++){
+    const bottles=[];
+    for(let i=0;i<count;i++)scene.bottle(scene.geometry(bottles),(i%4-1.5)*.19,0,Math.floor(i/4)*.16,
+      ['#799e96','#493024','#b6be97'][r],.58,['EAU','COLA','TONIC'][r]);
+    models[`fridge_${key}_${count}`]=bottles;
+  }
   const pivots = {body:[0,0,0],legLeft:[-.105,.865,0],legRight:[.105,.865,0],armLeft:[-.245,1.31,0],armRight:[.245,1.31,0]};
   for(let variant=0;variant<3;variant++){
     const person=[];scene.customer(person,{x:0,z:0,id:variant+1,time:0,moving:false,angle:0});
@@ -38,8 +44,10 @@ function exportScene() {
   // Shared model keys for empty vessels, eight fill levels and the full tray.
   // Liquid has a dedicated non-metallic material, with enough ambient colour in
   // the shadow under the tap. Glass walls keep their separate transparent pass.
-  for(const recipe of ['beer','wine','coffee'])for(let level=0;level<=8;level++) {
+  for(const recipe of ['beer','wine','coffee','water','cola','tonic'])for(let level=0;level<=8;level++) {
     const items=[];scene.glass(scene.geometry(items),recipe,0,0,0,level/8);
+    if(['water','cola','tonic'].includes(recipe))for(const item of items)
+      if(item.mat===scene.materials.glass)item.c={water:'#d4e7df',cola:'#543221',tonic:'#dce6c5'}[recipe];
     models[`drink_${recipe}_${level}`]=items.map(item=>({...item,
       mat:item.mat===scene.materials.glass||item.c==='#ede1c5'?16:item.mat}));
   }

@@ -21,14 +21,15 @@ namespace
 {
     // Avoid generic globals that trigger MSVC shadowing errors in Unreal templates.
     const FString GComptoirSaveSlotName = TEXT("LePetitComptoir_Unreal_Pilot_v1");
-    int RecipeForTarget(EComptoirTarget Target)
+    FString SaveSlot(int32 Index){return Index==0?GComptoirSaveSlotName:FString::Printf(TEXT("LePetitComptoir_Manual_%d"),Index);}
+    int RecipeForTarget(EComptoirTarget Target,Comptoir::Recipe Vessel)
     {
-        return Target==EComptoirTarget::Tap?0:Target==EComptoirTarget::Wine?1:Target==EComptoirTarget::Coffee?2:-1;
+        return Target==EComptoirTarget::Fridge?(Comptoir::IsCold(Vessel)?static_cast<int>(Vessel):-1):Target==EComptoirTarget::Tap?0:Target==EComptoirTarget::Wine?1:Target==EComptoirTarget::Coffee?2:-1;
     }
     FVector SeatPosition(int Slot){return FVector(430,460+Slot*140,0);}
     FVector StationPosition(Comptoir::Recipe Recipe)
     {
-        return Recipe==Comptoir::Recipe::Beer?FVector(272,415,113.3):
+        return Comptoir::IsCold(Recipe)?FVector(119,1110,165):Recipe==Comptoir::Recipe::Beer?FVector(272,415,113.3):
             Recipe==Comptoir::Recipe::Wine?FVector(110,290,106):FVector(247,843,115.2);
     }
     FString DrinkModel(Comptoir::Recipe Recipe,int Level)
@@ -45,6 +46,7 @@ AComptoirGameMode::AComptoirGameMode()
 void AComptoirGameMode::BeginPlay()
 {
     Super::BeginPlay();
+    LoadPreferences();
     BuildRoom();
     if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
     {
@@ -80,7 +82,7 @@ void AComptoirGameMode::BuildRoom()
     for (TActorIterator<AComptoirScene> It(GetWorld()); It; ++It)
         if (It->ActorHasTag(TEXT("OriginalVenue")))
         {
-            HasVenue = It->GetGeometryRevision() >= 6 || It->Build(TEXT("world"), true);
+            HasVenue = It->GetGeometryRevision() >= 7 || It->Build(TEXT("world"), true);
             break;
         }
     if (!HasVenue)
@@ -105,6 +107,7 @@ void AComptoirGameMode::BuildRoom()
     Target(FVector(272, 415, 168), FVector(35, 95, 75), EComptoirTarget::Tap);
     Target(FVector(92,290,125),FVector(40,38,60),EComptoirTarget::Wine);
     Target(FVector(247,843,148),FVector(55,80,65),EComptoirTarget::Coffee);
+    Target(FVector(113,1110,112),FVector(10,88,170),EComptoirTarget::Fridge);
     Target(FVector(85, 700, 130), FVector(45, 125, 65), EComptoirTarget::GlassRack);
     Target(FVector(288, 265, 144), FVector(50, 70, 65), EComptoirTarget::Till);
     Target(FVector(-350, 230, 130), FVector(70, 350, 180), EComptoirTarget::Stock);
@@ -133,6 +136,7 @@ void AComptoirGameMode::BuildRoom()
         CustomerStanding.Add(Model(FString::Printf(TEXT("guest%d_standing"),I)));
         CustomerDrinks.Add(Model(DrinkModel(Comptoir::Recipe::Beer,8)));
     }
+    for(int I=3;I<Comptoir::DrinkCount;++I)FridgeVisuals.Add(Model(FString::Printf(TEXT("fridge_%s_12"),UTF8_TO_TCHAR(Comptoir::Drinks[I].Key))));
     PreparationVisual=Model(DrinkModel(Comptoir::Recipe::Beer,0));
     for(int I=0;I<Comptoir::Game::TrayCapacity;++I)TrayVisuals.Add(Model(DrinkModel(Comptoir::Recipe::Beer,8)));
     DoorLeft=GetWorld()->SpawnActor<AComptoirScene>();
@@ -174,6 +178,11 @@ void AComptoirGameMode::Tick(float DeltaSeconds)
 
 void AComptoirGameMode::UpdateVisuals()
 {
+    for(int I=0;I<FridgeVisuals.Num();++I)if(FridgeVisuals[I])
+    {
+        FridgeVisuals[I]->UseModel(FString::Printf(TEXT("fridge_%s_%d"),UTF8_TO_TCHAR(Comptoir::Drinks[I+3].Key),FMath::Clamp(Simulation.Stock[I+3],0,12)));
+        FridgeVisuals[I]->SetActorLocation(FVector(42,1110,40+I*41));
+    }
     using namespace Comptoir;
     for(int I=0;I<Game::MaxCustomers;++I)
     {
@@ -228,13 +237,14 @@ bool AComptoirGameMode::CanReachTabletTarget(EComptoirTarget Target,int32 Slot) 
     if(Target==EComptoirTarget::Customer&&Simulation.HasCustomer(Slot)&&Customers.IsValidIndex(Slot)&&Customers[Slot])
         return FVector::Dist2D(Player->GetActorLocation(),Customers[Slot]->GetActorLocation())<=300;
     if(Target==EComptoirTarget::Till)return FVector::Dist2D(Player->GetActorLocation(),FVector(288,265,144))<=300;
+    if(Target==EComptoirTarget::Fridge)return FVector::Dist2D(Player->GetActorLocation(),FVector(113,1110,112))<=220;
     if(Target==EComptoirTarget::GlassRack)return FVector::Dist2D(Player->GetActorLocation(),FVector(85,700,130))<=300;
     return false;
 }
 
 void AComptoirGameMode::ChooseGlass(int32 Index)
 {
-    if(!Session.CanSimulate()||!Comptoir::ValidRecipe(Index)||!CanReachTabletTarget(EComptoirTarget::GlassRack))return;
+    if(!Session.CanSimulate()||!Comptoir::ValidRecipe(Index)||!(CanReachTabletTarget(EComptoirTarget::GlassRack)||(Index>=3&&CanReachTabletTarget(EComptoirTarget::Fridge))))return;
     if(Simulation.TakeGlass(static_cast<Comptoir::Recipe>(Index)))
     {
         Notify(FString::Printf(TEXT("%s choisi · rendez-vous au poste : %s."),UTF8_TO_TCHAR(Comptoir::Drinks[Index].Vessel),UTF8_TO_TCHAR(Comptoir::Drinks[Index].Station)));
@@ -260,8 +270,13 @@ void AComptoirGameMode::Interact(EComptoirTarget Target,int32 Slot)
         case EComptoirTarget::GlassRack:
             if(AComptoirCharacter* Player=Cast<AComptoirCharacter>(UGameplayStatics::GetPlayerPawn(this,0)))Player->SetGlassPicker(true);
             return;
+        case EComptoirTarget::Fridge:
+            if(Comptoir::IsCold(Simulation.Vessel)&&Simulation.Held==Comptoir::Glass::Filling)
+            {Changed=Simulation.FinishDrink(Simulation.Vessel);break;}
+            if(AComptoirCharacter* Player=Cast<AComptoirCharacter>(UGameplayStatics::GetPlayerPawn(this,0)))Player->SetGlassPicker(true,true);
+            return;
         case EComptoirTarget::Tap:case EComptoirTarget::Wine:case EComptoirTarget::Coffee:
-            Changed=Simulation.FinishDrink(static_cast<Comptoir::Recipe>(RecipeForTarget(Target)));break;
+            Changed=Simulation.FinishDrink(static_cast<Comptoir::Recipe>(RecipeForTarget(Target,Simulation.Vessel)));break;
         case EComptoirTarget::Customer:Changed=Simulation.InteractCustomer(Slot);break;
         case EComptoirTarget::Till:Changed=Simulation.PayCard();break;
         default:return;
@@ -272,7 +287,7 @@ void AComptoirGameMode::Interact(EComptoirTarget Target,int32 Slot)
 void AComptoirGameMode::Pour(EComptoirTarget Target,float DeltaSeconds)
 {
     if(!Session.CanSimulate())return;
-    const int Index=RecipeForTarget(Target);if(Index<0)return;
+    const int Index=RecipeForTarget(Target,Simulation.Vessel);if(Index<0)return;
     const auto Before=Simulation.Held;
     if(!Simulation.Pour(static_cast<Comptoir::Recipe>(Index),DeltaSeconds))return;
     if(Before!=Simulation.Held)Save();
@@ -283,7 +298,8 @@ FString AComptoirGameMode::Prompt(EComptoirTarget Target,int32 Slot) const
     using namespace Comptoir;
     if(Target==EComptoirTarget::Door)return bDoorOpen?TEXT("E - Fermer la porte"):TEXT("E - Ouvrir la porte et sortir");
     if(Simulation.Bankrupt())return TEXT("Trésorerie négative : partie terminée.");
-    const int R=RecipeForTarget(Target);
+    if(Target==EComptoirTarget::Fridge&&(Simulation.Held==Glass::None||!IsCold(Simulation.Vessel)))return TEXT("E - Réfrigérateur : eau pétillante, cola et tonic");
+    const int R=RecipeForTarget(Target,Simulation.Vessel);
     if(R>=0)
     {
         const auto& Info=Drinks[R];
@@ -318,34 +334,35 @@ FString AComptoirGameMode::Prompt(EComptoirTarget Target,int32 Slot) const
     }
 }
 
-bool AComptoirGameMode::Save(bool Feedback)
+bool AComptoirGameMode::Save(bool Feedback,int32 Slot)
 {
-    if (!bReadyToSave||!Session.CanSave()) return false;
+    if (Slot<0||Slot>3||!bReadyToSave||!Session.CanSave()) return false;
     UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::CreateSaveGameObject(UComptoirSave::StaticClass()));
     if (!Data) return false;
     const std::string Payload = Simulation.Serialize();
     Data->Simulation = UTF8_TO_TCHAR(Payload.c_str());
     Data->LayoutRevision = 3;
     Data->BarName=BarName;
+    Data->SavedAt=FDateTime::Now().ToString(TEXT("%d/%m/%Y %H:%M"));
     if (const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
     {
         Data->PlayerLocation = Player->GetActorLocation();
         Data->PlayerRotation = Player->GetControlRotation();
     }
-    const bool Saved = UGameplayStatics::SaveGameToSlot(Data, GComptoirSaveSlotName, 0);
+    const bool Saved = UGameplayStatics::SaveGameToSlot(Data, SaveSlot(Slot), 0);
     if (!Saved) Notify(TEXT("Echec de sauvegarde : verifiez l'espace disque."));
     else if (Feedback) Notify(TEXT("Partie Unreal sauvegardee."));
     return Saved;
 }
 
-bool AComptoirGameMode::Load(bool Feedback)
+bool AComptoirGameMode::Load(bool Feedback,int32 Slot)
 {
-    if (!UGameplayStatics::DoesSaveGameExist(GComptoirSaveSlotName, 0))
+    if (Slot<0||Slot>3||!UGameplayStatics::DoesSaveGameExist(SaveSlot(Slot), 0))
     {
         if (Feedback) Notify(TEXT("Aucune sauvegarde Unreal."));
         return false;
     }
-    UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::LoadGameFromSlot(GComptoirSaveSlotName, 0));
+    UComptoirSave* Data = Cast<UComptoirSave>(UGameplayStatics::LoadGameFromSlot(SaveSlot(Slot), 0));
     if (!Data || !Simulation.Restore(TCHAR_TO_UTF8(*Data->Simulation)))
     {
         // Do not overwrite a corrupt or unsupported save on the next autosave.

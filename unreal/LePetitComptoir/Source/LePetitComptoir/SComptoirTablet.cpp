@@ -87,7 +87,7 @@ int32 SComptoirTablet::OnPaint(const FPaintArgs& Args, const FGeometry& Geometry
     {return Geometry.ToPaintGeometry(Extent,FSlateLayoutTransform(Position));};
 
     FSlateDrawElement::MakeBox(Elements,LayerId,Geometry.ToPaintGeometry(),&Solid,
-        ESlateDrawEffect::None,FLinearColor(.027f,.063f,.051f,.64f)*Tint);
+        ESlateDrawEffect::None,FLinearColor(.027f,.063f,.051f,State.View==ComptoirSession::Screen::Playing?.64f:.12f)*Tint);
     int32 Layer=LayerId;
     for(const Command& Item:Device.Commands)
     {
@@ -95,8 +95,9 @@ int32 SComptoirTablet::OnPaint(const FPaintArgs& Args, const FGeometry& Geometry
         ++Layer; // Preserve layout painter order across boxes, lines and text.
         const FVector2D Position=Snap(FVector2D(Device.X+Item.X*Device.Scale,Device.Y+Item.Y*Device.Scale));
         const FVector2D Extent(Item.W*Device.Scale,Item.H*Device.Scale);
-        const FLinearColor Color=FLinearColor::FromSRGBColor(FColor(
+        FLinearColor Color=FLinearColor::FromSRGBColor(FColor(
             static_cast<uint8>(Item.Color>>16),static_cast<uint8>(Item.Color>>8),static_cast<uint8>(Item.Color)))*Tint;
+        Color.A*=Item.Opacity;
         switch(Item.Type)
         {
             case Kind::Rect:

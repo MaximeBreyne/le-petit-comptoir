@@ -8,7 +8,7 @@ class UStaticMeshComponent;
 class UTextRenderComponent;
 
 UENUM()
-enum class EComptoirTarget : uint8 { None, Sign, GlassRack, Tap, Customer, Till, Stock, Door, Wine, Coffee };
+enum class EComptoirTarget : uint8 { None, Sign, GlassRack, Tap, Customer, Till, Stock, Door, Wine, Coffee, Fridge };
 
 UCLASS()
 class LEPETITCOMPTOIR_API AComptoirProp : public AActor

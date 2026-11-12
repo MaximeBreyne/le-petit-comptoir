@@ -22,7 +22,9 @@ const streetFloors=data.collections.world.filter(s=>s.streetFloor);
 assert.equal(streetFloors.length,4);
 assert.ok(streetFloors.every(s=>s.collision),'Street and pavements must support the player');
 const fridge=data.collections.world.filter(s=>s.assembly==='fridge');
-assert.ok(fridge.length>20);
+assert.ok(fridge.some(s=>s.mat===11),'Refrigerated cabinet retains its glass front');
+for(const label of ['EAU PÉTILLANTE','COLA','TONIC','FRAÎCHEUR'])
+  assert.ok(fridge.some(s=>s.label===label),'Shelf and cabinet labels identify the available drinks');
 for(const s of fridge) {
   assert.ok(s.x-s.w/2>10.415,'Fridge must clear the adjacent cabinet');
   assert.ok(s.z+s.d/2<1.13,'Fridge shelves and handle must not protrude into the aisle');
@@ -34,7 +36,7 @@ for(let i=0;i<3;i++)for(const part of ['body','legLeft','legRight','armLeft','ar
   assert.ok(data.collections[`ped${i}_${part}`].length>0,`Missing pedestrian ${i} ${part}`);
 for(let i=0;i<2;i++)assert.ok(data.collections[`traffic${i}`].some(s=>s.collision));
 for(let i=0;i<3;i++)for(const pose of ['seated','standing'])assert.ok(data.collections[`guest${i}_${pose}`].length>0);
-for(const recipe of ['beer','wine','coffee'])for(let level=0;level<=8;level++) {
+for(const recipe of ['beer','wine','coffee','water','cola','tonic'])for(let level=0;level<=8;level++) {
   const model=data.collections[`drink_${recipe}_${level}`];assert.ok(model.length>0);
   assert.ok(model.every(s=>!s.collision),'Drinks must not block movement or interaction');
   if(recipe==='beer') {
@@ -50,6 +52,11 @@ assert.ok(details.every(s=>!s.collision),'New fittings cannot block the bar or r
 // Service and tray positions must remain free above their working surfaces.
 for(const [x,z] of [[4.15,2.72],[8.43,2.47],[4.98,2.85],[5.24,2.85],[4.98,3.17],[5.24,3.17]])
   assert.ok(!details.some(s=>Math.abs(s.x-x)<s.w/2+.065&&Math.abs(s.z-z)<s.d/2+.065&&s.y+s.h/2>1.16&&s.y-s.h/2<1.4),`Detail interferes with drink at ${x}/${z}`);
+for(const key of ['water','cola','tonic'])for(let n=0;n<=12;n++){
+  const model=data.collections[`fridge_${key}_${n}`];assert.ok(model);
+  assert.equal(model.filter(s=>s.label).length,n,'One label per stocked bottle');
+  for(const s of model)assert.ok(Math.abs(s.x)+s.w/2<.45&&s.z+s.d/2<.55,'Bottles fit inside the fridge');
+}
 const context=vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(sourceRoot,'renderer.js'),'utf8'),context);
 const Renderer=vm.runInContext('BarRenderer',context),renderer=Object.create(Renderer.prototype);
@@ -93,8 +100,22 @@ try {
   }
   const visualExe=path.join(temp,process.platform==='win32'?'visual.exe':'visual');
   cp.execFileSync(process.env.CXX||'g++',['-std=c++17','-Wall','-Wextra','-Werror','-pedantic',path.join(__dirname,'visual_geometry_test.cpp'),'-o',visualExe]);
-  const visualInput=shapes.map(s=>[s.shape==='sphere'?2:s.round?1:0,s.mat,Number(!!s.exterior&&Math.abs(s.x-6)>40),s.x,s.y,s.z,s.w,s.h,s.d,s.rx||0,s.ry||0,s.rz||0,s.topRadius??1,s.bottomRadius??1].join(' ')).join('\n');
-  console.log(cp.execFileSync(visualExe,{input:visualInput,encoding:'utf8'}).trim());
+  const visualInput=items=>items.map(s=>[s.shape==='sphere'?2:s.round?1:0,s.mat,Number(!!s.exterior&&Math.abs(s.x-6)>40),s.x,s.y,s.z,s.w,s.h,s.d,s.rx||0,s.ry||0,s.rz||0,s.topRadius??1,s.bottomRadius??1].join(' ')).join('\n');
+  console.log(cp.execFileSync(visualExe,['--all-variants'],{input:visualInput(shapes),encoding:'utf8'}).trim());
+  const active=[...data.collections.world,...data.collections.doorLeft,...data.collections.doorRight];
+  for(const key of ['water','cola','tonic'])active.push(...data.collections[`fridge_${key}_12`]);
+  for(let i=0;i<3;i++) {
+    // Include both customer poses as a conservative bound.
+    for(const pose of ['seated','standing'])active.push(...data.collections[`guest${i}_${pose}`]);
+    for(let copy=0;copy<2;copy++)for(const part of ['body','legLeft','legRight','armLeft','armRight'])
+      active.push(...data.collections[`ped${i}_${part}`]);
+  }
+  for(let i=0;i<2;i++)active.push(...data.collections[`traffic${i}`]);
+  // At most 8 visible drinks (3 customers + 4 tray + preparation). Count all
+  // recipes for each position to bound whichever vessel is most expensive.
+  for(let i=0;i<8;i++)for(const key of ['beer','wine','coffee','water','cola','tonic'])
+    active.push(...data.collections[`drink_${key}_8`]);
+  console.log('Active scene upper bound: '+cp.execFileSync(visualExe,{input:visualInput(active),encoding:'utf8'}).trim());
   const floor=data.collections.world.find(s=>s.x===2.3&&s.y===-.11&&s.z===-2.1);
   assert.equal(floor.collision,true,'The reserve must have a walkable floor');
   for(const s of data.collections.world.filter(s=>s.solid||s.roomFloor))assert.equal(s.collision,true);

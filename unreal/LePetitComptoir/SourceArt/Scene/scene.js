@@ -666,7 +666,12 @@ const BarScene=(()=>{
   b(11.10,1.11,.20,.90,1.67,.025,'#c5d1bc',M.light);
   for(const y of [.38,.79,1.2,1.61]){
    b(11.10,y,.67,.90,.022,.72,'#76897f',M.metal);
-   for(let j=0;j<5;j++)bottle(g,10.76+j*.17,y+.02,.76,['#587952','#9f713b','#455c69'][j%3],.58,'');
+   const row=[.38,.79,1.2,1.61].indexOf(y);
+   if(row<3){
+    const names=['EAU PÉTILLANTE','COLA','TONIC'];
+    // Bottles are rendered from live native fridge stock, independently of the shell.
+    b(11.10,y-.045,1.025,.78,.065,.008,'#eee8d5',M.paint,{label:names[row],labelFace:'back',labelColor:'#203c2c'});
+   }
   }
   for(const x of [10.60,11.60])b(x,1.08,1.07,.045,1.98,.055,'#273835',M.metal);
   b(11.10,2.04,1.04,1.04,.15,.06,'#344b46',0,{label:'FRAÎCHEUR',labelFace:'back'});
@@ -719,7 +724,7 @@ const BarScene=(()=>{
   }
   // Framed menu, wall art, clocks and pendant lamps.
   b(.24,2.1,4.35,.055,1.25,1.5,'#473f31',M.wood);
-  b(.28,2.1,4.35,1.35,1.1,.025,'#263b32',0,{ry:-Math.PI/2,label:'LA CARTE\nPression  5 €\nVin rouge  6 €\nEspresso  3 €\nMojito  10 €'});
+  b(.28,2.1,4.35,1.35,1.1,.025,'#263b32',0,{ry:-Math.PI/2,label:'LA CARTE\nPression  5 €\nVin rouge  6 €\nEspresso  3 €\nEau pétillante  3 €\nCola / Tonic  3,50 €'});
   for(const [z,word] of [[building.level?3.75:4.75,'CAFÉ\nDE QUARTIER'],[7.6,'LES BELLES\nSOIRÉES']]){
    b(11.84,2.03,z,.055,1.0,.77,'#4b4436',M.wood);
    b(11.8,2.03,z,.63,.87,.02,'#a79266',0,{ry:Math.PI/2,label:word,labelColor:'#263b34'});

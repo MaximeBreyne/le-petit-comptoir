@@ -48,8 +48,8 @@ void AComptoirCharacter::SetupPlayerInputComponent(UInputComponent* Input)
 
 void AComptoirCharacter::Forward(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddMovementInput(GetActorForwardVector(), FMath::Clamp(Value, -1.f, 1.f)); }
 void AComptoirCharacter::Right(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddMovementInput(GetActorRightVector(), FMath::Clamp(Value, -1.f, 1.f)); }
-void AComptoirCharacter::Turn(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddControllerYawInput(Value * .7f); }
-void AComptoirCharacter::Look(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) AddControllerPitchInput(Value * .7f); }
+void AComptoirCharacter::Turn(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) {const auto* G=GetWorld()->GetAuthGameMode<AComptoirGameMode>();AddControllerYawInput(Value*.7f*(G?G->Sensitivity:1));} }
+void AComptoirCharacter::Look(float Value) { if (!bMenuBlocked&&!bTabletOpen&&!bGlassPicker) {const auto* G=GetWorld()->GetAuthGameMode<AComptoirGameMode>();AddControllerPitchInput(Value*.7f*(G?G->Sensitivity:1)*(G&&G->bInvertY?-1:1));} }
 void AComptoirCharacter::StartSprint() { GetCharacterMovement()->MaxWalkSpeed = 400; }
 void AComptoirCharacter::StopSprint() { GetCharacterMovement()->MaxWalkSpeed = 220; }
 void AComptoirCharacter::StartPour() { bPouring = !bMenuBlocked&&!bTabletOpen&&!bGlassPicker; }
@@ -94,12 +94,15 @@ void AComptoirCharacter::OpenTablet(int32 Page)
 void AComptoirCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    const auto* Settings=GetWorld()->GetAuthGameMode<AComptoirGameMode>();
+    Camera->PostProcessSettings.bOverride_AutoExposureBias=true;
+    Camera->PostProcessSettings.AutoExposureBias=Settings?FMath::Log2(Settings->Brightness/100.f):0;
     if (const APlayerController* Player = Cast<APlayerController>(GetController()))
     {
         int32 Width = 0, Height = 0;
         Player->GetViewportSize(Width, Height);
         if (Width > 0 && Height > 0)
-            Camera->SetFieldOfView(FMath::RadiansToDegrees(2.f * FMath::Atan(FMath::Tan(FMath::DegreesToRadians(37.5f)) * Width / Height)));
+            Camera->SetFieldOfView(FMath::RadiansToDegrees(2.f * FMath::Atan(FMath::Tan(FMath::DegreesToRadians((Settings?Settings->FieldOfView:75.f)*.5f)) * Width / Height)));
     }
     if (!bPouring) return;
     if (const AComptoirProp* Prop = FocusedProp())
@@ -166,7 +169,7 @@ void AComptoirCharacter::Discard()
     if (bMenuBlocked||bTabletOpen||bGlassPicker) return;
     bPouring = false;
     if (const AComptoirProp* Prop = FocusedProp())
-        if (Prop->Target==EComptoirTarget::Tap||Prop->Target==EComptoirTarget::Wine||Prop->Target==EComptoirTarget::Coffee||Prop->Target==EComptoirTarget::GlassRack)
+        if (Prop->Target==EComptoirTarget::Fridge||Prop->Target==EComptoirTarget::Tap||Prop->Target==EComptoirTarget::Wine||Prop->Target==EComptoirTarget::Coffee||Prop->Target==EComptoirTarget::GlassRack)
             if (AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>())
                 if (Game->Simulation.Discard()) { Game->Notify(TEXT("Verre range ou boisson jetee.")); Game->Save(); }
 }
@@ -179,9 +182,10 @@ void AComptoirCharacter::Dismiss()
                 if (Game->Simulation.Dismiss(Prop->CustomerSlot)) { Game->Notify(TEXT("Commande refusee. Le client est parti.")); Game->Save(); }
 }
 
-void AComptoirCharacter::SetGlassPicker(bool Open)
+void AComptoirCharacter::SetGlassPicker(bool Open,bool Cold)
 {
     if(bMenuBlocked)return;
+    bColdPicker=Open&&Cold;
     bGlassPicker=Open;bTabletOpen=false;bPouring=false;StopSprint();
     GetCharacterMovement()->StopMovementImmediately();
     if(APlayerController* Player=Cast<APlayerController>(GetController()))

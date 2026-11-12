@@ -7,7 +7,7 @@
 using namespace ComptoirGeometry;
 using Key=std::tuple<long long,long long,long long>;
 Key KeyFor(Vec V){return {std::llround(V.X*100000),std::llround(V.Y*100000),std::llround(V.Z*100000)};}
-int main()
+int main(int Argc,char** Argv)
 {
     using namespace ComptoirVisualGeometry;
     for(const Vec Size:{Vec{1,.08,.45},Vec{.027,.32,.027},Vec{2,1,.04}})for(int Kind:{0,1,2})
@@ -60,6 +60,9 @@ int main()
         auto Check=[&](Vec P,Vec N,bool){assert(std::isfinite(P.X)&&std::isfinite(P.Y)&&std::isfinite(P.Z));assert(std::abs(Dot(N,N)-1)<1e-8);++Vertices;};
         if(Distant)ComptoirGeometry::Emit(S,Check);else Emit(S,Material,Check);++Shapes;
     }
-    assert(Vertices<2000000); // Budget across all scene/model variants, not one frame.
+    // The library includes mutually exclusive stock/fill states. Keep a separate
+    // fixed active-scene ceiling; adding variants must not increase that ceiling.
+    const bool Library=Argc==2&&std::string(Argv[1])=="--all-variants";
+    assert(Vertices<(Library?3000000u:2000000u));
     std::cout<<"PASS: closed bevels, round surfaces, normals, bounds and texture coordinates; "<<Shapes<<" scene shapes / "<<Vertices<<" render vertices.\n";
 }

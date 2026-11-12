@@ -24,6 +24,7 @@ struct Command
     float X=0,Y=0,W=0,H=0,Radius=0,Font=0;
     std::uint32_t Color=0;
     std::string Value;
+    float Opacity=1;
 };
 struct GuestLine
 {
@@ -36,13 +37,16 @@ struct State
     Page Active=Page::Orders;
     ComptoirSession::Screen View=ComptoirSession::Screen::Playing;
     bool CanContinue=false,HasSave=false,ValidName=true,Developer=false,ClockPaused=false;
+    std::array<std::string,4> Slots{};std::array<bool,4> ValidSlots{};
+    std::array<std::string,7> Settings{};std::string Confirmation;
+    bool ColdPicker=false,NearFridge=false;
     std::string SaveSummary,BarName="Le Petit Comptoir",PendingName="Le Petit Comptoir";
     int Cash=0,Sold=0,Day=1,Held=0,Vessel=0,Payment=-1,Processing=-1;
     double Time=1020,Amount=0;
     bool Open=false,Closing=false,Bankrupt=false,NearTill=false,GlassPicker=false,NearRack=false;
     std::array<GuestLine,3> Guests{};
-    std::array<int,3> Stock{{1000,150,40}},Reserve{{500,75,20}};
-    std::array<double,3> Delivery{{0,0,0}};
+    std::array<int,Comptoir::DrinkCount> Stock{{1000,150,40,12,12,12}},Reserve{{500,75,20,12,12,12}};
+    std::array<double,Comptoir::DrinkCount> Delivery{};
     std::array<int,4> Tray{{-1,-1,-1,-1}};
     std::string Feedback;
 };
@@ -110,19 +114,19 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
     if(S.GlassPicker&&S.View==ComptoirSession::Screen::Playing)
     {
         Rect(180,140,760,440,0xd4d9c8,18);Rect(182,142,756,436,Paper,16);
-        Text("VERRERIE",214,172,12,Muted);Text("Choisir un contenant",214,204,27);
+        Text(S.ColdPicker?"RÉFRIGÉRATEUR":"VERRERIE",214,172,12,Muted);Text(S.ColdPicker?"Choisir une boisson fraîche":"Choisir un contenant",214,204,27);
         Text("Choisissez librement, même sans commande en attente.",214,250,13,Muted);
         for(int I=0;I<3;++I)
         {
-            const auto& R=Comptoir::Drinks[I];const float X=214+I*232.f;
-            int Pending=0;for(const auto& G:S.Guests)Pending+=G.Phase==2&&G.Recipe==I;
+            const int Recipe=I+(S.ColdPicker?3:0);const auto& R=Comptoir::Drinks[Recipe];const float X=214+I*232.f;
+            int Pending=0;for(const auto& G:S.Guests)Pending+=G.Phase==2&&G.Recipe==Recipe;
             Card(X,286,218,172);
-            if(I==0){Line(X+98,303,X+120,303,Green);Line(X+98,303,X+101,331,Green);Line(X+120,303,X+117,331,Green);Line(X+101,331,X+117,331,Green);}
+            if(I==0||S.ColdPicker){Line(X+98,303,X+120,303,Green);Line(X+98,303,X+101,331,Green);Line(X+120,303,X+117,331,Green);Line(X+101,331,X+117,331,Green);}
             else if(I==1){Line(X+98,303,X+119,303,Green);Line(X+98,303,X+102,320,Green);Line(X+119,303,X+115,320,Green);Line(X+102,320,X+115,320,Green);Line(X+108,320,X+108,332,Green);Line(X+101,332,X+116,332,Green);}
             else{Rect(X+97,306,22,21,Green,4);Line(X+119,310,X+126,310,Green);Line(X+126,310,X+126,321,Green);Line(X+126,321,X+119,321,Green);Line(X+92,332,X+124,332,Green);}
             Text(R.Name,X+12,346,14,0x213e31,194);
-            Text(std::to_string(Pending)+" à servir · "+std::to_string(Ready(I))+" sur plateau",X+12,374,10,Muted,194);
-            Button("glass_"+std::to_string(I),R.Vessel,X+12,403,194,S.NearRack&&S.Held!=2&&!S.Bankrupt&&TrayCount<4);
+            Text(S.ColdPicker?std::to_string(S.Stock[Recipe])+" bouteilles · "+std::to_string(Pending)+" à servir":std::to_string(Pending)+" à servir · "+std::to_string(Ready(Recipe))+" sur plateau",X+12,374,10,Muted,194);
+            Button("glass_"+std::to_string(Recipe),R.Vessel,X+12,403,194,(S.ColdPicker?S.NearFridge:S.NearRack)&&S.Held!=2&&!S.Bankrupt&&TrayCount<4);
         }
         Text(S.Held==2?"Terminez ou jetez la préparation en cours avant de changer.":TrayCount>=4?"Plateau plein : servez ou retirez une boisson.":S.Held==1?"Le contenant vide sera remplacé, sans consommer de stock.":"Les stocks sont déduits au début de la préparation.",214,479,11,Muted,692);
         Button("glass_close","Fermer [Tab]",690,516,218);
@@ -130,44 +134,84 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
     }
     if(S.View!=ComptoirSession::Screen::Playing)
     {
-        const bool Home=S.View==ComptoirSession::Screen::Home;
-        const bool Confirm=S.View==ComptoirSession::Screen::NewGame;
-        Rect(20,20,530,680,0x183c30,22);
-        L.Commands.push_back({Kind::Logo,58,55,64,64,0,0,0,{}});
-        Text("LE PETIT COMPTOIR",140,70,19,0xf5f0df);
-        Text("UNE ADRESSE À FAIRE VIVRE",140,101,10,0xb8c6b4);
-        Text(Home?"Le Petit":Confirm?"Une nouvelle":"Une petite",58,155,43,0xf5f0df);
-        Text(Home?"Comptoir.":Confirm?"histoire ?":"pause.",58,211,43,0xe9c27c);
-        Text(Home?"Une soirée. Votre histoire.":Confirm?(S.HasSave?"La sauvegarde automatique sera remplacée.":"Choisissez le nom de votre bar."):"Le bar peut attendre.",58,290,14,0xe1e6d8,450);
+        using Screen=ComptoirSession::Screen;
+        const bool Home=S.View==Screen::Home,New=S.View==Screen::NewGame;
+        // Native adaptation of dev/dist/menus.css: charcoal veil, gold primary action,
+        // restrained navigation and the live bar visible to the right.
+        Rect(0,0,600,720,0x0a1011);
+        for(int I=0;I<104;++I){Rect(600+I*5,0,5,720,0x0a1011);L.Commands.back().Opacity=.90f*(1-I/104.f);}
+        L.Commands.push_back({Kind::Logo,58,40,64,64,0,0,0,{}});
+        Text(Home?"SIMULATION DE BAR":"LE PETIT COMPTOIR",142,55,12,0xdfc493,390);
+        Text(Home?"ÉDITION LOCALE":"Une adresse à faire vivre.",142,83,10,0xc4cec7,390);
+        const auto Nav=[&](std::string Id,std::string Caption,float Y,bool Enabled=true,bool Primary=false)
+        {
+            const bool Hover=Enabled&&MX>=58&&MX<512&&MY>=Y&&MY<Y+42;
+            Rect(58,Y,454,42,Primary&&Enabled?0xd4b57b:Hover?0x253331:0x10191a,3);
+            Text(Caption,75,Y+12,13,Primary&&Enabled?0x162321:Enabled?0xe1e5df:0xa7b4ac,414);
+            if(Enabled)L.Commands.push_back({Kind::Hit,58,Y,454,42,0,0,0,Id});
+        };
         if(Home)
         {
-            Button("menu_continue","Continuer la partie",58,344,454,S.CanContinue);
-            Button("menu_new","Nouvelle partie",58,398,454);
-            Button("menu_quit","Retour au bureau",58,452,454);
-            Text(S.SaveSummary.empty()?"Aucune partie enregistrée.":S.SaveSummary,58,520,12,0xe1e6d8,454);
+            Text("Le Petit",58,133,54,0xf3eee2);Text("Comptoir.",58,199,54,0xdfc493);
+            Text("Une soirée. Votre histoire.",58,276,14,0xc4cec7);
+            Nav("menu_continue","Continuer la partie",324,S.CanContinue,S.CanContinue);
+            Nav("menu_new","Nouvelle partie",374,true,!S.CanContinue);
+            Nav("menu_load","Charger une sauvegarde",424);Nav("menu_settings","Réglages",474);Nav("menu_quit","Retour au bureau",524);
+            Text(S.SaveSummary.empty()?"Aucune partie enregistrée.":S.SaveSummary,58,583,11,0xc4cec7,454);
+            Rect(665,485,423,151,0x0a1011);L.Commands.back().Opacity=.75f;
+            Text("LE SERVICE COMMENCE À 17 H",688,506,11,0xdfc493);
+            Text("Les lumières sont allumées.",688,544,20,0xf3eee2);
+            Text("Il ne manque plus que vous.",688,583,20,0xf3eee2);
         }
-        else if(Confirm)
+        else if(New)
         {
+            Text("Une nouvelle",58,155,36,0xf3eee2);Text("histoire ?",58,205,36,0xdfc493);
+            Text(S.HasSave?"L’autosauvegarde sera remplacée.":"Choisissez le nom de votre bar.",58,270,13,0xc4cec7,454);
+            Text("Vos sauvegardes manuelles seront conservées.",58,300,11,0xc4cec7,454);
             Text("Nom du bar",58,337,13,0xe1e6d8);
             L.Commands.push_back({Kind::Input,58,369,454,46,0,20,0x213e31,S.PendingName});
-            Text(S.ValidName?"1 à 32 caractères · visible sur la devanture.":"Saisissez un nom de 1 à 32 caractères, sur une ligne.",58,429,11,0xe1e6d8,454);
-            Button("menu_confirm_new","Commencer la nouvelle partie",58,470,454,S.ValidName);
-            Button("menu_cancel","Annuler",58,524,454);
+            Text(S.ValidName?"1 à 32 caractères · visible sur la devanture.":"Saisissez un nom de 1 à 32 caractères, sur une ligne.",58,429,11,0xc4cec7,454);
+            Nav("menu_confirm_new","Commencer la nouvelle partie",470,S.ValidName,true);Nav("menu_cancel","Annuler",524);
+        }
+        else if(S.View==Screen::Pause)
+        {
+            Text("Une petite pause.",58,157,36,0xf3eee2,520);
+            Text("Le bar peut attendre. Reprenez quand vous êtes prêt.",58,222,12,0xc4cec7,500);
+            Nav("menu_resume","Reprendre la partie [P]",282,true,true);Nav("menu_save","Sauvegarder la partie",332);
+            Nav("menu_load","Charger une sauvegarde",382);Nav("menu_settings","Réglages",432);
+            Nav("menu_home","Retour au menu principal",482);Nav("menu_quit","Retour au bureau",532);
+        }
+        else if(S.View==Screen::Load||S.View==Screen::Save)
+        {
+            const bool Loading=S.View==Screen::Load;
+            Text(Loading?"Retrouver votre soirée.":"Garder une trace.",58,157,30,0xf3eee2,520);
+            Text(Loading?"Choisissez la partie à retrouver.":"Trois emplacements pour conserver vos soirées.",58,218,12,0xc4cec7,500);
+            int Row=0;for(int I=Loading?0:1;I<4;++I,++Row)
+            {
+                const float Y=268+Row*77.f;
+                Nav("slot_"+std::to_string(I),I==0?"Sauvegarde automatique":"Emplacement "+std::to_string(I),Y,!Loading||S.ValidSlots[I]);
+                Text(S.Slots[I].empty()?"Emplacement vide":S.Slots[I],75,Y+47,10,0xc4cec7,465);
+            }
+            Nav("menu_back","Retour",594);
+        }
+        else if(S.View==Screen::Settings)
+        {
+            Text("Réglages",58,141,36,0xf3eee2);Text("Cliquez sur une valeur pour la modifier.",58,201,12,0xc4cec7);
+            const char* Keys[]={"quality","fps","window","sensitivity","fov","brightness","invert"};
+            const char* Titles[]={"Qualité graphique","Limite d’images/s","Affichage","Sensibilité souris","Champ de vision","Luminosité","Inverser l’axe vertical"};
+            for(int I=0;I<7;++I)Nav(std::string("setting_")+Keys[I],std::string(Titles[I])+" : "+S.Settings[I],247+I*48.f);
+            Nav("menu_back","Retour",602);
         }
         else
         {
-            Button("menu_resume","Reprendre la partie [P]",58,344,454);
-            Button("menu_save","Sauvegarder",58,398,454);
-            Button("menu_home","Retour à l’accueil",58,452,454);
-            Button("menu_quit","Retour au bureau",58,506,454);
+            Text("Confirmer votre choix",58,157,31,0xf3eee2,520);
+            Text(S.Confirmation,58,235,13,0xc4cec7,485);
+            Text("La progression précédente sera remplacée.",58,267,12,0xc4cec7,485);
+            Nav("slot_confirm","Confirmer",330,true,true);Nav("slot_cancel","Annuler",382);
         }
-        Text(S.Feedback,58,592,12,0xe9c27c,454);
-        Rect(570,458,530,230,0x183c30,16);
-        Text("LE SERVICE COMMENCE À 17 H",610,486,13,0xf5f0df);
-        Text("Les lumières sont allumées.",610,522,22,0xf5f0df);
-        Text("Il ne manque plus que vous.",610,560,22,0xf5f0df);
-        Text("ZQSD / WASD : marcher   ·   E : interagir",610,625,12,0xf5f0df);
-        Text("Tab : tablette   ·   P : pause",610,652,12,0xf5f0df);
+        Text(S.Feedback,58,654,11,0xdfc493,1000);
+        Rect(0,682,1120,38,0x0a1011);L.Commands.back().Opacity=.9f;
+        Line(58,691,1060,691,0x506057);Text("LE PETIT COMPTOIR",58,701,9,0xb1c0b7);Text("Une adresse à faire vivre.",842,701,9,0xb1c0b7);
         return L;
     }
     // Landscape device: dark bezel, inset screen and the original light/green palette.
@@ -219,7 +263,7 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         const float Top=S.Active==Page::Service?340.f:290.f;
         for(int I=0;I<3;++I)
         {
-            const auto& G=S.Guests[I];const auto& R=Comptoir::Drinks[std::clamp(G.Recipe,0,2)];const float Y=Top+I*86;
+            const auto& G=S.Guests[I];const auto& R=Comptoir::Drinks[std::clamp(G.Recipe,0,Comptoir::DrinkCount-1)];const float Y=Top+I*86;
             Card(214,Y,864,76);
             Text(G.Phase?"Client #"+std::to_string(G.Id):"Place "+std::to_string(I+1)+" · disponible",230,Y+12,14);
             const std::string Detail=G.Phase==0?"Le prochain client prendra place ici.":G.Phase==1?"Approchez-vous pour prendre sa commande.":std::string(R.Name)+" · "+R.Vessel+" · "+Money(R.Price);
@@ -248,7 +292,7 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         int LineIndex=0;
         for(const auto& G:S.Guests)if(G.Phase>=4)
         {
-            const auto& R=Comptoir::Drinks[std::clamp(G.Recipe,0,2)];
+            const auto& R=Comptoir::Drinks[std::clamp(G.Recipe,0,Comptoir::DrinkCount-1)];
             Text("Client #"+std::to_string(G.Id)+" · "+R.Name+" · "+Money(R.Price)+" · "+Phases[G.Phase],235,455+LineIndex++*28,11,Muted,815);
         }
         if(!LineIndex)Text("Aucun règlement en attente.",235,460,14,Muted);
@@ -259,20 +303,19 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
     }
     else if(S.Active==Page::Reserve)
     {
-        Text("Stocks indépendants pour chaque boisson.",214,213,14,Muted);
-        Card(214,255,864,342);
-        Text("PRODUIT",233,272,10,Muted);Text("AU COMPTOIR",450,272,10,Muted);Text("RÉSERVE",630,272,10,Muted);
-        for(int I=0;I<3;++I)
+        Text("Réapprovisionnez le comptoir et le réfrigérateur depuis la réserve.",214,213,13,Muted);
+        Card(214,252,864,370);
+        Text("PRODUIT",233,267,10,Muted);Text("DISPONIBLE",490,267,10,Muted);Text("RÉSERVE",665,267,10,Muted);
+        for(int I=0;I<Comptoir::DrinkCount;++I)
         {
-            const auto& R=Comptoir::Drinks[I];const float Y=310+I*92.f;const std::string Unit=I==2?" doses":" cl";
-            Text(R.Name,233,Y+5,13,0x213e31,205);Text("Lot : "+std::to_string(R.Pack)+Unit+" · "+Money(R.PackCost),233,Y+35,10,Muted,205);
-            Text(std::to_string(S.Stock[I])+Unit,450,Y+5,17);Text("Max. "+std::to_string(R.Capacity),450,Y+35,10,Muted);
-            Text(std::to_string(S.Reserve[I])+Unit,630,Y+5,17);
-            Text(S.Delivery[I]>0?"Livraison : "+std::to_string(static_cast<int>(std::ceil(S.Delivery[I])))+" s":"Stock disponible",630,Y+35,10,Muted,190);
+            const auto& R=Comptoir::Drinks[I];const float Y=295+I*53.f;
+            const std::string Unit=I>=3?" bt.":I==2?" doses":" cl";
+            Text(R.Name,233,Y+1,12,0x213e31,240);Text(Money(R.PackCost)+" / lot de "+std::to_string(R.Pack),233,Y+26,9,Muted,240);
+            Text(std::to_string(S.Stock[I])+Unit,490,Y+9,14);
+            Text(S.Delivery[I]>0?"En livraison":std::to_string(S.Reserve[I])+Unit,665,Y+9,12,Muted,170);
             const bool Transfer=S.Reserve[I]>0;
-            Button("supply_"+std::to_string(I),Transfer?"Réapprovisionner":"Commander",853,Y+4,204,!S.Bankrupt&&(Transfer?S.Stock[I]<R.Capacity:S.Delivery[I]<=0&&S.Cash>=R.PackCost));
+            Button("supply_"+std::to_string(I),Transfer?"Réapprovisionner":"Commander",853,Y,204,!S.Bankrupt&&(Transfer?S.Stock[I]<R.Capacity:S.Delivery[I]<=0&&S.Cash>=R.PackCost));
         }
-        Text("Livraison en 10 secondes · les achats sont débités une seule fois.",214,619,11,Muted);
     }
     else if(S.Active==Page::Developer)
     {
@@ -290,7 +333,7 @@ inline Layout Build(const State& S,float Width,float Height,float MouseX=-1,floa
         Button("dev_progress_25","+25 clients",672,369,180,S.Developer);
         Button("dev_progress_100","+100 clients",866,369,194,S.Developer);
         Card(214,441,422,162);Text("Stocks",232,456,17);
-        Text("Bière, vin et café au maximum",232,488,11,Muted);
+        Text("Comptoir et réfrigérateur au maximum",232,488,11,Muted);
         Text("Termine aussi une livraison en cours.",232,514,11,Muted);
         Button("dev_stock","Remplir les stocks",232,548,385,S.Developer);
         Card(654,441,424,162);Text("Horloge du service",672,456,17);
