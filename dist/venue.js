@@ -10,9 +10,9 @@ const BarVenue=(()=>{
  const labelTemplates=Object.values(faces).map(face=>({...sign,d:.012,mat:0,...face,labelColor:'#f4e8c9',labelPixels:480,labelFace:'front',castShadow:false}));
  function serviceState(s){return s.closing?'closing':s.open?'open':'closed'}
  function dayProgress(s){
-  const time=Math.max(1020,Math.min(1440,Number.isFinite(s.time)?s.time:1020));
-  const remaining=Math.ceil(1440-time);
-  return {elapsed:time-1020,remaining,text:`${Math.floor(remaining/60)} h ${String(remaining%60).padStart(2,'0')} avant minuit`};
+  const info=BarEngine.serviceInfo(s),remaining=Math.ceil(info.remaining);
+  const closing=BarEngine.formatServiceTime(info.closesAt).replace(':',' h ');
+  return {...info,remaining,text:`${Math.floor(remaining/60)} h ${String(remaining%60).padStart(2,'0')} avant ${closing}${info.clockPaused?'\nHorloge suspendue':''}`};
  }
  function nearSign(position){return !!position&&position.z<sign.z&&Math.hypot(position.x-sign.x,position.z-sign.z)<1.5}
  function aimedAtSign(camera){

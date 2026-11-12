@@ -29,14 +29,15 @@ app.whenReady().then(async()=>{
    const status=()=>({code:$('serviceHud').dataset.state,text:$('serviceStatus').textContent});
    const initial=status();check(initial.code==='closed'&&initial.text==='FERMÉ','A new bar starts visibly closed');
    const stages=[];
-   for(const [time,value,remaining]of [[1020,0,'7 h 00'],[1230,210,'3 h 30'],[1440,420,'0 h 00'],[1500,420,'0 h 00']]){
+   for(const [time,value,remaining,clock]of [[1020,0,'11 h 00','17:00'],[1230,210,'7 h 30','20:30'],[1440,420,'4 h 00','00:00'],[1500,480,'3 h 00','01:00'],[1680,660,'0 h 00','04:00'],[1740,660,'0 h 00','05:00']]){
     state.time=time;ui();const progress=$('dayProgress');
-    check(progress.max===420&&progress.value===value,'Day progress tracks elapsed service time at '+time);
+    check(progress.max===660&&progress.value===value,'Day progress tracks elapsed service time at '+time);
     check($('dayRemaining').textContent.startsWith(remaining)&&progress.getAttribute('aria-valuetext')===$('dayRemaining').textContent,'Remaining time is readable and accessible at '+time);
-    stages.push({time,value:progress.value,remaining:$('dayRemaining').textContent});
+    check($('clock').textContent===clock,'Clock wraps after midnight without freezing at '+time);
+    stages.push({time,value:progress.value,remaining:$('dayRemaining').textContent,clock:$('clock').textContent});
    }
-   state.time=1230;ui();save(true);GameMenu.returnHome();GameMenu.continueGame();await flush();
-   check(state.time===1230&&$('dayProgress').value===210&&$('dayRemaining').textContent.startsWith('3 h 30'),'Loading a saved game restores the progress and remaining time');
+   state.time=1500;ui();save(true);GameMenu.returnHome();GameMenu.continueGame();await flush();
+   check(state.time===1500&&$('clock').textContent==='01:00'&&$('dayProgress').value===480&&$('dayRemaining').textContent.startsWith('3 h 00'),'Loading a saved game after midnight restores the clock, progress and remaining time');
    state.time=1020;ui();
    const atlasSize=renderer.labelMap.size;
    const front={x:BarVenue.sign.x,y:1.68,z:BarVenue.sign.z-1,a:0,pitch:Math.atan2(BarVenue.sign.y-1.68,1)};

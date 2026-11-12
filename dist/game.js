@@ -16,11 +16,11 @@ function save(force=false){if(force!==true&&window.GameMenu&&!GameMenu.canAutosa
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,4000)}
 function modal(title,html){game.setPour(false);keys={};window.BarTablet?.close({suspend:true});if(window.BarInput)BarInput.suspend();else document.exitPointerLock?.();$('modalTitle').textContent=title;$('modalContent').innerHTML=html;$('modal').showModal()}
 function act(fn){if(paused){toast('Reprenez la partie pour continuer.');return}const sales=game.s.totalSold,result=fn();toast(result);audio.chime(game.s.totalSold>sales?'sale':'click');state=game.s;save();ui()}
-function ui(){state=game.s;syncBuilding();$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;const t=Math.min(1440,state.time);$('clock').textContent=t>=1440?'00:00':String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('pause').textContent=paused?'Reprendre':'Pause';
+function ui(){state=game.s;syncBuilding();$('cash').textContent=money(state.cash);$('day').textContent='SOIR '+state.day;$('clock').textContent=BarEngine.formatServiceTime(state.time);$('pause').textContent=paused?'Reprendre':'Pause';
  const day=BarVenue.dayProgress(state),status=BarVenue.serviceState(state);
  $('serviceHud').dataset.state=status;
  $('serviceStatus').textContent={closed:'FERMÉ',open:'OUVERT',closing:'DERNIÈRE TOURNÉE'}[status];
- $('dayRemaining').textContent=day.text;$('dayProgress').value=day.elapsed;
+ $('dayRemaining').textContent=day.text;$('dayProgress').max=day.duration;$('dayProgress').value=day.elapsed;
  $('dayProgress').setAttribute('aria-valuetext',day.text);
  $('register').textContent=state.payments?.terminalCarried?'Caisse · terminal en main':'Caisse';
  $('trayCount').textContent=`PLATEAU ${state.tray.length}/${state.capacity}`;
@@ -29,6 +29,7 @@ function ui(){state=game.s;syncBuilding();$('cash').textContent=money(state.cash
  updateHTML($('tray'),state.tray.length?state.tray.map(t=>`<span class="drink">${recipes[t.recipe].name} ${t.quality}%</span>`).join(''):'<span class="empty">Plateau vide</span>');
  window.BarService?.refresh();
  window.BarTablet?.refresh();
+ window.BarDeveloper?.refresh();
  if(window.BarInput&&typeof camera!=='undefined')BarInput.refresh();
 }
 $('tablet').onclick=()=>BarTablet.open('orders');$('register').onclick=()=>window.BarService?.openRegister();

@@ -7,6 +7,13 @@ const coreIngredientKeys=Object.freeze(['beer','wine','coffee','rum','lime','min
 const isValidStock=stock=>!!stock&&typeof stock==='object'&&!Array.isArray(stock)&&coreIngredientKeys.every(key=>Number.isFinite(stock[key])&&stock[key]>=0)&&ingredientKeys.every(key=>!Object.hasOwn(stock,key)||Number.isFinite(stock[key])&&stock[key]>=0);
 const serviceCapacities=Object.freeze(Object.fromEntries(ingredientKeys.map(key=>[key,ingredients[key].pack*2])));
 const normalizeReserve=value=>Object.fromEntries(ingredientKeys.map(key=>[key,Number.isFinite(value?.[key])&&value[key]>=0?value[key]:0]));
+const serviceSchedule=Object.freeze({opensAt:1020,closesAt:1680,minutesPerSecond:.5});
+function formatServiceTime(minutes){const time=((Math.floor(Number.isFinite(minutes)?minutes:serviceSchedule.opensAt)%1440)+1440)%1440;return String(Math.floor(time/60)).padStart(2,'0')+':'+String(time%60).padStart(2,'0')}
+function serviceInfo(state){
+ const {opensAt,closesAt,minutesPerSecond}=serviceSchedule,duration=closesAt-opensAt,elapsed=Math.max(0,Math.min(duration,(Number.isFinite(state?.time)?state.time:opensAt)-opensAt));
+ return {opensAt,closesAt,duration,elapsed,remaining:duration-elapsed,progress:elapsed/duration,realDurationSeconds:duration/minutesPerSecond,clockPaused:state?.developer?.enabled===true&&state.developer.clockPaused===true};
+}
+function normalizeDeveloper(value){const enabled=value?.enabled===true;return {enabled,clockPaused:enabled&&value?.clockPaused===true}}
 const managementUpgrades=Object.freeze({
  tray:{name:'Plateau de service',category:'building',requiredSales:5,cost:100,requires:[],description:'Passez de 2 à 4 boissons sur le plateau.'},
  cocktails:{name:'Licence cocktails',category:'licenses',requiredSales:8,cost:120,requires:[],description:'Ajoutez le mojito à votre carte et aux commandes des clients.'},
@@ -158,13 +165,13 @@ const preparationSlots=Object.freeze([
 ].map(Object.freeze));
 const waiterPaymentTasks=new Set(['collect-cash','prepare-change','return-change','pickup-terminal','take-card','wait-card','return-terminal']);
 const freshPayments=()=>({till:80,terminalCarried:false,terminalWithWaiter:false,terminalOrderId:null,cashRevenue:0,cardRevenue:0,receipts:[]});
-const fresh=()=>({...normalizeDecor(),version:2,cash:260,day:1,time:1020,open:false,closing:false,stock:{...normalizeReserve(),beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{...Object.fromEntries(Object.keys(managementUpgrades).filter(id=>id!=='tray').map(id=>[id,false])),restockTimer:0},payments:freshPayments(),staff:{bartender:null,bartender2:null,waiter:null,waiterPosition:{x:1.05,z:4.5}},orders:[],deliveries:[],prep:null,parkedPreps:[],nextPrepId:1,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
+const fresh=()=>({...normalizeDecor(),version:2,cash:260,day:1,time:serviceSchedule.opensAt,developer:normalizeDeveloper(),open:false,closing:false,stock:{...normalizeReserve(),beer:1000,wine:150,coffee:25,rum:70,lime:12,mint:12,sugar:100,soda:200,ice:20},reserve:Object.fromEntries(ingredientKeys.map(key=>[key,coreIngredientKeys.includes(key)?ingredients[key].pack:0])),management:{...Object.fromEntries(Object.keys(managementUpgrades).filter(id=>id!=='tray').map(id=>[id,false])),restockTimer:0},payments:freshPayments(),staff:{bartender:null,bartender2:null,waiter:null,waiterPosition:{x:1.05,z:4.5}},orders:[],deliveries:[],prep:null,parkedPreps:[],nextPrepId:1,tray:[],sold:0,lost:0,revenue:0,expenses:0,waste:0,totalSold:0,capacity:2,upgraded:false,spawn:1,nextId:1,lastReport:null,gameOver:false});
 class Game{
  constructor(saved){this.s=fresh();if(saved&&saved.version===2){const s=saved;const nums=['cash','day','time','sold','lost','revenue','expenses','waste','totalSold','capacity','spawn','nextId'];if(nums.every(k=>Number.isFinite(s[k]))&&isValidStock(s.stock)&&Array.isArray(s.orders)&&s.orders.every(o=>o&&Object.hasOwn(recipes,o.recipe)&&Number.isFinite(o.patience))&&Array.isArray(s.tray)&&s.tray.every(t=>t&&Object.hasOwn(recipes,t.recipe))&&Array.isArray(s.deliveries)&&s.deliveries.every(d=>d&&Object.hasOwn(ingredients,d.key)&&Number.isFinite(d.remaining))&&(!s.prep||(Object.hasOwn(recipes,s.prep.recipe)&&Number.isFinite(s.prep.amount)))){this.s=JSON.parse(JSON.stringify(s));
   // Legacy saves already own their service stock. Migrating must not grant a
   // second starter supply, clamp existing quantities or mutate the saved object.
   this.s.stock=normalizeReserve(s.stock);this.s.reserve=normalizeReserve(s.reserve);this.s.management=normalizeManagement(s);if(this.s.prep)this.s.prep.pouring=false;
-  Object.assign(this.s,normalizeDecor(s));
+  Object.assign(this.s,normalizeDecor(s));this.s.developer=normalizeDeveloper(s.developer);
   this.normalizeService(s);this.normalizePreparations(s);
  }}}
  normalizePreparation(saved){
@@ -384,6 +391,43 @@ class Game{
   if(id==='tray'){s.upgraded=true;s.capacity=4}else{s.management[id]=true;if(id==='assistant')s.management.restockTimer=0}
   return id==='tray'?'Plateau agrandi : 4 boissons au lieu de 2.':`${info.name} : achat effectué.`;
  }
+ setDeveloperMode(enabled){
+  if(typeof enabled!=='boolean')return 'Choisissez si le mode développeur est activé.';
+  this.s.developer={enabled,clockPaused:enabled&&this.s.developer?.clockPaused===true};
+  return enabled?'Mode développeur activé pour cette partie.':'Mode développeur désactivé. L’horloge reprend son cours.';
+ }
+ developerAction(action,value){
+  const s=this.s;if(s.developer?.enabled!==true)return 'Activez le mode développeur pour cette partie.';
+  switch(action){
+   case'addMoney':{
+    if(!Number.isFinite(value)||value<1||value>1000000||money(value)!==value||s.cash+value>1e9)return 'Choisissez un montant de 1 à 1 000 000 €, avec deux décimales au maximum.';
+    s.cash=money(s.cash+value);if(s.cash>=0)s.gameOver=false;
+    return `${value.toLocaleString('fr-BE',{maximumFractionDigits:2})} € ajoutés à la trésorerie.`;
+   }
+   case'addProgress':{
+    if(!Number.isSafeInteger(value)||value<1||value>1000||!Number.isSafeInteger(s.totalSold+value))return 'Choisissez de 1 à 1 000 clients de progression.';
+    s.totalSold+=value;
+    return `${value} clients ajoutés à la progression. Les améliorations restent à acheter.`;
+   }
+   case'refillStocks':{
+    for(const key of ingredientKeys)if(this.canBuy(key)){s.stock[key]=Math.max(s.stock[key],this.serviceCapacity(key));s.reserve[key]=Math.max(s.reserve[key],ingredients[key].pack*5)}
+    return 'Comptoir rempli et réserve portée à au moins cinq lots par ingrédient débloqué.';
+   }
+   case'pauseClock':{
+    if(typeof value!=='boolean')return 'Choisissez si l’horloge doit être figée.';
+    s.developer.clockPaused=value;
+    return value?'Horloge figée. Les clients et les préparations continuent.':'L’horloge reprend son cours.';
+   }
+   case'advanceTime':{
+    if(!s.open||s.closing)return 'Ouvrez le service avant d’avancer l’heure ; la dernière tournée doit être terminée.';
+    if(!Number.isFinite(value)||value<1||value>60)return 'Choisissez une avance de 1 à 60 minutes de service.';
+    s.time=Math.max(s.time,Math.min(serviceSchedule.closesAt,s.time+value));
+    if(s.time>=serviceSchedule.closesAt)s.closing=true;
+    return s.closing?'Il est 04:00 : dernière tournée. Terminez le service des clients présents.':`Heure du service avancée à ${formatServiceTime(s.time)}.`;
+   }
+   default:return 'Action développeur inconnue.';
+  }
+ }
  open(){let s=this.s;if(s.gameOver)return 'La partie est terminée. Lancez un nouveau bar.';if(s.open)return 'Le bar est déjà ouvert.';s.open=true;s.closing=false;s.spawn=1;return 'Le bar est ouvert. Premier client en approche.'}
  buy(key){let s=this.s;if(!Object.hasOwn(ingredients,key))return 'Produit inconnu.';const i=ingredients[key];if(s.gameOver)return 'La partie est terminée.';if(!this.canBuy(key))return `Achetez la ${managementUpgrades[i.license].name.toLocaleLowerCase('fr-BE')} dans la tablette pour commander ce produit.`;if(s.cash<i.cost)return 'Trésorerie insuffisante.';this.spend(i.cost);s.expenses+=i.cost;s.deliveries.push({key,remaining:10});return 'Commande passée : livraison en réserve dans 10 secondes de jeu.'}
  restock(key,amount){
@@ -513,7 +557,7 @@ class Game{
  removeOrder(order){const s=this.s;s.orders=s.orders.filter(o=>o!==order);this.releaseOrderDrinks(order.id);if(s.payments.terminalOrderId===order.id)s.payments.terminalOrderId=null}
  upgrade(){return this.purchaseUpgrade('tray')}
  close(){if(!this.s.open)return;this.s.closing=true;return 'Dernières commandes : servez et encaissez les clients restants.'}
- end(){let s=this.s;if(s.orders.length||s.payments.terminalWithWaiter||s.staff.waiter?.task==='return-terminal')return null;const salaries=Object.entries(managementUpgrades).reduce((sum,[id,offer])=>sum+(offer.category==='team'&&s.management[id]?offer.salary:0),0),charges=35+salaries;this.spend(charges);s.waste+=s.tray.length+this.preparations().length+this.bartenderJobs().length+(s.staff.waiter?.drink?1:0);s.lastReport={day:s.day,revenue:s.revenue,cashRevenue:s.payments.cashRevenue,cardRevenue:s.payments.cardRevenue,expenses:s.expenses,charges,salaries,profit:s.revenue-s.expenses-charges,sold:s.sold,lost:s.lost,waste:s.waste};s.open=false;s.closing=false;s.orders=[];s.tray=[];s.prep=null;s.parkedPreps=[];s.staff={bartender:null,bartender2:null,waiter:null,waiterPosition:{x:1.05,z:4.5}};s.payments.terminalWithWaiter=false;s.payments.cashRevenue=0;s.payments.cardRevenue=0;s.payments.terminalOrderId=null;s.management.restockTimer=0;s.gameOver=s.cash<0;s.day++;s.time=1020;s.sold=0;s.lost=0;s.revenue=0;s.expenses=0;s.waste=0;return s.lastReport}
+ end(){let s=this.s;if(s.orders.length||s.payments.terminalWithWaiter||s.staff.waiter?.task==='return-terminal')return null;const salaries=Object.entries(managementUpgrades).reduce((sum,[id,offer])=>sum+(offer.category==='team'&&s.management[id]?offer.salary:0),0),charges=35+salaries;this.spend(charges);s.waste+=s.tray.length+this.preparations().length+this.bartenderJobs().length+(s.staff.waiter?.drink?1:0);s.lastReport={day:s.day,revenue:s.revenue,cashRevenue:s.payments.cashRevenue,cardRevenue:s.payments.cardRevenue,expenses:s.expenses,charges,salaries,profit:s.revenue-s.expenses-charges,sold:s.sold,lost:s.lost,waste:s.waste};s.open=false;s.closing=false;s.orders=[];s.tray=[];s.prep=null;s.parkedPreps=[];s.staff={bartender:null,bartender2:null,waiter:null,waiterPosition:{x:1.05,z:4.5}};s.payments.terminalWithWaiter=false;s.payments.cashRevenue=0;s.payments.cardRevenue=0;s.payments.terminalOrderId=null;s.management.restockTimer=0;s.gameOver=s.cash<0;s.day++;s.time=serviceSchedule.opensAt;s.sold=0;s.lost=0;s.revenue=0;s.expenses=0;s.waste=0;return s.lastReport}
  staffTick(dt){
   const s=this.s;
   for(const role of ['bartender','bartender2']){
@@ -607,7 +651,7 @@ class Game{
  }
  tick(dt){let s=this.s;if(!Number.isFinite(dt))return;dt=Math.min(.1,Math.max(0,dt));for(let d of s.deliveries){d.remaining-=dt;if(d.remaining<=0)s.reserve[d.key]+=ingredients[d.key].pack}s.deliveries=s.deliveries.filter(d=>d.remaining>0);if(!s.open)return;
   if(s.management.assistant){s.management.restockTimer+=dt;if(s.management.restockTimer>=12-1e-9){s.management.restockTimer=Math.max(0,s.management.restockTimer-12);for(const key of ingredientKeys)this.restock(key)}}
-  if(s.prep?.pouring&&this.isPour()){s.prep.amount=Math.min(recipes[s.prep.recipe].target*1.6,s.prep.amount+recipes[s.prep.recipe].speed*dt)}s.time+=dt*2;if(s.time>=1440)s.closing=true;
+  if(s.prep?.pouring&&this.isPour()){s.prep.amount=Math.min(recipes[s.prep.recipe].target*1.6,s.prep.amount+recipes[s.prep.recipe].speed*dt)}if(!(s.developer?.enabled&&s.developer.clockPaused))s.time+=dt*serviceSchedule.minutesPerSecond;if(s.time>=serviceSchedule.closesAt-1e-9){s.time=Math.max(s.time,serviceSchedule.closesAt);s.closing=true;}
   for(const order of [...s.orders]){
    if(order.arrivalRemaining>0){order.arrivalRemaining=Math.max(0,order.arrivalRemaining-dt);continue}
    const phase=this.orderPhase(order);
@@ -619,5 +663,5 @@ class Game{
   // Do not accumulate missed arrivals while all available seats are occupied.
   s.spawn=Math.max(0,s.spawn-dt);if(!s.closing&&s.spawn<=1e-9)this.spawnCustomer();if(s.closing&&s.orders.length===0)return this.end()}
 }
-const api={Game,ingredients,recipes,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout,preparationSlots,buildingLayout,buildingZones,availableTables,decorCatalog,decorStyle};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
+const api={Game,ingredients,recipes,serviceSchedule,formatServiceTime,serviceInfo,serviceCapacities,managementUpgrades,isValidStock,tables,counterSeats,crowdStages,MAX_CUSTOMERS,registerPosition,preparationLayout,preparationSlots,buildingLayout,buildingZones,availableTables,decorCatalog,decorStyle};if(typeof module!=='undefined')module.exports=api;root.BarEngine=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

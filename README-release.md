@@ -49,6 +49,27 @@ préparations en cours. Reprenez un verre au poste avec **E** ; ingrédients et
 dosages sont conservés, y compris en sauvegarde. Le service continue pendant
 l’utilisation de la tablette.
 
+Le service dure de **17 h à 4 h du matin**, soit environ **22 minutes réelles**
+hors pauses et fin des commandes en cours. Une minute du jeu prend deux secondes
+réelles. Le statut, le temps restant et la barre d’avancement suivent ces horaires,
+y compris après minuit. Les clients, préparations et employés gardent leur rythme.
+À 4 h, les arrivées s’arrêtent ; terminez le service et les paiements avant le bilan.
+Vous pouvez lancer la dernière tournée plus tôt depuis le panneau ou la tablette.
+
+Dans **Réglages > Mode développeur**, activez les outils pour la partie en cours :
+
+- Ajouter de la trésorerie, sans compter cet argent comme recette.
+- Augmenter le total de clients encaissés pour tester les déblocages. Les achats
+  et leurs autres prérequis restent nécessaires.
+- Remplir le comptoir jusqu’à sa capacité et la réserve jusqu’à cinq lots des
+  ingrédients déjà débloqués, sans fournir les ingrédients des licences manquantes.
+- Geler l’horloge tout en laissant les clients, employés et préparations fonctionner.
+- Avancer d’une heure pendant le service, jusqu’à la dernière tournée à 4 h.
+
+Le mode est désactivé par défaut. Son activation et ses actions sont conservées
+dans la sauvegarde ; une nouvelle partie démarre sans ces outils. Désactiver le
+mode relance l’horloge. Les réglages mettent le jeu en pause pendant vos changements.
+
 La réserve est une pièce accessible par la porte à gauche, derrière le bar.
 Appuyez sur **E** dans cette pièce pour la gérer. Les achats arrivent en
 réserve après **10 secondes de jeu** ; transférez-les ensuite vers le comptoir

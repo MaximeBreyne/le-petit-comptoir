@@ -53,9 +53,9 @@ app.whenReady().then(async()=>{
    check(GameMenu.getMode()==='play'&&!paused&&locked===canvas,'Return to game button also resumes when settings came from pause');
    GameMenu.openSettings();await flush();esc();await flush();
    check(GameMenu.getMode()==='play'&&!paused&&locked===canvas,'Escape from settings opened in play returns to play');
-   game.open();state.time=1439.9;state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:100}];state.nextId=2;
+   game.open();state.time=BarEngine.serviceSchedule.closesAt-.01;state.orders=[{id:1,name:'Lucie',recipe:'beer',patience:100}];state.nextId=2;
    for(let i=0;i<100;i++)game.tick(.1);
-   check(state.closing&&state.time>1450&&state.orders.length===1,'Closing service continues while the last customer waits');
+   check(state.closing&&state.time>BarEngine.serviceSchedule.closesAt&&state.orders.length===1,'Closing service continues after 4 AM while the last customer waits');
    const closingTime=state.time;GameMenu.returnHome();
    check(!document.querySelector('[data-menu-action="continue"]').disabled,'Closing service save remains loadable after midnight');
    click('continue');check(state.closing&&state.time===closingTime&&state.orders[0].name==='Lucie','Continue restores the closing service');

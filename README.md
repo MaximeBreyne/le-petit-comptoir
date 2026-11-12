@@ -31,8 +31,12 @@ sur E, ou utilisez Ouvrir le bar dans Service sur la tablette.
 Un clic en regardant le panneau à proximité permet également de le tourner.
 Le même panneau ou bouton lance la dernière tournée : les clients présents
 doivent être servis et encaissés avant le bilan. Le panneau reflète cet état.
-En haut à gauche, seuls le statut et le temps de jeu restant jusqu’à minuit
-sont affichés, avec une barre d’avancement de 17 h à minuit.
+Le service s’étend de 17 h à 4 h du matin. Une minute dans le jeu prend
+deux secondes réelles : la soirée dure environ 22 minutes, hors pauses
+et temps nécessaire pour terminer les dernières commandes et paiements.
+En haut à gauche, le statut, le temps restant et une barre d’avancement
+suivent ces horaires. Après minuit, l’horloge affiche 00:00, 01:00, etc.
+Les déplacements, préparations, livraisons et clients gardent leur rythme.
 Les stocks, améliorations et l’action Nouveau bar se consultent uniquement
 dans la tablette ; Nouveau bar se trouve dans Bâtiment et demande confirmation.
 Les indications de préparation apparaissent uniquement derrière le comptoir.
@@ -61,6 +65,21 @@ Les anciennes préparations déjà payées restent utilisables sans nouveau déb
 35 euros de charges par soir, auxquels s’ajoutent les salaires des employés recrutés.
 Une trésorerie négative termine la partie.
 Le bouton Aide détaille les commandes et le fonctionnement.
+
+MODE DÉVELOPPEUR
+Pendant une partie, ouvrez Réglages puis activez Mode développeur.
+Ce mode est désactivé par défaut et appartient à la sauvegarde en cours.
+Il permet d’ajouter un montant de trésorerie, d’augmenter le total de clients
+encaissés pour tester les déblocages, ou de remplir les stocks autorisés.
+L’argent ajouté ne compte pas comme recette ; les améliorations, licences
+et recrutements restent à acheter avec leurs prérequis habituels.
+Le remplissage complète le comptoir jusqu’à sa capacité et la réserve
+jusqu’à cinq lots par ingrédient déjà débloqué, sans acheter de licence.
+Geler l’horloge arrête seulement l’heure : les clients, employés, préparations
+et livraisons continuent. Avancer d’une heure fonctionne pendant le service
+et lance la dernière tournée à 4 h, sans supprimer les clients présents.
+Désactiver le mode relance l’horloge. Les actions et l’activation sont sauvegardées ;
+une nouvelle partie commence avec le mode développeur désactivé.
 
 SERVICE À TABLE ET ENCAISSEMENTS
 Six tabourets sont installés au comptoir, en plus des quatre tables numérotées.
@@ -268,7 +287,7 @@ Les vitrages et parois de verre laissent voir le décor derrière eux ; le nivea
 des boissons suit le dosage et les cocktails reçoivent glaçons et garnitures.
 Le comptoir en pierre, le métal brossé, le parquet et les tissus ont des rendus
 distincts. La lumière de la rue baisse pendant le service, tandis que les
-suspensions gardent le bar éclairé jusqu’à minuit.
+suspensions gardent le bar éclairé pendant toute la nuit.
 Les clients arrivent et repartent en marchant,
 conservent leur place au comptoir et bloquent le passage lorsqu'ils attendent.
 Les chaises font face aux tables et la machine à café laisse un espace
@@ -283,6 +302,12 @@ npm test inclut les contrôles du rangement des textures de panneaux et de
 la géométrie mise en cache, en plus du moteur, des sauvegardes et du build.
 electron checks/hud.cjs vérifie l’interface, la progression de la journée
 et les interactions avec le panneau d’entrée dans une fenêtre masquée.
+node --test checks/developer-engine.cjs checks/service-engine.cjs contrôle
+les outils développeur, la durée du service et les encaissements.
+electron checks/developer-ui.cjs vérifie l’activation, les actions développeur
+et leur sauvegarde depuis les réglages, au clavier et à la manette.
+electron checks/menus.cjs contrôle la pause, le retour des réglages et
+les sauvegardes, y compris la fin du service après 4 h du matin.
 electron checks/licenses-ui.cjs contrôle les achats de licences, les six nouvelles
 recettes et le chargement d’une sauvegarde antérieure.
 electron checks/preparation-ui.cjs vérifie les dix recettes par interactions

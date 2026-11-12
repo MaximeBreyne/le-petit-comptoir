@@ -102,6 +102,16 @@ test('closing waits for outstanding payments and reports cash/card receipts sepa
  const report=game.tick(.1);assert.equal(report.sold,1);assert.equal(report.cashRevenue,customer.due);assert.equal(report.cardRevenue,0);assert.equal(game.s.day,2);assert.equal(game.s.payments.cashRevenue,0);assert.equal(game.s.payments.receipts.length,1);
 });
 
+test('a full service lasts 22 real minutes, crosses midnight and closes arrivals only at 04:00',()=>{
+ let game=session();game.s.spawn=99999;const customer=order(game,{phase:'payment',due:5,tender:5});
+ advance(game,840);assert.ok(Math.abs(game.s.time-1440)<1e-7);assert.equal(game.s.closing,false);assert.equal(game.s.day,1);
+ game=reload(game);assert.equal(game.s.closing,false);assert.equal(game.s.orders[0].id,customer.id);
+ advance(game,479.9);assert.equal(game.s.closing,false);assert.equal(game.s.orders.length,1);
+ advance(game,.1);assert.equal(game.s.closing,true);assert.equal(game.s.day,1);assert.equal(game.s.open,true);assert.ok(Math.abs(game.s.time-1680)<1e-7);
+ const ids=game.s.orders.map(item=>item.id);game.s.spawn=0;advance(game,10);game.spawnCustomer();assert.deepEqual(game.s.orders.map(item=>item.id),ids);
+ game.finishPayment(game.s.orders[0],'card');const report=game.tick(.1);assert.equal(report.sold,1);assert.equal(game.s.day,2);assert.equal(game.s.time,1020);assert.equal(game.s.open,false);
+});
+
 test('legacy saves preserve funds and stock while old counter orders gain explicit payment stages',()=>{
  const old=new Game().s;old.cash=173;old.stock.beer=777;old.orders=[{id:4,name:'Marc',recipe:'beer',patience:44}];old.nextId=5;delete old.payments;delete old.staff;delete old.management.bartender;delete old.management.waiter;
  const before=JSON.stringify(old),game=new Game(old);assert.equal(JSON.stringify(old),before);assert.equal(game.s.cash,173);assert.equal(game.s.stock.beer,777);assert.equal(game.s.orders[0].phase,'preparing');assert.equal(game.s.orders[0].tableId,null);assert.equal(game.s.payments.till,80);assert.equal(game.s.management.bartender,false);

@@ -7,7 +7,7 @@
 #serviceHud[data-state="open"] #serviceStatus::before{background:#8bc19a}
 #serviceHud[data-state="closing"] #serviceStatus::before{background:#e7bc78}
 #serviceHud[data-state="closing"] .service-summary{flex-wrap:wrap;gap:8px}
-#dayRemaining{color:#eee7d8;font-variant-numeric:tabular-nums;white-space:nowrap}
+#dayRemaining{color:#eee7d8;font-variant-numeric:tabular-nums;white-space:pre-line;text-align:right}
 #dayProgress{display:block;appearance:none;width:100%;height:4px;margin-top:12px;border:0;border-radius:2px;overflow:hidden;background:#ffffff20;color:#d2b27a}
 #dayProgress::-webkit-progress-bar{background:#ffffff20;border-radius:2px}
 #dayProgress::-webkit-progress-value{background:#d2b27a;border-radius:2px}
