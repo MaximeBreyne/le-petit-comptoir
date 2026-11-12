@@ -11,10 +11,12 @@ la palette et la disposition compacte de l'interface sont repris du prototype.
 La tablette retrouve son boîtier paysage arrondi, son écran clair et sa navigation
 latérale : Service, À préparer, Caisse et Réserve sont utilisables. Les rubriques
 Bâtiment, Décoration, Licences et Équipe sont visibles mais désactivées.
-Les textes utilisent la police de jeu standard du HUD, avec une position alignée
-sur les pixels. Le rendu avec la police Slate introduit précédemment a été retiré
-après un affichage sans aucun caractère dans Unreal. Les tailles agrandies,
-les contrastes renforcés et les boutons plus hauts sont conservés.
+La tablette est un widget **Slate ajouté directement au viewport**. Les caractères
+sont rasterisés à leur taille d'affichage, avec le DPI de la fenêtre ; les icônes et
+contours arrondis sont dessinés par Slate avec anticrénelage. L'interface ne passe
+plus par la police bitmap du HUD ni par une texture agrandie. Les tailles agrandies,
+les contrastes renforcés et les boutons plus hauts sont conservés. Les clics utilisent
+la géométrie du widget, y compris lorsque la fenêtre est redimensionnée.
 
 **La migration fonctionnelle reste partielle** : une bière, un client à la fois,
 paiement par carte, stocks, fermeture et sauvegarde. Les autres recettes, employés,
@@ -43,6 +45,22 @@ et les coordonnées utilisées par ses matériaux. Avant cette correction, une c
 de la carte est conservée dans `Saved/Backups/BeforeAxisFix/`. Les autres acteurs de
 la carte et l'ancienne carte `Bar` sont conservés. Les matériaux peuvent demander
 une compilation de shaders. Il n'est pas nécessaire de supprimer la carte.
+
+Pour vérifier le nouveau rendu de la tablette sur le PC qui possède Unreal, ajouter
+`-VerifyTablet` au script (une carte graphique est nécessaire) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\unreal\LePetitComptoir\Scripts\Setup-Unreal.ps1 -VerifyTablet -OpenEditor
+```
+
+Cette option exécute `LePetitComptoir.Tablet.RenderedText` dans Unreal avant d'ouvrir
+l'éditeur. Le test compare les pixels réellement rendus avec et sans texte sur les
+quatre pages ; il échoue si les caractères ou les titres ne sont pas visibles.
+Il enregistre les captures `Saved/Tests/Tablet/Tablet-0.bmp` à `Tablet-3.bmp` et un
+rapport dans `Saved/Tests/TabletReport-…`. Il vérifie la présence des textes, pas leur
+netteté visuelle : vérifier aussi la tablette en Play, les quatre onglets, les clics,
+le retour au jeu avec Tab et le redimensionnement de la fenêtre. Sans cette option,
+le fonctionnement habituel du script reste identique.
 
 ## Première installation sur Windows
 
@@ -180,9 +198,13 @@ de l'export, le sol de la réserve et les collisions des objets solides. La proj
 à l'écran est comparée dans cinq directions de caméra pour détecter les effets miroir.
 Le second teste service, stock, paiement unique, fermeture et sauvegardes. Le troisième
 contrôle 140 mises en page de tablette : dimensions, zones cliquables sans chevauchement,
-disponibilité des actions, taille de texte minimale dans le repère de la tablette et
-contraste texte/fond d'au moins 4,5:1. Le boîtier et les quatre pages sont inspectables via
+disponibilité des actions, conversion des coordonnées des clics, taille de texte
+minimale dans le repère de la tablette et contraste texte/fond d'au moins 4,5:1.
+Le boîtier et les quatre pages sont inspectables via
 les commandes de dessin partagées avec Unreal ; ce contrôle ne remplace pas Play.
+Le test natif `LePetitComptoir.Tablet.RenderedText` complète ces contrôles par un
+rendu Slate réel. Il est disponible dans l'éditeur ou via `-VerifyTablet` ci-dessus,
+et ne peut pas être exécuté avec `-NullRHI`.
 
 À vérifier dans Unreal : compilation UHT/C++, compilation des matériaux, absence de
 surfaces noires, visibilité du logo et des enseignes, passage vers la réserve, service

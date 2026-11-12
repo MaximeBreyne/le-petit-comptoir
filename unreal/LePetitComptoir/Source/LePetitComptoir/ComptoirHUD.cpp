@@ -12,8 +12,9 @@ void AComptoirHUD::DrawHUD()
     Super::DrawHUD();
     const AComptoirGameMode* Game = GetWorld()->GetAuthGameMode<AComptoirGameMode>();
     const AComptoirCharacter* Player = Cast<AComptoirCharacter>(GetOwningPawn());
-    if (!Canvas || !Game || !Player) return;
-    if (Player->IsTabletOpen()) { DrawTablet(*Game, *Player); return; }
+    if (!Canvas || !Game || !Player) { HideTablet(); return; }
+    if (Player->IsTabletOpen()) { UpdateTablet(*Game); return; }
+    HideTablet();
     const auto& S = Game->Simulation;
     const float Scale = FMath::Clamp(Canvas->SizeX / 1440.f, .65f, 1.2f);
     const float W = Canvas->SizeX / Scale, H = Canvas->SizeY / Scale;
@@ -135,4 +136,5 @@ void AComptoirHUD::NotifyHitBoxClick(FName BoxName)
     else if (BoxName==TEXT("tab_register")) TabletPage=2;
     else if (BoxName==TEXT("tab_reserve")) TabletPage=3;
     else if (BoxName==TEXT("save")) Game->Save(true);
+    if (!Player->IsTabletOpen()) HideTablet();
 }

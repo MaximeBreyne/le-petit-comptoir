@@ -75,12 +75,19 @@ int main(int Argc,char** Argv)
             {
                 assert(C.X+C.W<=1120&&C.Y+C.H<=720&&C.W>0&&C.H>0);
                 assert(Keys.insert(C.Value).second);
+                // The native widget receives local Slate coordinates; translate them
+                // through the same responsive layout used for drawing, including margins.
+                const float X=L.X+(C.X+C.W*.5f)*L.Scale,Y=L.Y+(C.Y+C.H*.5f)*L.Scale;
+                assert(HitTest(L,X,Y)==C.Value);
                 for(const auto& Other:Hits)
                     assert(C.X+C.W<=Other.X||Other.X+Other.W<=C.X||C.Y+C.H<=Other.Y||Other.Y+Other.H<=C.Y);
                 Hits.push_back(C);
             }
         }
         for(const char* Key:{"tab_service","tab_orders","tab_register","tab_reserve","tablet"})assert(Has(L,Key));
+        assert(HitTest(L,-1,-1).empty());
+        assert(HitTest(L,L.X+200*L.Scale,L.Y+200*L.Scale).empty());
+        assert(HitTest(L,L.X+90*L.Scale,L.Y+370*L.Scale).empty()); // Disabled Bâtiment.
         assert(!Has(L,"tab_building")&&!Has(L,"tab_decor")&&!Has(L,"tab_licenses")&&!Has(L,"tab_team"));
         ++Layouts;
     }
@@ -99,5 +106,5 @@ int main(int Argc,char** Argv)
         S.Cash=26000;S.Reserve=500;S.Phase=1;S.Beer=900;S.Held=2;S.Amount=32;
         for(int P=0;P<4;++P){S.Active=static_cast<Page>(P);Preview(Build(S,1280,800),std::string(Argv[1])+std::to_string(P)+".svg");}
     }
-    std::cout<<"PASS: "<<Layouts<<" tablet layouts fit; text contrast >= 4.5:1 and size >= 14; hit regions are unique, nonoverlapping and action availability is enforced.\n";
+    std::cout<<"PASS: "<<Layouts<<" tablet layouts fit; text contrast >= 4.5:1 and size >= 14; responsive hit testing and action availability are enforced.\n";
 }

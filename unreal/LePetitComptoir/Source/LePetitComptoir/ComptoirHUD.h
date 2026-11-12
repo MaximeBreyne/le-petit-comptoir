@@ -10,8 +10,13 @@ class LEPETITCOMPTOIR_API AComptoirHUD : public AHUD
 public:
     virtual void DrawHUD() override;
     virtual void NotifyHitBoxClick(FName BoxName) override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 private:
-    void DrawTablet(const class AComptoirGameMode& Game, const class AComptoirCharacter& Player);
+    void UpdateTablet(const class AComptoirGameMode& Game);
+    void HideTablet();
+    void RemoveTablet();
+    TSharedPtr<class SComptoirTablet> TabletWidget;
+    TWeakObjectPtr<class UGameViewportClient> TabletViewport;
     int32 TabletPage = 1;
     UPROPERTY() TObjectPtr<class UTexture2D> BrandLogo;
 };

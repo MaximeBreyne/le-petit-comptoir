@@ -36,6 +36,15 @@ struct Layout
     float Scale=1,X=0,Y=0;
     std::vector<Command> Commands;
 };
+inline std::string HitTest(const Layout& L,float X,float Y)
+{
+    if(L.Scale<=0)return {};
+    const float LocalX=(X-L.X)/L.Scale,LocalY=(Y-L.Y)/L.Scale;
+    for(auto It=L.Commands.rbegin();It!=L.Commands.rend();++It)
+        if(It->Type==Kind::Hit&&LocalX>=It->X&&LocalX<It->X+It->W&&LocalY>=It->Y&&LocalY<It->Y+It->H)
+            return It->Value;
+    return {};
+}
 inline std::string Money(int Cents)
 {
     std::ostringstream Out;Out.imbue(std::locale::classic());
