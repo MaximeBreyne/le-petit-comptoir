@@ -48,7 +48,7 @@ window.BarService=(()=>{
    const visual=typeof customerVisuals!=='undefined'?customerVisuals.get(order.id):null;
    const seat=order.tableId?BarScene.tableSeat(order.tableId):null;
    const counter=BarScene.counterSeat(game.counterSeat(order).slot);
-   const point={x:visual?.x??seat?.x??counter.x,y:order.tableId?1.25:1.5,z:visual?.z??seat?.z??counter.z};
+   const point={x:visual?.x??seat?.x??counter.x,y:(visual?.y??seat?.y??0)+(order.tableId?1.25:1.5),z:visual?.z??seat?.z??counter.z};
    const hit=aim(position,point,.48,4);if(hit)candidates.push({action:'direct-service',kind:'customer',orderId:order.id,label:customerLabel(order),...hit});
   }
   return candidates.sort((a,b)=>a.aimScore-b.aimScore||a.distance-b.distance)[0]||null;

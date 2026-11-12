@@ -1,10 +1,11 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {Game,recipes,ingredients,preparationLayout,preparationSlots}=require('../dist/engine.js');
+const {Game,recipes,ingredients,managementUpgrades,preparationLayout,preparationSlots}=require('../dist/engine.js');
 const {staff,approach,stationPosition,gather,prepare}=require('./preparation-fixtures.cjs');
 const clone=value=>JSON.parse(JSON.stringify(value));
 const session=()=>{const game=new Game();game.open();game.s.spawn=999;return game};
 const table={x:1.65,z:6.4};
+const unlockMenu=state=>{for(const [key,offer]of Object.entries(managementUpgrades))if(offer.category==='licenses'||offer.requiresClosed)state.management[key]=true};
 
 test('preparation is restricted to the staff aisle and needs physical collection',()=>{
  const game=session(),before=clone(game.s);
@@ -29,9 +30,9 @@ test('preparation is restricted to the staff aisle and needs physical collection
  game.plate(table);assert.equal(game.s.tray.length,0);game.plate(stationPosition(game));assert.equal(game.s.tray.length,1);
 });
 
-test('all ten recipes consume precisely the ingredients physically taken',()=>{
+test('every recipe consumes precisely the ingredients physically taken',()=>{
  for(const id of Object.keys(recipes)){
-  const game=session();for(const key of ['cocktails','softDrinks','spirits','signature'])game.s.management[key]=true;
+  const game=session();unlockMenu(game.s);
   for(const [key,ingredient]of Object.entries(ingredients))game.s.stock[key]=ingredient.pack*2;
   const before=clone(game.s.stock);prepare(game,id);
   assert.equal(game.s.tray[0].recipe,id);assert.equal(game.s.tray[0].quality,100);
@@ -70,7 +71,7 @@ test('held ingredients and gathered state survive reload with no duplicate deduc
 
 test('legacy prepaid preparations retain dose and quality without rededucting ingredients',()=>{
  for(const id of Object.keys(recipes))for(const ready of [false,true]){
-  const saved=session().s,recipe=recipes[id];for(const key of ['cocktails','softDrinks','spirits','signature'])saved.management[key]=true;
+  const saved=session().s,recipe=recipes[id];unlockMenu(saved);
   saved.prep={recipe:id,step:recipe.finishStep??recipe.pourStep,amount:recipe.target,quality:93,ready,pouring:true};
   saved.stock.wine=37;const before=clone(saved);let game=new Game(saved);assert.deepEqual(saved,before);
   assert.equal(game.s.prep.amount,recipe.target);assert.equal(game.s.prep.quality,93);assert.equal(game.s.prep.ready,ready);assert.equal(game.s.prep.pouring,false);

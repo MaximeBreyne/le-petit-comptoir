@@ -1,0 +1,82 @@
+'use strict';
+const {app,BrowserWindow}=require('electron');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'comptoir-vertical-tablet-')));
+let win;const timeout=setTimeout(()=>{console.error('Vertical tablet UI timed out');app.exit(1)},90000);
+app.whenReady().then(async()=>{
+ try{
+  const errors=[];win=new BrowserWindow({show:false,width:1440,height:960,useContentSize:true,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
+  win.webContents.on('console-message',event=>{if(event.level==='error'||event.level===3)errors.push(event.message)});
+  await win.loadFile(path.resolve(process.env.BAR_QA_TARGET||'dist/index.html'));
+  const evaluate=code=>win.webContents.executeJavaScript(code,true);
+  const result=await evaluate(`(async()=>{
+   const check=(value,message)=>{if(!value)throw Error(message)},flush=()=>new Promise(resolve=>setTimeout(resolve,25));
+   const click=selector=>{const node=document.querySelector(selector);check(node&&!node.disabled&&!node.closest('[hidden]'),'Usable control '+selector);node.click()};
+   const upgrade=id=>document.querySelector('[data-tablet-upgrade="'+id+'"]');
+   let locked=null;Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>locked});
+   canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
+   document.exitPointerLock=()=>queueMicrotask(()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))});
+   window.requestAnimationFrame=()=>0;await flush();GameMenu.newGame();await flush();
+   check(game.crowdInfo().capacity===7&&game.activeTables().length===4,'A new game keeps the original four tables and seven places');
+   BarTablet.open('service');check(document.querySelector('[data-service-zone="upstairs"]').hidden&&document.querySelector('[data-service-zone="nightclub"]').hidden,'Unbought areas do not appear as active seats');
+   state.totalSold=300;state.cash=50000;BarTablet.open('team');
+   check(upgrade('floorManager').disabled&&upgrade('bartender2').disabled&&upgrade('dj').disabled&&upgrade('host').disabled,'Progression and cash alone cannot unlock large-building jobs');
+   check(document.querySelector('[data-upgrade="floorManager"]').textContent.includes('174 m²'),'Required floor area is visible before recruitment');
+   let charged=0;
+   const buy=id=>{const offer=BarEngine.managementUpgrades[id];BarTablet.open(offer.category);const before=state.cash;click('[data-tablet-upgrade="'+id+'"]');check(state.cash===before-offer.cost,'Purchase charged exactly once: '+id);charged+=offer.cost;check(upgrade(id).disabled,'Purchased offer is disabled: '+id);};
+   for(const id of ['expansion1','table5','table6','expansion2','table7','table8','waiter','bartender'])buy(id);
+   BarTablet.open('team');check(!upgrade('floorManager').disabled&&upgrade('bartender2').disabled,'174 m² opens the floor manager but not the upstairs preparer');buy('floorManager');
+   BarTablet.open('building');game.open();ui();BarTablet.refresh(true);check(upgrade('upstairs').disabled,'Upper-floor work is blocked while the bar is open');
+   game.close();game.end();ui();const budgetBefore=state.cash;
+   buy('upstairs');check(game.buildingInfo().area===246&&game.activeTables().length===8&&state.orders.length===0,'An empty upper floor adds space without clients or free tables');
+   check(document.querySelector('[data-building-metric="floors"]').textContent==='2','The building summary reports both levels');
+   for(const id of ['table9','table10','table11','table12'])buy(id);
+   buy('bartender2');buy('nightclub');check(game.buildingInfo().area===294&&game.activeTables().length===12,'The empty nightclub adds space without table capacity');
+   for(const id of ['table13','table14','table15','table16','cocktails','spirits','classiques','premium','nightlife','dj','host'])buy(id);
+   check(game.buildingInfo().tableCount===16&&game.crowdInfo().capacity===22,'Full building reaches sixteen tables and twenty-two places');
+   check(state.stock.vodka===0&&state.stock.cranberry===0&&state.stock.energy===0,'Buying licences never grants stock');
+   BarTablet.open('licenses');check(document.querySelector('[data-upgrade="nightlife"]').textContent.includes('Nuit Pourpre'),'The club licence lists its drinks');
+   BarTablet.open('reserve');check(document.querySelector('[data-stock-key="energy"]')&&!document.querySelector('[data-tablet-buy="energy"]').disabled,'The club ingredient becomes available to order');
+   BarTablet.open('team');const payroll=['waiter','bartender','floorManager','bartender2','dj','host'].reduce((sum,id)=>sum+BarEngine.managementUpgrades[id].salary,0);
+   check(document.querySelector('[data-team-summary]').textContent.includes('6 employés')&&document.querySelector('[data-team-summary]').textContent.includes(money(payroll)),'The complete payroll is visible');
+   const auto=JSON.parse(localStorage.getItem('comptoir-bar-v2'));check(auto.management.table16&&auto.management.bartender2&&auto.management.nightlife,'Purchases are autosaved');
+   const restored=new Game(auto);check(restored.buildingInfo().area===294&&restored.s.management.dj&&restored.s.stock.energy===0,'Reloading retains buildings, staff, licences and empty new stock');
+   BarTablet.open('service');check(!document.querySelector('[data-service-zone="upstairs"]').hidden&&!document.querySelector('[data-service-zone="nightclub"]').hidden,'Both bought areas appear in Service');
+   check(document.querySelector('[data-service-seat="table:9"]').textContent.includes('Étage')&&document.querySelector('[data-service-seat="table:13"]').textContent.includes('Boîte de nuit'),'Every new table identifies its area');
+   game.open();state.spawn=999;for(let i=0;i<22;i++)game.spawnCustomer();state.spawn=999;
+   const order=state.orders.find(order=>order.tableId===9);check(order,'A customer can occupy an upstairs table');order.arrivalRemaining=0;
+   camera={...BarScene.playCamera,x:13.15,z:6.5};BarTablet.refresh(true);
+   const takeSelector='[data-tablet-order-action="take"][data-order-id="'+order.id+'"]';
+   check(document.querySelector(takeSelector).disabled,'A table directly above the player cannot be served from below');
+   camera.y=5.28;BarTablet.refresh(true);check(!document.querySelector(takeSelector).disabled,'An upstairs customer is reachable from the upper-floor aisle');click(takeSelector);check(order.phase==='preparing','Taking the upstairs order uses the real tablet interaction');
+   const ground=state.orders.find(order=>order.tableId===5);ground.arrivalRemaining=0;BarTablet.refresh(true);
+   check(document.querySelector('[data-tablet-order-action="take"][data-order-id="'+ground.id+'"]').disabled,'An upstairs player cannot take the downstairs order through the floor');
+   BarTablet.close();await flush();save(true);const saved=JSON.parse(localStorage.getItem('comptoir-bar-v2'));
+   check(new Game(saved).s.orders.find(item=>item.id===order.id)?.phase==='preparing','The upstairs order survives an autosave');
+   const pad={id:'Building tablet controller',index:0,mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,value:0}))};
+   Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[pad]});
+   const updatePad=()=>BarGamepad.update(.05),press=async index=>{pad.buttons[index]={pressed:true,value:1};updatePad();pad.buttons[index]={pressed:false,value:0};updatePad();await flush()};
+   updatePad();updatePad();BarTablet.open('building');
+   let steps=0;while(!document.activeElement?.matches('[data-building-jump="upstairs"]')&&steps++<80)await press(13);
+   check(steps<80,'The upper-floor building shortcut is reachable with the D-pad');await press(0);updatePad();
+   check(document.activeElement?.textContent==='Étage et escalier'&&document.querySelector('.tablet-main').scrollTop>0,'Controller activation reaches the upper-floor group and keeps its focus');
+   await press(1);check(!BarTablet.isOpen()&&!paused&&GameMenu.getMode()==='play','B returns from the new building controls directly to the game');
+   render();check(renderer.gl.getError()===0,'The full scene renders successfully');
+   window.__verticalTabletQA={check,budgetBefore};
+   return {tables:16,capacity:22,area:294,licences:3,newRoles:4,payroll,charged,buildingGuards:true,stockPreserved:true,threeServiceZones:true,noCrossFloorOrders:true,gamepadBuildingNavigation:true,saved:true,gl:0};
+  })()`);
+  async function capture(name,code){
+   await evaluate(code+';__verticalTabletQA.check(BarTablet.isOpen(),"Tablet is open for capture");render();renderer.gl.finish()');await new Promise(resolve=>setTimeout(resolve,150));
+   // The first offscreen paint may still be the frame queued before the dialog opened.
+   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('No settled paint '+name)),5000);win.webContents.once('paint',()=>{clearTimeout(timer);resolve()});win.webContents.invalidate()});
+   await new Promise(resolve=>setTimeout(resolve,100));
+   const png=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('No capture '+name)),5000);win.webContents.once('paint',(_event,_rect,image)=>{clearTimeout(timer);resolve(image.toPNG())});win.webContents.invalidate()});
+   const directory=path.join(__dirname,'artifacts');fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,name+'.png'),png);
+  }
+  await capture('vertical-building-tablet',"BarTablet.open('building')");
+  await capture('vertical-team-tablet',"BarTablet.open('team')");
+  await capture('vertical-team-unlocks',"BarTablet.open('team');document.querySelector('[data-upgrade=\"floorManager\"]').scrollIntoView({block:'start'})");
+  if(errors.length)throw Error(errors.join('\n'));
+  console.log('VERTICAL TABLET UI OK',JSON.stringify(result));clearTimeout(timeout);win.destroy();app.exit(0);
+ }catch(error){console.error(error);clearTimeout(timeout);win?.destroy();app.exit(1)}
+});

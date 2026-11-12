@@ -22,7 +22,7 @@ window.BarOrders=(()=>{
      item.dataset.queueOrder=ticket.orderId;item.append(recipe,place,status);row={item,recipe,place,status};entry.rows.set(ticket.orderId,row);entry.list.append(item);
     }
     row.item.dataset.status=ticket.status;row.recipe.textContent=recipes[ticket.recipe]?.name||'Commande';row.place.textContent=ticket.place;
-    row.status.textContent=ticket.status==='ready'?(ticket.prepId?'À récupérer':'Sur le plateau'):ticket.worker==='bartender'?'Préparateur':labels[ticket.status]||'À faire';
+    row.status.textContent=ticket.status==='ready'?(ticket.prepId?'À récupérer':'Sur le plateau'):ticket.worker==='bartender2'?'Second préparateur':ticket.worker==='bartender'?'Préparateur':labels[ticket.status]||'À faire';
    }
   }
   $('orderQueueCount').textContent=String(queue.length);

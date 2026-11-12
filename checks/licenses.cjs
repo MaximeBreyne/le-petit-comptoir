@@ -20,7 +20,7 @@ function addOrder(game,recipe){
 }
 
 test('legacy stock accepts absent extension keys but rejects malformed quantities',()=>{
- const stock=clone(new Game().s.stock);for(const key of newIngredients)delete stock[key];
+ const stock=clone(new Game().s.stock);for(const [key,ingredient]of Object.entries(ingredients))if(ingredient.license)delete stock[key];
  assert.equal(isValidStock(stock),true);
  for(const key of Object.keys(ingredients))for(const invalid of [NaN,Infinity,-1,'0',null,undefined]){
   assert.equal(isValidStock({...stock,[key]:invalid}),false,key+' must be numeric and nonnegative when present');

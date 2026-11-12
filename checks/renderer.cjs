@@ -69,13 +69,13 @@ test('window daylight fades through the evening while invalid or out-of-range ti
  assert.equal(Renderer.daylightAt(NaN),1);
 });
 
-test('all fourteen clients and three employees cast contacts that clear when people leave',()=>{
- assert.equal(Renderer.maxContactPeople,17);
+test('all twenty-two clients and seven employees cast contacts on their own floor and clear when people leave',()=>{
+ assert.equal(Renderer.maxContactPeople,29);
  const r=renderer(4096);r.people=new Float32Array(Renderer.maxContactPeople*4);
- const people=Array.from({length:18},(_,index)=>({x:index+1,z:index/2,contactShadow:true}));
+ const people=Array.from({length:30},(_,index)=>({x:index+1,z:index/2,contactShadow:true,contactFloor:index%2?3.6:0}));
  r.contactShadows([{x:100,z:100},...people]);
- for(let i=0;i<17;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.equal(r.people[i*4+3],1);}
- assert.equal(r.people.length,68,'Departing extras cannot grow the fixed GPU upload');
+ for(let i=0;i<29;i++){assert.equal(r.people[i*4],people[i].x);assert.equal(r.people[i*4+1],people[i].z);assert.ok(Math.abs(r.people[i*4+2]-people[i].contactFloor)<1e-6);assert.equal(r.people[i*4+3],1);}
+ assert.equal(r.people.length,116,'Departing extras cannot grow the fixed GPU upload');
  r.contactShadows([people[0]]);assert.equal(r.people[3],1);assert.ok([...r.people.subarray(4)].every(value=>value===0));
 });
 
@@ -89,12 +89,34 @@ for(const limit of [2048,4096])test(`expansion rebuilds fit the ${limit}px atlas
  r.setScene(Scene.create());assert.equal(r.buildingWidth,12,'Starting over restores the original shadow volume');
 });
 
+for(const limit of [2048,4096])test(`both storeys, the club and all sixteen table signs fit the ${limit}px atlas with separate shadow geometry`,()=>{
+ const r=renderer(limit),game=new context.BarEngine.Game();for(const id of Object.keys(context.BarEngine.managementUpgrades))game.s.management[id]=true;
+ const boxes=Scene.create(game.s);Venue.addFrame(boxes);r.setScene(boxes);inspectAtlas(r);
+ assert.equal(r.buildingWidth,32);assert.equal(r.hasUpstairs,true);assert.equal(r.shadowFloor,0);
+ assert.ok(r.upperShadowMesh.length>0&&r.groundShadowMesh.length>r.upperShadowMesh.length);
+ for(let offset=1;offset<r.upperShadowMesh.length;offset+=12)assert.ok(r.upperShadowMesh[offset]>=3.5,'The upper shadow buffer cannot contain ground-floor furniture');
+ r.setScene(Scene.create());assert.equal(r.hasUpstairs,false);assert.equal(r.upperShadowMesh,null);assert.equal(r.shadowFloor,0);
+});
+
 test('clear panes are separated from opaque depth and shadow geometry',()=>{
  const r=renderer(4096),uploaded=[];r.gl.bufferData=(_target,data)=>uploaded.push(data.length/12);
  const solid={x:0,y:1,z:3,w:1,h:1,d:.1,c:'#aa4433',mat:0};
  const pane={...solid,z:2,mat:11};r.setScene([solid,pane]);
  assert.equal(r.staticGlass.length,1);assert.equal(r.staticGlass[0],pane);
  assert.equal(r.count,36);assert.equal(r.shadowCount,36);assert.deepEqual(uploaded,[36,36]);
+});
+
+test('character visibility preserves near bodies and screen-edge limbs using actual yaw, pitch, FOV and aspect ratio',()=>{
+ const camera={x:0,y:1.68,z:0,a:0,pitch:0},visible=(point,view=camera,fov=90,aspect=1)=>Renderer.characterVisible({x:0,y:1.68,z:10,radius:1.35,...point},view,fov,aspect);
+ assert.equal(visible({}),true);assert.equal(visible({z:-3}),false);assert.equal(visible({z:-.5}),true);
+ assert.equal(visible({x:100,z:.5}),false,'Near depth does not keep an unrelated character far beside the camera');
+ assert.equal(visible({x:11.8}),true,'A limb can intersect the screen edge even with its center off-screen');assert.equal(visible({x:12.1}),false);
+ assert.equal(visible({y:13.48}),true);assert.equal(visible({y:13.78}),false);
+ assert.equal(visible({x:15},camera,90,16/9),true);assert.equal(visible({x:15}),false);
+ assert.equal(visible({x:8},camera,60),false);assert.equal(visible({x:8},camera,100),true);
+ assert.equal(visible({x:10,z:0},{...camera,a:Math.PI/2}),true);assert.equal(visible({x:-10,z:0},{...camera,a:Math.PI/2}),false);
+ assert.equal(visible({y:11.68,z:0},{...camera,pitch:Math.PI/2}),true);assert.equal(visible({y:-8.32,z:0},{...camera,pitch:Math.PI/2}),false);
+ const upper={...camera,y:5.28};assert.equal(visible({y:4.6},upper),true,'Upstairs characters use their world altitude');
 });
 
 test('table edge finishes reach only the sides of the actual mesh without adding intersecting surfaces',()=>{

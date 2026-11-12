@@ -14,7 +14,7 @@ const BarScene=(()=>{
  function tableSeat(id){
   const table=tableLocations.find(table=>table.id===Number(id));if(!table)return null;
   const inside=table.x<6?1:-1;
-  return {x:table.x+inside*.78,z:table.z,angle:inside*Math.PI/2};
+  return {x:table.x+inside*.78,y:table.y||0,z:table.z,angle:inside*Math.PI/2};
  }
  const counterLocations=globalThis.BarEngine?.counterSeats||[4.6,6,7.4,3.2,8.8,10.2].map((x,slot)=>({slot,x,z:4.3}));
  function counterSeat(slot){
@@ -35,19 +35,36 @@ const BarScene=(()=>{
   {key:'gin',label:'GIN',pack:70,x:.43,y:.32,z:-2.18,side:true,kind:'bottle',color:'#638477'},
   {key:'tonic',label:'TONIC',pack:100,x:.43,y:1.02,z:-1.12,side:true,kind:'bottle',color:'#a1b9a3'},
   {key:'cola',label:'COLA',pack:100,x:.43,y:1.02,z:-2.18,side:true,kind:'bottle',color:'#604536'},
+  {key:'vodka',label:'VODKA',pack:70,x:.43,y:1.72,z:-1.12,side:true,kind:'bottle',color:'#a5bdc2'},
+  {key:'cranberry',label:'CRANBERRY',pack:100,x:.43,y:1.72,z:-2.18,side:true,kind:'bottle',color:'#8f425b'},
+  {key:'energy',label:'ÉNERGIE',pack:100,x:2.25,y:2.29,kind:'bottle',color:'#83a95a'},
  ];
- function containsWalkablePosition(x,z,state){
-  if(!Number.isFinite(x)||!Number.isFinite(z))return false;
-  const level=globalThis.BarEngine?.buildingLayout?.(state)?.level||0;
-  return (x>=.3&&x<=11.7&&z>=.3&&z<=9.6)||
+ function walkSurfaceHeight(x,z,state,feetY=0){
+  if(!Number.isFinite(x)||!Number.isFinite(z)||!Number.isFinite(feetY))return null;
+  const building=globalThis.BarEngine?.buildingLayout?.(state)||{},level=building.level||0;
+  if(building.upstairs){
+   // Only the stairs connect levels. The caller also limits the height change
+   // per walking step, so crossing a landing edge can never teleport a player.
+   if(x>=21.65&&x<=23.35&&z>=5.25&&z<=9.1)return (z-5.25)*3.6/3.85;
+   if(x>=20.7&&x<=23.7&&z>=9.1&&z<=9.6&&feetY>3.3)return 3.6;
+   if(x>=12.3&&x<=20.7&&z>=4.3&&z<=9.6&&feetY>3.3)return 3.6;
+   if(feetY>.18)return null;
+   if(x>=20.7&&x<=21.3&&z>=4.9&&z<=5.6)return 0;
+   if(x>=21.3&&x<=23.7&&z>=4.3&&z<=5.4)return 0;
+   if(building.nightclub&&x>=23.7&&x<=24.3&&z>=4.9&&z<=5.6)return 0;
+  }
+  if(feetY>.18)return null;
+  if(building.nightclub&&x>=24.3&&x<=31.7&&z>=4.3&&z<=9.6)return 0;
+  return ((x>=.3&&x<=11.7&&z>=.3&&z<=9.6)||
    (x>=.3&&x<=4.3&&z>=-3.9&&z<=-.3)||
    (x>=.55&&x<=1.35&&z>=-.35&&z<=.35)||
    (level>=1&&x>=11.7&&x<=12.3&&z>=4.9&&z<=5.6)||
    (level>=1&&x>=12.3&&x<=16.2&&z>=4.3&&z<=9.6)||
    (level>=2&&x>=16.2&&x<=16.8&&z>=4.9&&z<=5.6)||
-   (level>=2&&x>=16.8&&x<=20.7&&z>=4.3&&z<=9.6);
+   (level>=2&&x>=16.8&&x<=20.7&&z>=4.3&&z<=9.6))?0:null;
  }
- const inStockroom=position=>!!position&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
+ const containsWalkablePosition=(x,z,state,feetY=0)=>walkSurfaceHeight(x,z,state,feetY)!==null;
+ const inStockroom=position=>!!position&&(!Number.isFinite(position.y)||position.y<2)&&position.x>=.3&&position.x<=4.3&&position.z>=-3.9&&position.z<-.35;
  function prepStation(preparation){
   const recipe=typeof preparation==='string'?preparation:preparation?.recipe;
   const key=recipe==='beer'?'beer':recipe==='coffee'?'coffee':'cocktails';
@@ -159,8 +176,8 @@ const BarScene=(()=>{
    }
   }
  }
- const preparationLabels={wine:'VIN ROUGE',rum:'RHUM',whisky:'WHISKY',gin:'GIN',sugar:'SIROP',soda:'EAU PÉTILLANTE',tonic:'TONIC',cola:'COLA',lime:'CITRONS',mint:'MENTHE',ice:'GLAÇONS',coffee:'CAFÉ'};
- const preparationColors={wine:'#593c40',rum:'#8b6d3b',whisky:'#916037',gin:'#538476',sugar:'#b2a169',soda:'#739ca0',tonic:'#a1b692',cola:'#624132'};
+ const preparationLabels={wine:'VIN ROUGE',rum:'RHUM',whisky:'WHISKY',gin:'GIN',sugar:'SIROP',soda:'EAU PÉTILLANTE',tonic:'TONIC',cola:'COLA',vodka:'VODKA',cranberry:'CRANBERRY',energy:'ÉNERGIE',lime:'CITRONS',mint:'MENTHE',ice:'GLAÇONS',coffee:'CAFÉ'};
+ const preparationColors={wine:'#593c40',rum:'#8b6d3b',whisky:'#916037',gin:'#538476',sugar:'#b2a169',soda:'#739ca0',tonic:'#a1b692',cola:'#624132',vodka:'#a5bdc2',cranberry:'#8f425b',energy:'#83a95a'};
  function preparationFixtures(items){
   const layout=globalThis.BarEngine?.preparationLayout;if(!layout)return;
   const g=geometry(items),{box:b,cylinder:c}=g;
@@ -254,14 +271,14 @@ const BarScene=(()=>{
   const activeTables=globalThis.BarEngine?.availableTables?.(state)||tableLocations.filter(table=>!table.upgrade);
   // A room purchase changes the shell. Furniture is a separate purchase, so an
   // empty salon remains accessible without creating extra customer places.
-  function sideWall(x,start,end,door=false){
-   const spans=door?[[start,4.6],[5.9,end]]:[[start,end]];
-   for(const [from,to]of spans)b(x,1.7,(from+to)/2,.2,3.4,to-from,wall.plaster,M.plaster,{...solid,...noShadow});
+  function sideWall(x,start,end,door=false,elevation=0,doorZ=5.25){
+   const spans=door?[[start,doorZ-.65],[doorZ+.65,end]]:[[start,end]];
+   for(const [from,to]of spans)if(to>from)b(x,elevation+1.7,(from+to)/2,.2,3.4,to-from,wall.plaster,M.plaster,{...solid,...noShadow});
    if(door){
-    b(x,2.95,5.25,.2,.9,1.3,wall.plaster,M.plaster,noShadow);
-    for(const z of [4.6,5.9])b(x,1.25,z,.26,2.5,.065,'#4d5e51',M.wood,solid);
-    b(x,2.52,5.25,.26,.09,1.43,'#4d5e51',M.wood,noShadow);
-    b(x,.006,5.25,.25,.012,1.25,'#ad9670',M.metal,noShadow);
+    b(x,elevation+2.95,doorZ,.2,.9,1.3,wall.plaster,M.plaster,noShadow);
+    for(const z of [doorZ-.65,doorZ+.65])b(x,elevation+1.25,z,.26,2.5,.065,'#4d5e51',M.wood,solid);
+    b(x,elevation+2.52,doorZ,.26,.09,1.43,'#4d5e51',M.wood,noShadow);
+    b(x,elevation+.006,doorZ,.25,.012,1.25,'#ad9670',M.metal,noShadow);
    }
   }
   function sidePanel(x,start,end,door=false){
@@ -290,8 +307,8 @@ const BarScene=(()=>{
    b(middle,3.45,7,4.5,.18,6,ceiling.surface,M.plaster,noShadow);
    b(middle,1.7,4,4.5,3.4,.2,wall.plaster,M.plaster,{...solid,...noShadow});
    sidePanel(left+.12,4,10,true);
-   sideWall(right,4,10,room+1<building.level);
-   sidePanel(right-.12,4,10,room+1<building.level);
+   sideWall(right,4,10,room+1<building.level||right===21&&building.upstairs);
+   sidePanel(right-.12,4,10,room+1<building.level||right===21&&building.upstairs);
    b(middle,.58,4.12,4.26,1.16,.12,wall.panel,M.wood);
    b(middle,1.18,4.12,4.26,.06,.17,wall.trim,M.wood);
    b(middle,.075,4.12,4.26,.15,.18,wall.trim,M.wood);
@@ -317,6 +334,87 @@ const BarScene=(()=>{
    b(middle,2.17,4.14,1.5,.83,.045,'#4b4436',M.wood);
    b(middle,2.17,4.17,1.34,.67,.02,'#a79266',M.paint,{label:room?'LES SOIRÉES\nDU COMPTOIR':'PRENEZ\nLE TEMPS',labelFace:'back',labelColor:'#263b34',labelPixels:256,castShadow:false});
   }
+  if(building.upstairs){
+   // The upper salon is a real second storey over the two existing annexes.
+   // Its slab meets the ceilings below, while the staircase has an open shaft.
+   b(16.5,3.57,7,9,.06,6,floor.surface,floorMaterial,{roomFloor:true,decorCategory:'floor',floorHeight:3.6,solid:true,castShadow:false});
+   b(16.5,7.05,7,9,.18,6,ceiling.surface,M.plaster,noShadow);
+   sideWall(12,4,10,false,3.6);sideWall(21,4,10,true,3.6,9.3);
+   b(21,3.5,7,.2,.2,6,wall.plaster,M.plaster,noShadow);
+   b(16.5,5.3,4,9,3.4,.2,wall.plaster,M.plaster,{...solid,...noShadow});
+   for(const z of [4.12,9.88]){
+    b(16.5,4.18,z,8.76,1.16,.12,wall.panel,M.wood);
+    b(16.5,4.78,z,8.76,.06,.17,wall.trim,M.wood);
+    b(16.5,3.675,z,8.76,.15,.18,wall.trim,M.wood);
+    b(16.5,6.84,z,8.76,.11,.18,ceiling.trim,M.plaster,noShadow);
+   }
+   b(12.12,4.18,7,.12,1.16,6,wall.panel,M.wood);
+   b(12.12,4.78,7,.17,.06,6,wall.trim,M.wood);
+   b(12.12,6.84,7,.18,.11,6,ceiling.trim,M.plaster,noShadow);
+   b(20.88,4.18,6.325,.12,1.16,4.65,wall.panel,M.wood);
+   b(20.88,4.78,6.325,.17,.06,4.65,wall.trim,M.wood);
+   b(20.88,6.84,7,.18,.11,6,ceiling.trim,M.plaster,noShadow);
+   b(16.5,4.0,9.98,9,.8,.2,wall.panel,M.wood,solid);
+   b(16.5,6.73,9.98,9,.55,.2,wall.plaster,M.plaster,noShadow);
+   for(const x of [12.12,16.5,20.88])b(x,5.2,9.96,.18,3.2,.2,'#273a38',M.metal,{...solid,...noShadow});
+   for(const x of [14.3,18.7]){
+    b(x,5.57,9.99,4.16,2.27,.009,'#c0d1cf',M.clearGlass,noShadow);
+    b(x,5.88,9.94,4.16,.06,.12,'#283c3b',M.metal,noShadow);
+   }
+   for(const x of [14.25,18.75])for(const z of [6.2,8.4]){
+    c(x,6.65,z,.018,.62,.018,'#273632',M.metal,noShadow);
+    c(x,6.3,z,.57,.20,.57,'#364137',M.metal,{topRadius:.32});
+    c(x,6.19,z,.50,.016,.50,'#f2d799',M.light,noShadow);
+   }
+   b(16.5,5.85,4.14,2.5,.48,.035,'#263e36',M.paint,{label:'LE SALON À L’ÉTAGE',labelFace:'back',labelColor:'#f2e9cf',labelPixels:512,castShadow:false});
+   b(20.845,6.42,9.3,1.15,.25,.025,'#263e36',M.paint,{ry:Math.PI/2,label:'ESCALIER',labelColor:'#f2e9cf',labelPixels:256,castShadow:false});
+   b(21.155,6.42,9.3,1.15,.25,.025,'#263e36',M.paint,{ry:-Math.PI/2,label:'ÉTAGE',labelColor:'#f2e9cf',labelPixels:256,castShadow:false});
+   // Enclosed staircase tower. The landing remains clear of rails and posts.
+   b(22.5,-.11,7,3,.22,6,floor.surface,floorMaterial,{roomFloor:true,decorCategory:'floor'});
+   b(22.5,7.05,7,3,.18,6,ceiling.surface,M.plaster,noShadow);
+   b(22.5,3.5,4,3,7,.2,wall.plaster,M.plaster,{...solid,...noShadow});
+   b(22.5,3.5,10,3,7,.2,wall.plaster,M.plaster,{...solid,...noShadow});
+   sideWall(24,4,10,building.nightclub);sideWall(24,4,10,false,3.6);
+   b(24,3.5,7,.2,.2,6,wall.plaster,M.plaster,noShadow);
+   b(22.5,3.57,9.55,3,.06,.9,floor.surface,floorMaterial,{solid:true,castShadow:false});
+   // 24 treads, with walking following a smooth ramp to prevent camera jolts.
+   for(let step=0;step<24;step++){
+    const height=(step+1)*3.6/24,depth=3.85/24,z=5.25+(step+.5)*depth;
+    b(22.5,height/2,z,2.04,height,depth+.003,wall.trim,M.wood,{stairTread:true,castShadow:false});
+    b(22.5,height+.004,z-depth/2+.016,2.04,.008,.032,'#b8ab81',M.metal,noShadow);
+   }
+   const railAngle=Math.atan2(3.6,3.85),railLength=Math.hypot(3.6,3.85);
+   for(const x of [21.45,23.55]){
+    b(x,2.75,7.175,.065,.065,railLength,'#aa936c',M.wood,{rx:-railAngle});
+    // Closely spaced spindles meet the handrail without protruding above it.
+    // Their gaps are narrower than the player's collision diameter.
+    for(let step=2;step<24;step++){const z=5.25+(step+.5)*3.85/24,y=(step+.5)*3.6/24;b(x,y+.475,z,.035,.95,.035,'#3e4e46',M.metal,{solid:true,stairGuard:true});}
+   }
+   b(20.845,2.82,5.25,1.15,.25,.025,'#263e36',M.paint,{ry:Math.PI/2,label:'ÉTAGE',labelColor:'#f2e9cf',labelPixels:256,castShadow:false});
+   b(22.5,2.65,4.14,1.8,.35,.03,'#263e36',M.paint,{label:'ÉTAGE · SALON',labelFace:'back',labelColor:'#f2e9cf',labelPixels:256,castShadow:false});
+   for(const [z,y]of [[4.7,2.8],[8.7,6.2]])b(23.84,y,z,.045,.45,.28,'#f2d799',M.light,noShadow);
+  }
+  if(building.nightclub){
+   // Keep a complete loop around the dance floor and clear table approaches.
+   b(28,-.11,7,8,.22,6,'#292b3b',M.tile,{roomFloor:true,decorCategory:'club'});
+   b(28,3.45,7,8,.18,6,'#252532',M.plaster,noShadow);
+   b(28,1.7,4,8,3.4,.2,'#363044',M.plaster,{...solid,...noShadow});
+   b(28,1.7,10,8,3.4,.2,'#363044',M.plaster,{...solid,...noShadow});
+   b(32,1.7,7,.2,3.4,6,'#303b49',M.plaster,{...solid,...noShadow});
+   for(const z of [4.12,9.88]){b(28,.48,z,7.76,.96,.12,'#252836',M.fabric);b(28,2.8,z,7.76,.035,.035,z<7?'#7b84dc':'#69bec9',M.light,noShadow);}
+   for(const x of [24.12,31.88])b(x,2.8,7,.035,.035,5.76,'#b771c4',M.light,noShadow);
+   b(24.15,2.82,5.25,1.15,.25,.025,'#29253b',M.paint,{ry:-Math.PI/2,label:'COMPTOIR',labelColor:'#e8e0fa',labelPixels:256,castShadow:false});
+   b(23.845,2.82,5.25,1.15,.25,.025,'#29253b',M.paint,{ry:Math.PI/2,label:'LE CLUB',labelColor:'#e8e0fa',labelPixels:256,castShadow:false});
+   for(let i=0;i<4;i++)for(let j=0;j<5;j++)b(27.3+i*.46,.006,6.4+j*.46,.44,.012,.44,['#3c586e','#67446e','#426665','#49466d'][(i+j)%4],M.paint,noShadow);
+   // DJ desk stays north of the 5.25 m service corridor.
+   b(28,.53,4.65,2.1,1.06,.35,'#222632',M.metal,solid);
+   b(28,1.075,4.65,2.2,.03,.42,'#383a49',M.metal);
+   for(const x of [27.45,28.55]){c(x,1.099,4.65,.32,.015,.32,'#151b23',M.paint,noShadow);c(x,1.11,4.65,.09,.008,.09,'#76c8cd',M.light,noShadow);}
+   for(let i=0;i<6;i++)b(27.84+i*.065,1.11,4.65,.018,.016,.17,i%2?'#80c4cb':'#aa91cd',M.metal);
+   for(const x of [25.5,30.5]){b(x,1.28,4.4,.5,1.7,.48,'#232731',M.fabric,solid);for(const y of [.85,1.4])c(x,y,4.648,.29,.025,.29,'#111b24',M.metal,{rx:Math.PI/2});}
+   b(28,2.3,4.14,2.3,.50,.035,'#29253b',M.paint,{label:'LE CLUB\nNUITS DU COMPTOIR',labelFace:'back',labelColor:'#b6e4e6',labelPixels:512,castShadow:false});
+   for(const [x,z,color]of [[26,6,'#8d89e1'],[30,6,'#76ced1'],[26,8.7,'#d47fbd'],[30,8.7,'#858fdb']]){c(x,3.04,z,.22,.18,.22,'#242d35',M.metal);c(x,2.94,z,.17,.02,.17,color,M.light,noShadow);}
+  }
   b(6,3.24,.16,12,.11,.18,ceiling.trim,M.plaster,noShadow);
   b(.15,.58,.15,.3,1.16,.14,wall.panel,M.wood);
   b(6.8,.58,.15,10.4,1.16,.14,wall.panel,M.wood);
@@ -341,7 +439,7 @@ const BarScene=(()=>{
   for(const bin of storageBins.filter(bin=>!bin.side))b(bin.x,bin.y-.085,-3.38,.94,.16,.025,'#eee8d5',0,{label:bin.label,labelFace:'back',labelColor:'#203c2c',castShadow:false});
   // The new bottles have their own shallow rack on the left wall. The aisle
   // through the reserve door remains clear, including the player's collision radius.
-  for(const x of [.20,.68])for(const z of [-.67,-2.63])b(x,.87,z,.035,1.74,.035,'#4b5a53',M.metal,solid);
+  for(const x of [.20,.68])for(const z of [-.67,-2.63])b(x,1.12,z,.035,2.24,.035,'#4b5a53',M.metal,solid);
   for(const y of [.30,1.00,1.70])b(.44,y,-1.65,.56,.035,2.02,'#939783',M.paint,solid);
   b(.44,.15,-1.65,.56,.30,2.02,'#667064',M.paint,solid);
   for(const bin of storageBins.filter(bin=>bin.side))b(.735,bin.y-.075,bin.z,.86,.14,.02,'#eee8d5',M.paint,{ry:Math.PI/2,label:bin.label,labelFace:'back',labelColor:'#203c2c',labelPixels:256,castShadow:false});
@@ -509,7 +607,8 @@ const BarScene=(()=>{
    // continuing down to the rear feet without protruding into the seat.
    for(const dx of [-.19,.19])for(const [dz,h] of [[-.18,.46],[.24,.99]]){[xx,zz]=p(dx,dz);b(xx,h/2,zz,.038,h,.038,chairColors.frame,M.metal,{ry:angle})}
   }
-  for(const {id,x,z} of activeTables){
+  for(const {id,x,z,y=0} of activeTables){
+   const first=items.length;
    c(x,.75,z,1.05,.065,1.05,table.top,tableMaterial,{solid:true,sideColor:table.edge,decorCategory:'tables'});
    c(x,.38,z,.075,.72,.075,table.base,M.metal);
    c(x,.04,z,.53,.05,.53,table.base,M.metal);
@@ -520,6 +619,7 @@ const BarScene=(()=>{
    const inward=x<6?1:-1,signAngle=-inward*Math.PI/2;
    b(x+inward*.26,.794,z-.18,.24,.015,.07,'#867854',M.metal,{ry:signAngle});
    b(x+inward*.26,.85,z-.18,.23,.10,.018,'#203e30',M.paint,{ry:signAngle,label:'TABLE '+id,labelColor:'#f2e8c9',labelPixels:256,castShadow:false});
+   if(y)for(let index=first;index<items.length;index++)items[index].y+=y;
   }
   // All six stools exist from the start. Progression only changes which seats
   // guests use; the backrests face the room and leave the serving aisle clear.
@@ -672,14 +772,15 @@ const BarScene=(()=>{
   }
   if(!state?.payments?.terminalCarried&&!state?.payments?.terminalWithWaiter)terminal(items);
  }
- function customer(items,{x,z,id,time,moving,departing=false,patience=100,seated=false,seatHeight,angle,staffKind,carrying=false,carryingTerminal=false}){
+ function customer(items,{x,y:floorY=0,z,id,time,moving,departing=false,patience=100,seated=false,seatHeight,angle,staffKind,carrying=false,carryingTerminal=false}){
   const g=geometry(items),skin=['#c4916d','#956c51','#d4b191','#b18061'][id%4];
-  const shirt=staffKind?'#d1d0b8':['#555f61','#815c4b','#6b7058','#525f74','#927e68'][id%5];
+  const shirt=staffKind?({manager:'#674d5d',dj:'#424969',host:'#3c4f59'}[staffKind]||'#d1d0b8'):['#555f61','#815c4b','#6b7058','#525f74','#927e68'][id%5];
   const hair=['#45352a','#302c26','#8b7750','#62564b'][id%4];
   const highSeat=seated&&Number.isFinite(seatHeight)&&seatHeight>.7;
   const turn=Number.isFinite(angle)?angle:departing?Math.PI:0,cs=Math.cos(turn),sn=Math.sin(turn),bob=!seated&&moving?Math.sin(time*11+id)*.012:Math.sin(time*1.7+id)*.006,seatOffset=seated?(Number.isFinite(seatHeight)?seatHeight-.7825:-.265):0;
+  const characterBounds={x,y:floorY+1,z,radius:1.35};
   const original=g.box;
-  g.box=(ox,y,oz,w,h,d,c,mat=0,extra={})=>original(x+ox*cs+oz*sn,y+bob+seatOffset,z-ox*sn+oz*cs,w,h,d,c,mat,{...extra,ry:(extra.ry||0)+turn});
+  g.box=(ox,y,oz,w,h,d,c,mat=0,extra={})=>original(x+ox*cs+oz*sn,floorY+y+bob+seatOffset,z-ox*sn+oz*cs,w,h,d,c,mat,{...extra,characterBounds,...(extra.contactShadow?{contactFloor:floorY}:{}),ry:(extra.ry||0)+turn});
   g.cylinder=(...args)=>{args[8]={...args[8],round:true};return g.box(...args)};
   g.sphere=(...args)=>{args[8]={...args[8],shape:'sphere'};return g.box(...args)};
   const {box:b,cylinder:c,sphere:s}=g;
@@ -785,7 +886,12 @@ const BarScene=(()=>{
    }
   }
   for(let y=.98;y<1.28;y+=.087){const chest=.1325*Math.sqrt(Math.max(0,1-((y-1.14)/.25)**2)),waist=y<1.025?.118:0;b(0,y,.004-Math.max(chest,waist)-.004,.009,.009,.006,'#bfb79e',M.paint);}
-  if(staffKind){
+  if(staffKind==='dj'){
+   for(const side of [-1,1]){b(side*.114,1.54,.016,.028,.075,.065,'#1f252d',M.metal);b(side*.114,1.62,.02,.018,.10,.026,'#1f252d',M.metal);}
+   b(0,1.682,.02,.23,.018,.026,'#1f252d',M.metal);
+  }else if(staffKind==='manager'||staffKind==='host'){
+   b(-.10,1.22,-.125,.085,.035,.007,'#d7c39a',M.metal);
+  }else if(staffKind){
    const apron=staffKind==='bartender'?'#254c3a':'#43566a';
    b(0,1.16,-.138,.25,.28,.014,apron,M.fabric);
    b(0,.90,-.145,.34,.28,.020,apron,M.fabric);
@@ -793,5 +899,5 @@ const BarScene=(()=>{
    b(0,.92,-.16,.16,.085,.008,'#b2a888',M.fabric);
   }
  }
- return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,counterSeat,prepStation,trayPosition,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
+ return {create,geometry,bottle,glass,customer,storageVisuals,preparationVisuals,registerVisuals,terminal,terminalLabelTemplates,tableSeat,counterSeat,prepStation,trayPosition,walkSurfaceHeight,containsWalkablePosition,inStockroom,playCamera,homeCamera,stockroomCamera,materials:M};
 })();

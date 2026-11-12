@@ -16,14 +16,14 @@ function assertDistinctSeats(game){
 }
 
 test('six stable counter seats retain old positions and share player and waiter interaction positions',()=>{
- assert.equal(MAX_CUSTOMERS,14);assert.equal(counterSeats.length,6);assert.ok(Object.isFrozen(counterSeats));
+ assert.equal(MAX_CUSTOMERS,22);assert.equal(counterSeats.length,6);assert.ok(Object.isFrozen(counterSeats));
  assert.deepEqual(counterSeats.slice(0,3),[{slot:0,x:4.6,z:4.3},{slot:1,x:6,z:4.3},{slot:2,x:7.4,z:4.3}]);
  assert.deepEqual(counterSeats.slice(3).map(seat=>seat.x),[3.2,8.8,10.2]);
  const game=session(80);fill(game);
  for(const seat of counterSeats){
   assert.ok(Object.isFrozen(seat));const order=game.s.orders.find(order=>!order.tableId&&order.slot===seat.slot);
   assert.ok(order);order.arrivalRemaining=0;
-  assert.deepEqual(game.orderPosition(order),{x:seat.x,z:2.1});
+  assert.deepEqual(game.orderPosition(order),{x:seat.x,z:2.1,floorY:0});
   assert.deepEqual(game.waiterDestination('serve',order),{x:seat.x,z:4.8});
   assert.equal(game.canReachOrder(order.id,{x:seat.x,z:2.1}),true);
  }
@@ -37,7 +37,7 @@ test('attendance grows for paid customer totals only, without spending or automa
   [80,6,10,12,80,null],[1000,6,10,12,80,null]
  ]){
   game.s.totalSold=sales;
-  assert.deepEqual(game.crowdInfo(),{totalSold:sales,currentThreshold:current,nextThreshold:next,counterSeatsUnlocked:seats,capacity,spawnInterval:interval,maxCapacity:14});
+  assert.deepEqual(game.crowdInfo(),{totalSold:sales,currentThreshold:current,nextThreshold:next,counterSeatsUnlocked:seats,capacity,spawnInterval:interval,maxCapacity:22});
   assert.equal(game.s.cash,cash);assert.deepEqual(game.s.management,management);assert.equal(game.s.orders.length,0);
  }
  assert.ok(Object.isFrozen(crowdStages));assert.ok(crowdStages.every(Object.isFrozen));
@@ -196,9 +196,9 @@ function expandedBar(last='table8'){
 
 test('new and legacy bars retain their original room and tables until construction is bought',()=>{
  const game=new Game();
- assert.deepEqual(buildingLayout(),{level:0,width:12,area:120});
+ assert.deepEqual(buildingLayout(),{level:0,upstairs:false,nightclub:false,width:12,area:120,height:3.6});
  assert.deepEqual(availableTables().map(table=>table.id),[1,2,3,4]);
- assert.deepEqual(game.buildingInfo(),{level:0,width:12,area:120,tableCount:4,maxTables:8,capacity:7,maxCapacity:14});
+ assert.deepEqual(game.buildingInfo(),{level:0,upstairs:false,nightclub:false,width:12,area:120,height:3.6,tableCount:4,maxTables:16,capacity:7,maxCapacity:22});
  assert.equal(game.s.orders.length,0);
  const saved=clone(game.s);for(const id of buildingPurchases)delete saved.management[id];
  saved.totalSold=1000;const before=clone(saved),loaded=new Game(saved);

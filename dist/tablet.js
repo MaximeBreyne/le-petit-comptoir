@@ -34,8 +34,9 @@ window.BarTablet=(()=>{
  const roomSummary=make('div','tablet-service-summary');service.append(roomServiceNotice,serviceNote,roomSummary);
  const crowdPanel=make('div','tablet-crowd'),crowdTitle=make('strong'),crowdDetail=make('p'),crowdProgress=make('progress','tablet-unlock-progress');
  crowdPanel.dataset.crowdProgress='';crowdProgress.setAttribute('aria-label','Progression vers la prochaine place au comptoir');crowdPanel.append(crowdTitle,crowdDetail,crowdProgress);service.append(crowdPanel);
- const tableGrid=make('div','tablet-service-grid'),counterGrid=make('div','tablet-service-grid');
- service.append(make('h3','tablet-group-title','Tables de la salle'),tableGrid,make('h3','tablet-group-title','Au comptoir'),counterGrid);
+ const tableZones=new Map(),counterGrid=make('div','tablet-service-grid');
+ for(const [key,label]of [['ground','Tables du rez-de-chaussée'],['upstairs','Tables de l’étage'],['nightclub','Tables de la boîte de nuit']]){const section=make('section','tablet-service-zone'),grid=make('div','tablet-service-grid');section.dataset.serviceZone=key;section.append(make('h3','tablet-group-title',label),grid);service.append(section);tableZones.set(key,{section,grid});}
+ service.append(make('h3','tablet-group-title','Au comptoir'),counterGrid);
  const seats=new Map();let selectedOrderId=null;
  const phaseNames={'awaiting-order':'Commande à prendre',preparing:'À préparer',drinking:'Dégustation',payment:'Paiement attendu','cash-collected':'Passage en caisse','change-ready':'Monnaie à remettre','card-processing':'Carte en cours'};
  function seatCard(key,titleText,grid){
@@ -49,12 +50,16 @@ window.BarTablet=(()=>{
   }
   card.append(head,customer,detail,bill,patience,proximity,actions);grid.append(card);seats.set(key,{card,badge,customer,detail,bill,proximity,patience,buttons});
  }
- for(const table of BarEngine.tables||[{id:1},{id:2},{id:3},{id:4}])seatCard('table:'+table.id,'Table '+table.id,tableGrid);
+ const tableZone=table=>['upstairs','nightclub'].includes(table?.floor)?table.floor:'ground';
+ const zoneName=zone=>({ground:'Rez-de-chaussée',upstairs:'Étage',nightclub:'Boîte de nuit'}[zone]||'Rez-de-chaussée');
+ function tableName(id){const table=BarEngine.tables.find(table=>table.id===Number(id));return 'Table '+id+' · '+zoneName(tableZone(table))}
+ for(const table of BarEngine.tables||[{id:1},{id:2},{id:3},{id:4}])seatCard('table:'+table.id,tableName(table.id),tableZones.get(tableZone(table)).grid);
  for(const {slot}of BarEngine.counterSeats)seatCard('counter:'+slot,'Comptoir '+(slot+1),counterGrid);
- function orderPlace(order){return order.tableId?'Table '+order.tableId:'Comptoir '+((order.slot??0)+1)}
+ function orderPlace(order){return order.tableId?tableName(order.tableId):'Comptoir '+((order.slot??0)+1)}
  function reachOrder(order){return !!game.canReachOrder?.(order.id,camera)}
  function refreshService(s){
-  const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo(),activeTables=new Set(game.activeTables().map(table=>table.id));
+  const payments=s.payments||{},orders=s.orders||[],crowd=game.crowdInfo(),availableTables=game.activeTables(),activeTables=new Set(availableTables.map(table=>table.id));
+  for(const [zone,entry]of tableZones)entry.section.hidden=!availableTables.some(table=>tableZone(table)===zone);
   serviceNote.textContent='Approchez-vous d’un client pour noter sa commande ici. Choisissez ensuite sa boisson au rangement des verres derrière le bar. Pour servir ou encaisser, regardez le client et utilisez la commande Interagir.';
   roomServiceText.textContent=s.gameOver?'Votre trésorerie est épuisée. La rubrique Bâtiment permet de commencer un nouveau bar.':s.closing?'Les nouvelles arrivées sont arrêtées. Terminez les commandes et encaissez les derniers clients.':s.open?'Le bar accueille les clients. Lancez la dernière tournée lorsque vous souhaitez terminer le service.':'Le bar est fermé. Ouvrez le service pour accueillir vos premiers clients.';
   const count=orders.length,unpaid=orders.filter(order=>['payment','cash-collected','change-ready','card-processing'].includes(order.phase)).length;
@@ -87,13 +92,13 @@ window.BarTablet=(()=>{
    if(phase==='card-processing')entry.detail.textContent=`Validation du terminal · ${Math.ceil(order.cardRemaining||0)} s`;
    if(phase==='cash-collected')entry.detail.textContent=`${money(order.tender||0)} reçus. Rejoignez la caisse pour préparer la monnaie.`;
    if(phase==='change-ready')entry.detail.textContent=`Rapportez ${money(Math.max(0,(order.tender||0)-(order.due||0)))} de monnaie et le ticket au client.`;
-   const job=s.staff?.bartender,waiter=s.staff?.waiter,beingServed=phase==='preparing'&&waiter?.task==='serve'&&waiter.orderId===order.id;
+   const job=[s.staff?.bartender,s.staff?.bartender2].find(job=>job?.orderId===order.id),waiter=s.staff?.waiter,beingServed=phase==='preparing'&&waiter?.task==='serve'&&waiter.orderId===order.id;
    if(phase==='preparing'&&job?.orderId===order.id)entry.detail.textContent+=` · préparateur, ${Math.ceil(job.remaining)} s`;
    if(beingServed){entry.badge.textContent='Serveur en route';entry.detail.textContent=`${recipe?.name||'Boisson'} · apportée par le serveur, ${Math.ceil(waiter.remaining)} s`;}
    entry.bill.hidden=!['payment','cash-collected','change-ready','card-processing'].includes(phase);
    entry.bill.textContent=`À régler : ${money(order.due||0)} · ${order.paymentMethod==='cash'?'Espèces':'Carte bancaire'}`;
    entry.patience.hidden=arriving||!['awaiting-order','preparing'].includes(phase);entry.patience.value=Math.max(0,order.patience||0);
-   entry.proximity.hidden=arriving||beingServed||['drinking','card-processing'].includes(phase);entry.proximity.textContent=near?'Vous êtes à portée du client.':`Rejoignez ${order.tableId?'la table '+order.tableId:'ce client au comptoir'} pour intervenir.`;entry.proximity.dataset.near=String(near);
+   entry.proximity.hidden=arriving||beingServed||['drinking','card-processing'].includes(phase);entry.proximity.textContent=near?'Vous êtes à portée du client.':`Rejoignez ${order.tableId?tableName(order.tableId):'ce client au comptoir'} pour intervenir.`;entry.proximity.dataset.near=String(near);
    const enable=(name,allowed,label)=>{const item=entry.buttons[name];item.hidden=false;item.disabled=!allowed||arriving||s.gameOver;if(label)item.textContent=label;};
    if(phase==='awaiting-order')enable('take',near);
    if(phase==='preparing'&&!beingServed){
@@ -176,11 +181,16 @@ window.BarTablet=(()=>{
 
  const building=pages.get('building');
  const summary=make('div','tablet-building-summary'),buildingTitle=make('h3'),buildingMetrics=make('div','tablet-building-metrics'),buildingValues={};
- for(const [key,label]of [['area','Surface hors réserve'],['tables','Tables installées'],['capacity','Clients accueillis à la fois']]){const item=make('div'),value=make('strong');value.dataset.buildingMetric=key;item.append(value,make('span',null,label));buildingMetrics.append(item);buildingValues[key]=value;}
- summary.append(make('span','tablet-eyebrow','VOTRE ADRESSE'),buildingTitle,buildingMetrics,make('p',null,'Agrandissez les locaux, puis équipez chaque salon avec ses tables. Chaque table achetée accueille un client supplémentaire ; les nouvelles arrivées restent progressives.'));building.append(summary);
+ for(const [key,label]of [['area','Surface hors réserve'],['tables','Tables installées'],['capacity','Clients accueillis à la fois'],['floors','Niveaux ouverts']]){const item=make('div'),value=make('strong');value.dataset.buildingMetric=key;item.append(value,make('span',null,label));buildingMetrics.append(item);buildingValues[key]=value;}
+ summary.append(make('span','tablet-eyebrow','VOTRE ADRESSE'),buildingTitle,buildingMetrics,make('p',null,'Agrandissez les salons, aménagez un étage et ouvrez une boîte de nuit. Chaque table achetée accueille un client supplémentaire ; les nouvelles arrivées restent progressives.'));building.append(summary);
+ const buildingAreas=make('div','tablet-building-areas'),areaCards=new Map(),buildingHeadings=new Map();
+ for(const [zone,title,group]of [['ground','Les salons','salon'],['upstairs','Un étage pour votre bar','upstairs'],['nightclub','La boîte de nuit','nightclub']]){
+  const card=make('article','tablet-building-area'),heading=make('h4',null,title),status=make('strong'),detail=make('p'),link=button('Voir les aménagements',null,'tablet-button tablet-button-subtle');card.dataset.buildingArea=zone;link.dataset.buildingJump=group;card.append(heading,status,detail,link);buildingAreas.append(card);areaCards.set(zone,{card,status,detail});
+ }
+ building.append(buildingAreas);
  const buildingWorks=make('p','tablet-building-works');buildingWorks.dataset.buildingStatus='';building.append(buildingWorks);
  const decor=pages.get('decor'),decorCards=new Map(),decorGroups=new Map(),decorNotice=make('p','tablet-building-works');decorNotice.dataset.decorStatus='';
- decor.append(make('p','tablet-decor-intro','Choisissez les finitions des tables, des sièges et des surfaces de toutes vos salles. Chaque finition est achetée une seule fois ; vous pouvez ensuite la réappliquer gratuitement. Les changements se font entre deux services.'),decorNotice);
+ decor.append(make('p','tablet-decor-intro','Choisissez les finitions des tables, des sièges et des surfaces du bar et de l’étage. Le club reprend vos tables et sièges ; sa piste, ses murs et son plafond gardent leur ambiance dédiée. Chaque finition s’achète une fois, puis se réapplique gratuitement entre deux services.'),decorNotice);
  const decorLinks=make('div','tablet-decor-links');decorLinks.setAttribute('aria-label','Surfaces à décorer');decor.append(decorLinks);
  const materialNames={wood:'Bois',stone:'Pierre',fabric:'Tissu',leather:'Cuir',plaster:'Enduit',floor:'Parquet',tile:'Carrelage'};
  for(const [category,catalog]of Object.entries(BarEngine.decorCatalog)){
@@ -209,26 +219,29 @@ window.BarTablet=(()=>{
  }
  const licenses=pages.get('licenses'),team=pages.get('team');
  const licenseIntro=make('div','tablet-management-intro');licenseIntro.append(icon('licenses'),make('div',null));licenseIntro.lastChild.append(make('h3',null,'Une carte qui grandit avec votre réputation.'),make('p',null,'La carte de base est incluse. Servez des clients pour débloquer les licences suivantes, puis achetez-les ici.'));licenses.append(licenseIntro);
- const teamIntro=make('div','tablet-management-intro');teamIntro.append(icon('team'),make('div',null));teamIntro.lastChild.append(make('h3',null,'Un coup de main pendant le service.'),make('p',null,'Confiez les stocks et la préparation à votre équipe. Le serveur prend les commandes, apporte les boissons et encaisse les espèces comme les cartes. Il partage le terminal avec vous.'));team.append(teamIntro);
+ const teamIntro=make('div','tablet-management-intro');teamIntro.append(icon('team'),make('div',null));teamIntro.lastChild.append(make('h3',null,'Une équipe à la mesure de votre bar.'),make('p',null,'Les agrandissements ouvrent de nouveaux recrutements. Le serveur prend les commandes, sert et encaisse ; les préparateurs travaillent en parallèle. Les responsables de salle, le DJ et l’accueil améliorent le service selon les effets indiqués.'));team.append(teamIntro);
+ const teamSummary=make('p','tablet-team-summary');teamSummary.dataset.teamSummary='';team.append(teamSummary);
  const upgradeLists=new Map();for(const key of ['building','licenses','team']){const list=make('div','tablet-upgrade-list');pages.get(key).append(list);upgradeLists.set(key,list)}
- for(const key of ['building','licenses','team'])pages.get(key).append(make('p','tablet-section-note','Les déblocages dépendent du nombre total de clients encaissés. Les achats et recrutements sont conservés dans votre sauvegarde.'));
+ for(const key of ['building','licenses','team'])pages.get(key).append(make('p','tablet-section-note','Les déblocages dépendent des clients encaissés, des aménagements achetés et, pour certains postes, de la surface du bâtiment. Les achats et recrutements sont conservés dans votre sauvegarde.'));
  const newBarNotice=make('div','tablet-service-notice'),newBarAction=button('Nouveau bar','new-bar','tablet-button tablet-button-subtle');
  newBarNotice.append(make('p',null,'Recommencez avec un nouveau bar. Une confirmation protège la partie actuelle ; vos sauvegardes manuelles restent disponibles.'),newBarAction);building.append(newBarNotice);
  function syncUpgrades(){
   const catalog=BarEngine.managementUpgrades||{},signature=JSON.stringify(catalog);if(signature===upgradesSignature)return;upgradesSignature=signature;
   for(const list of upgradeLists.values())list.replaceChildren();upgradeCards.clear();
   const buildingGroups=new Map();
-  for(const [key,label]of [['salon','Premier salon'],['grandSalon','Grand salon'],['equipment','Équipement du comptoir']]){const group=make('section','tablet-building-group'),list=make('div','tablet-upgrade-list');group.dataset.buildingGroup=key;group.append(make('h3','tablet-building-group-title',label),list);upgradeLists.get('building').append(group);buildingGroups.set(key,list);}
-  const buildingOrder=['expansion1','table5','table6','expansion2','table7','table8','tray','counter'];
+  buildingHeadings.clear();
+  for(const [key,label]of [['salon','Premier salon'],['grandSalon','Grand salon'],['upstairs','Étage et escalier'],['nightclub','Boîte de nuit'],['equipment','Équipement du comptoir']]){const group=make('section','tablet-building-group'),list=make('div','tablet-upgrade-list'),heading=make('h3','tablet-building-group-title',label);heading.tabIndex=0;group.dataset.buildingGroup=key;group.append(heading,list);upgradeLists.get('building').append(group);buildingGroups.set(key,list);buildingHeadings.set(key,heading);}
+  const buildingOrder=['expansion1','table5','table6','expansion2','table7','table8','upstairs','table9','table10','table11','table12','nightclub','table13','table14','table15','table16','tray','counter'];
   const rank=id=>{const index=buildingOrder.indexOf(id);return index<0?buildingOrder.length:index;};
   const offers=Object.entries(catalog).sort(([a],[b])=>rank(a)-rank(b));
   for(const [id,offer]of offers){
-   const group=['expansion1','table5','table6'].includes(id)?'salon':['expansion2','table7','table8'].includes(id)?'grandSalon':'equipment';
+   const group=['expansion1','table5','table6'].includes(id)?'salon':['expansion2','table7','table8'].includes(id)?'grandSalon':['upstairs','table9','table10','table11','table12'].includes(id)?'upstairs':['nightclub','table13','table14','table15','table16'].includes(id)?'nightclub':'equipment';
    const list=offer.category==='building'?buildingGroups.get(group):upgradeLists.get(offer.category);if(!list)continue;
    const card=make('article','tablet-upgrade-card');card.dataset.upgrade=id;
    const copy=make('div','tablet-upgrade-copy'),topLine=make('div','tablet-upgrade-top'),name=make('h3'),owned=make('span','tablet-owned');topLine.append(name,owned);copy.append(topLine);
    const description=make('p'),statusText=make('p','tablet-upgrade-status');const progress=make('progress','tablet-unlock-progress');progress.setAttribute('aria-label','Clients servis pour débloquer cette amélioration');copy.append(description);
    if(offer.category==='licenses'){const menu=Object.values(recipes).filter(recipe=>recipe.license===id).map(recipe=>recipe.name);copy.append(make('p','tablet-license-menu',`À la carte : ${menu.join(' · ')}`));}
+   if(offer.category==='team'){const terms=make('p','tablet-staff-terms');terms.textContent=`Salaire : ${money(offer.salary||0)} par soir`+(offer.requiredArea?` · Bâtiment d’au moins ${number(offer.requiredArea)} m²`:'');copy.append(terms);}
    copy.append(statusText,progress);
    const purchase=button('',null,'tablet-button');purchase.dataset.tabletUpgrade=id;card.append(copy,purchase);list.append(card);upgradeCards.set(id,{card,name,owned,description,statusText,progress,purchase});
   }
@@ -239,22 +252,25 @@ window.BarTablet=(()=>{
   if(!dialog.open&&!force)return;const now=performance.now();if(!force&&now-lastRefresh<200)return;lastRefresh=now;
   const s=game.s,inReserve=!!BarScene.inStockroom?.(camera);syncUpgrades();BarOrders.refresh();cash.textContent=money(s.cash);serviceStatus.textContent=s.gameOver?'Partie terminée':s.closing?'Dernière tournée':s.open?'Service ouvert':'Service fermé';serviceStatus.dataset.open=String(s.open&&!s.closing);
   closeButton.textContent='Ranger · '+(window.BarControls?.label('tablet')||preferences.bindings.tablet?.label||'Tab');refreshDecor(s);
-  const premises=game.buildingInfo();buildingTitle.textContent=['Un bar de quartier à faire grandir.','Le bar et son premier salon.','Le bar et son grand salon.'][premises.level];
-  buildingValues.area.textContent=number(premises.area)+' m²';buildingValues.tables.textContent=premises.tableCount+' / '+premises.maxTables;buildingValues.capacity.textContent=String(premises.capacity);
+  const premises=game.buildingInfo();buildingTitle.textContent=premises.nightclub?'Votre bar, son étage et sa boîte de nuit.':premises.upstairs?'Votre bar prend de la hauteur.':['Un bar de quartier à faire grandir.','Le bar et son premier salon.','Le bar et son grand salon.'][premises.level];
+  buildingValues.area.textContent=number(premises.area)+' m²';buildingValues.tables.textContent=premises.tableCount+' / '+premises.maxTables;buildingValues.capacity.textContent=String(premises.capacity);buildingValues.floors.textContent=premises.upstairs?'2':'1';
+  const activeTables=game.activeTables();
+  for(const [zone,entry]of areaCards){const owned=zone==='ground'||!!premises[zone],count=activeTables.filter(table=>tableZone(table)===zone).length,max=BarEngine.tables.filter(table=>tableZone(table)===zone).length;entry.card.dataset.owned=String(owned);entry.status.textContent=owned?`${count} / ${max} tables installées`:'À débloquer';entry.detail.textContent=zone==='ground'?'Deux salons agrandissent progressivement le rez-de-chaussée.':zone==='upstairs'?'Un salon à l’étage et un escalier praticable au fond des annexes. Les quatre tables s’achètent séparément.':owned?(s.management.nightlife?'La carte de nuit est débloquée. Préparez les cocktails au comptoir, puis apportez-les aux tables du club.':'Le club est accessible. Achetez ses tables et la licence Cocktails de nuit pour proposer sa carte de cocktails.'):'Une piste de danse, une cabine DJ et quatre emplacements de tables. La licence Cocktails de nuit débloque les cocktails du club.';}
+  const hired=Object.entries(BarEngine.managementUpgrades).filter(([id,offer])=>offer.category==='team'&&s.management[id]),payroll=hired.reduce((sum,[,offer])=>sum+(offer.salary||0),0);teamSummary.textContent=`${number(premises.area)} m² aménagés · ${hired.length} employé${hired.length>1?'s':''} recruté${hired.length>1?'s':''} · ${money(payroll)} de salaires par soir`;
   const worksBlocked=s.open||s.closing||s.orders.length>0;buildingWorks.dataset.blocked=String(worksBlocked);
   buildingWorks.textContent=worksBlocked?'Travaux indisponibles pendant le service. Fermez le bar et attendez le départ du dernier client pour agrandir ou installer des tables.':'Le bar est fermé : vous pouvez réaliser les travaux débloqués et installer de nouvelles tables avant le prochain service.';
   refreshService(s);refreshRegister(s);
-  location.textContent=inReserve?'Dans la réserve':game.canWork(camera)?'Derrière le bar':'Dans la salle';location.dataset.reserve=String(inReserve);
+  location.textContent=inReserve?'Dans la réserve':premises.upstairs&&camera.x>21&&camera.x<24?'Dans l’escalier':camera.y>3.4?'À l’étage':premises.nightclub&&camera.x>=24?'Dans la boîte de nuit':game.canWork(camera)?'Derrière le bar':'Dans la salle';location.dataset.reserve=String(inReserve);
   roomServiceAction.hidden=false;roomServiceAction.disabled=s.closing||s.gameOver;roomServiceAction.textContent=s.open?'Dernière tournée':'Ouvrir le bar';
   newBarAction.disabled=!GameMenu.hasSession()||GameMenu.getMode()!=='play'||paused;
   reserveNote.textContent=inReserve?'Vous êtes dans la réserve. Réapprovisionnez le comptoir avec les ingrédients disponibles.':'Pour réapprovisionner le comptoir, rejoignez la réserve derrière le bar puis utilisez Interagir.';reserveNote.classList.toggle('tablet-reserve-present',inReserve);
   for(const [key,row]of stockRows){const ingredient=ingredients[key],stored=s.reserve?.[key]||0,limit=game.serviceCapacity(key);row.serviceAmount.textContent=`${number(s.stock[key])} ${ingredient.unit}`;row.capacity.textContent=`Capacité : ${number(limit)} ${ingredient.unit}`;row.reserveAmount.textContent=`${number(stored)} ${ingredient.unit}`;const deliveries=s.deliveries.filter(d=>d.key===key);row.delivery.textContent=deliveries.length?`${deliveries.length} lot${deliveries.length>1?'s':''} en route · ${Math.ceil(Math.min(...deliveries.map(d=>d.remaining)))} s`:'Aucune livraison en cours';row.refill.disabled=!inReserve||s.gameOver||stored<=0||s.stock[key]>=limit;row.refill.title=!inReserve?'Rejoignez la réserve pour transférer les ingrédients.':'';const licensed=game.canBuy(key);row.buy.disabled=s.gameOver||s.cash<ingredient.cost||!licensed;row.licenseNote.hidden=licensed;row.licenseNote.textContent=licensed?'':`${BarEngine.managementUpgrades[ingredient.license]?.name||'Licence'} requise`;row.buy.title=licensed?'':row.licenseNote.textContent;}
   for(const [id,entry]of upgradeCards){
    const offer=game.upgradeInfo(id);entry.name.textContent=offer.name;entry.description.textContent=offer.description;entry.owned.hidden=!offer.owned;entry.owned.textContent=offer.category==='team'?'Recruté':'Acquis';entry.card.classList.toggle('tablet-upgrade-owned',offer.owned);entry.progress.hidden=offer.owned||s.totalSold>=offer.requiredSales;entry.progress.max=Math.max(1,offer.requiredSales);entry.progress.value=Math.min(offer.requiredSales,s.totalSold);
-   const requirements=[];if(s.totalSold<offer.requiredSales)requirements.push(`${s.totalSold} / ${offer.requiredSales} clients encaissés pour débloquer`);if(offer.unmetPrerequisites?.length)requirements.push('À acheter d’abord : '+offer.unmetPrerequisites.map(key=>BarEngine.managementUpgrades[key].name).join(', '));if(offer.blockedReason)requirements.push(offer.blockedReason);
+   const requirements=[];if(s.totalSold<offer.requiredSales)requirements.push(`${s.totalSold} / ${offer.requiredSales} clients encaissés pour débloquer`);if(offer.unmetPrerequisites?.length)requirements.push('À acheter d’abord : '+offer.unmetPrerequisites.map(key=>BarEngine.managementUpgrades[key].name).join(', '));if(offer.unmetArea)requirements.push(`Surface actuelle : ${number(premises.area)} m² · minimum ${number(offer.requiredArea)} m²`);if(offer.blockedReason&&!offer.unmetArea)requirements.push(offer.blockedReason);
    entry.statusText.textContent=offer.owned?(offer.category==='team'?`${s.open?'En poste':'Prêt pour le prochain service'} · ${money(offer.salary||0)} de salaire par soir`:'Disponible pour tous les prochains services'):requirements.length?requirements.join(' · '):(s.cash<offer.cost?`Débloqué · Il manque ${money(offer.cost-s.cash)}`:'Débloqué · Achat disponible');entry.purchase.disabled=!offer.purchasable;entry.purchase.title=offer.owned?'Déjà acquis':offer.blockedReason||'';entry.purchase.textContent=offer.owned?(offer.category==='team'?'Dans votre équipe':'Déjà acquis'):`${offer.category==='team'?'Recruter':'Acheter'} · ${money(offer.cost)}`;
   }
-  for(const id of ['bartender','waiter']){const job=s.staff?.[id],entry=upgradeCards.get(id);if(!job||!entry)continue;const order=s.orders.find(order=>order.id===job.orderId);entry.statusText.textContent=`${id==='bartender'?'Prépare '+(recipes[job.recipe]?.name||'une boisson'):job.task==='take-order'?'Prend une commande':job.task==='serve'?'Apporte une boisson':waiterPaymentMessage(game.waiterPaymentStatus?.())}${order?' · '+orderPlace(order):''} · ${Math.ceil(job.remaining)} s`;}
+  for(const id of ['bartender','bartender2','waiter']){const job=s.staff?.[id],entry=upgradeCards.get(id);if(!job||!entry)continue;const order=s.orders.find(order=>order.id===job.orderId);entry.statusText.textContent=`${id.startsWith('bartender')?'Prépare '+(recipes[job.recipe]?.name||'une boisson'):job.task==='take-order'?'Prend une commande':job.task==='serve'?'Apporte une boisson':waiterPaymentMessage(game.waiterPaymentStatus?.())}${order?' · '+orderPlace(order):''} · ${Math.ceil(job.remaining)} s`;}
   if(s.management.waiter&&!s.staff.waiter){const waiting=game.waiterPaymentStatus?.();if(waiting)upgradeCards.get('waiter').statusText.textContent=waiterPaymentMessage(waiting);}
  }
  function focusOrder(id){selectedOrderId=Number.isSafeInteger(id)?id:null;refresh(true);const entry=[...seats.values()].find(entry=>Number(entry.card.dataset.serviceOrder)===selectedOrderId);const card=current==='register'?cashCards.get(selectedOrderId)?.card:entry?.card;if(card){card.focus({preventScroll:true});card.scrollIntoView({block:'nearest'});}}
@@ -279,6 +295,7 @@ window.BarTablet=(()=>{
   if(target.dataset.tabletTab){setTab(target.dataset.tabletTab);return}
   if(target.dataset.tabletLicense){const id=target.dataset.tabletLicense;setTab('licenses');const entry=upgradeCards.get(id);if(entry){entry.card.tabIndex=-1;entry.card.focus({preventScroll:true});entry.card.scrollIntoView({block:'center'});}return;}
   const actAndRefresh=fn=>{let message;act(()=>{message=fn();return message});feedback.textContent=message||'';refresh(true);};
+  if(target.dataset.buildingJump){const heading=buildingHeadings.get(target.dataset.buildingJump);heading?.focus({preventScroll:true});heading?.scrollIntoView({block:'start'});return;}
   if(target.dataset.decorJump){const heading=decorGroups.get(target.dataset.decorJump);heading?.focus({preventScroll:true});heading?.scrollIntoView({block:'start'});return;}
   if(target.dataset.decorFinish){actAndRefresh(()=>game.purchaseDecor(target.dataset.decorCategory,target.dataset.decorFinish));return;}
   if(target.dataset.tabletOrderAction){

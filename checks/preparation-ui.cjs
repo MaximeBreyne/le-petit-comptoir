@@ -15,7 +15,7 @@ app.whenReady().then(async()=>{
    canvas.requestPointerLock=()=>Promise.resolve().then(()=>{locked=canvas;document.dispatchEvent(new Event('pointerlockchange'))});
    document.exitPointerLock=()=>queueMicrotask(()=>{locked=null;document.dispatchEvent(new Event('pointerlockchange'))});
    window.requestAnimationFrame=()=>0;await flush();GameMenu.newGame();await flush();game.open();state.spawn=999;
-   for(const key of ['cocktails','softDrinks','spirits','signature'])state.management[key]=true;
+   for(const [key,offer]of Object.entries(BarEngine.managementUpgrades))if(offer.category==='licenses'||offer.requiresClosed)state.management[key]=true;
    for(const key of Object.keys(ingredients))state.stock[key]=1000;
    const key=(code,type='keydown')=>window.dispatchEvent(new KeyboardEvent(type,{code,bubbles:true,cancelable:true}));
    const layout=BarEngine.preparationLayout;
@@ -130,7 +130,7 @@ app.whenReady().then(async()=>{
    if(!BarPreparation.openVessels())throw Error('The screenshot must open the physical vessel selector');
    await new Promise(resolve=>setTimeout(resolve,180));
    const dialog=$('modal'),rect=dialog.getBoundingClientRect();
-   if(!BarPreparation.isChoosingVessel()||!dialog.classList.contains('vessel-picker')||rect.width<700||rect.height<300||document.querySelectorAll('[data-vessel-recipe]').length!==10)
+   if(!BarPreparation.isChoosingVessel()||!dialog.classList.contains('vessel-picker')||rect.width<700||rect.height<300||document.querySelectorAll('[data-vessel-recipe]').length!==Object.keys(recipes).length)
     throw Error('The vessel selector must remain visibly open before its screenshot');
   })()`,true);
   const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursive:true});fs.writeFileSync(path.join(artifacts,'physical-vessel-picker.png'),(await win.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());

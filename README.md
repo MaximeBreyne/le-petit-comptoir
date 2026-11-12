@@ -103,8 +103,9 @@ pièce et appuyez sur E pour gérer les stocks. Les achats arrivent dans la
 réserve après 10 secondes de jeu ; transférez ensuite les ingrédients vers
 le comptoir depuis cette pièce. La tablette distingue ces deux stocks.
 Une nouvelle partie commence avec un lot de chaque ingrédient de base en réserve.
-Le whisky, le gin, le tonic et le cola sont à commander après l’achat de leur
-licence. Ils sont rangés sur l’étagère latérale de la réserve.
+Le whisky, le gin, le tonic, le cola, la vodka, le jus de cranberry et la boisson
+énergisante sont à commander après l’achat de leur licence. Ils sont rangés
+dans la réserve et disposent de bouteilles étiquetées derrière le bar.
 Les anciennes sauvegardes conservent leur stock au comptoir et commencent
 avec une réserve vide : aucun ingrédient existant n’est perdu.
 
@@ -120,11 +121,30 @@ Table 7 : 55 clients et 180 euros, après le deuxième agrandissement.
 Table 8 : 75 clients et 220 euros, après l’achat de la table 7.
 Les nouvelles portes donnent accès à des salles meublées au fil des achats.
 Chaque table achetée ajoute une place client : quatre tables au départ,
-huit au maximum, soit jusqu’à quatorze clients avec les six places du comptoir.
+huit après les salons, douze avec l’étage et seize avec le club. Le bâtiment
+complet accueille jusqu’à vingt-deux clients avec les six places du comptoir.
 La fréquentation initiale reste inchangée. Un agrandissement vide ne crée
 aucune place supplémentaire et aucun achat ne fait apparaître de clients.
 Les clients et le serveur utilisent les nouvelles salles pour les commandes,
 le service et les paiements. Achats, clients et position sont sauvegardés.
+
+ÉTAGE ET BOÎTE DE NUIT
+Étage panoramique : 110 clients encaissés et 1 800 euros, après le deuxième
+agrandissement et la table 8. Il ajoute 54 m² à l’étage et un escalier de 18 m²,
+pour une surface totale de 246 m². L’escalier se rejoint au fond des annexes ;
+montez et descendez à pied pour servir les tables et encaisser les clients.
+Tables 9 à 12 : achats successifs à 200, 220, 240 et 260 euros, après
+respectivement 110, 125, 140 et 155 clients encaissés.
+Boîte de nuit : 180 clients encaissés et 2 600 euros, après l’achat de l’étage.
+Elle ajoute 48 m² au rez-de-chaussée, au-delà de l’escalier, pour un total de
+294 m². Elle comprend une piste, une cabine DJ et quatre emplacements de tables.
+Tables 13 à 16 : achats successifs à 240, 260, 280 et 300 euros, après
+respectivement 180, 195, 210 et 225 clients encaissés.
+Les bâtiments et les tables s’achètent séparément, bar fermé. Une salle vide
+ne crée pas de clients. Service distingue les tables du rez-de-chaussée,
+de l’étage et du club. Vous devez être au même étage et à portée pour agir.
+Toutes les boissons, y compris celles du club, se préparent derrière le bar
+principal. La tablette sert à noter et consulter les commandes et à gérer le bar.
 
 PROGRESSION SUR LA TABLETTE
 Plateau de 4 boissons : 5 clients servis et 100 euros.
@@ -135,6 +155,14 @@ Licence spiritueux : 20 clients servis et 210 euros, pour le whisky sur glace
 et le gin tonic, ainsi que leurs ingrédients chez le fournisseur.
 Licence créations maison : 36 clients servis et 360 euros, après l’achat des
 licences cocktails et spiritueux, pour le gin fizz et le cuba libre.
+Licence cocktails classiques : 45 clients encaissés et 260 euros, après le
+premier agrandissement et les licences cocktails et spiritueux ; daiquiri et
+whisky highball, avec les ingrédients déjà présents au bar.
+Licence vodka et jus : 80 clients encaissés et 380 euros, après le deuxième
+agrandissement et la licence spiritueux ; vodka tonic et vodka cranberry.
+Licence cocktails de nuit : 190 clients encaissés et 600 euros, après la boîte
+de nuit et la licence vodka et jus ; vodka energy et Nuit Pourpre. Ces deux
+cocktails sont commandés exclusivement par les clients du club.
 Les licences s’achètent dans Tab > Licences. Chaque carte indique les boissons,
 le prix, le nombre de clients requis et les licences préalables éventuelles.
 Une boisson verrouillée propose un lien vers sa licence. Les achats sont
@@ -158,9 +186,25 @@ rapporte sur son socle. Reposez le terminal si vous le portez pour le lui laisse
 Un paiement pris en charge par le serveur ne peut pas être encaissé deux fois.
 Les serveurs déjà recrutés bénéficient de ces fonctions et les tâches en cours
 sont conservées en sauvegarde, y compris le transport du terminal et de la monnaie.
+Responsable de salle : 85 clients, 650 euros, au moins 174 m² et un serveur
+recruté ; salaire de 30 euros par soir. Le serveur se déplace 25 % plus vite
+et la patience des clients diminue 20 % moins vite.
+Second préparateur : 120 clients, 700 euros, au moins 246 m², l’étage et le
+premier préparateur ; salaire de 26 euros par soir. Il prépare une autre
+commande en parallèle, en partageant les stocks et la capacité du plateau.
+DJ résident : 200 clients, 850 euros, au moins 294 m², le club et sa licence
+de cocktails ; salaire de 35 euros par soir. Les boissons servies au club
+rapportent 1 euro de pourboire supplémentaire et le délai entre les arrivées
+de clients diminue de 15 %. Il diffuse une ambiance rythmique instrumentale
+créée dans le jeu, plus discrète hors du club. Son niveau suit le volume
+d’ambiance ; la pause et le mode muet interrompent la musique.
+Agent d’accueil : 210 clients, 550 euros, au moins 294 m² et le club ; salaire
+de 24 euros par soir. La patience baisse 15 % moins vite, en complément du
+responsable de salle. La rubrique Équipe affiche la masse salariale totale,
+la surface requise et les prérequis avant chaque recrutement.
 Les anciennes sauvegardes gardent l’accès aux cocktails.
 Elles conservent aussi leur argent, stocks, employés, commandes et préparations.
-Les trois nouvelles licences restent à acheter et les quatre nouveaux stocks
+Les licences non possédées restent à acheter et les nouveaux stocks
 commencent à zéro : charger une ancienne partie ne donne aucun lot gratuit.
 
 DÉCORATION DU BAR
@@ -169,7 +213,9 @@ les murs, le plafond et le sol. Les finitions proposent différents matériaux
 et couleurs. Le prix et la progression nécessaire figurent sur chaque carte.
 Une finition est payée une seule fois ; réappliquer une finition possédée
 est gratuit. Les changements se font bar fermé, après le départ des clients.
-Le décor s’applique aussi aux salles agrandies et se conserve dans la sauvegarde.
+Le décor s’applique aussi aux salles agrandies et à l’étage, et se conserve
+dans la sauvegarde. Le club reprend vos tables et sièges ; sa piste, ses murs
+et son plafond conservent leur ambiance nocturne dédiée.
 Les anciennes parties retrouvent leur décoration classique gratuitement.
 
 MANETTE ET COMMANDES PERSONNALISÉES

@@ -36,7 +36,9 @@ Les raccourcis de cette notice correspondent aux réglages par défaut.
 Dans **Tablette > Décoration**, choisissez les finitions des tables, chaises,
 murs, plafonds et sols. Chaque finition achetée reste disponible et peut être
 réappliquée gratuitement, entre deux services. Les couleurs et matériaux
-s’appliquent également aux agrandissements et sont conservés dans les sauvegardes.
+s’appliquent également aux agrandissements et à l’étage, et sont conservés dans
+les sauvegardes. Le club reprend les tables et sièges choisis ; ses murs, son
+plafond et sa piste gardent leur ambiance nocturne dédiée.
 
 **Tab** ouvre ou range la tablette. Ses rubriques regroupent les boissons,
 les stocks, le bâtiment, les licences et l’équipe. La rubrique **À préparer**
@@ -76,12 +78,58 @@ nécessitent un bar fermé et aucun client restant.
 | Deuxième agrandissement | 55 | 900 € | Table 6 |
 | Table 7 | 55 | 180 € | Deuxième agrandissement |
 | Table 8 | 75 | 220 € | Table 7 |
+| Étage panoramique avec escalier | 110 | 1 800 € | Deuxième agrandissement et table 8 |
+| Table 9 · Étage | 110 | 200 € | Étage |
+| Table 10 · Étage | 125 | 220 € | Table 9 |
+| Table 11 · Étage | 140 | 240 € | Table 10 |
+| Table 12 · Étage | 155 | 260 € | Table 11 |
+| Boîte de nuit | 180 | 2 600 € | Étage |
+| Table 13 · Club | 180 | 240 € | Boîte de nuit |
+| Table 14 · Club | 195 | 260 € | Table 13 |
+| Table 15 · Club | 210 | 280 € | Table 14 |
+| Table 16 · Club | 225 | 300 € | Table 15 |
 
-Chaque table achetée ajoute une place client. Le bar passe de quatre à huit
-tables et peut accueillir **14 clients** avec les six places du comptoir
+Chaque table achetée ajoute une place client. Le bar passe de quatre à seize
+tables et peut accueillir **22 clients** avec les six places du comptoir
 débloquées. Les salles vides n’augmentent pas la capacité ; la fréquentation
 de départ reste inchangée. Les achats et la position dans les nouvelles
 salles sont conservés dans les sauvegardes.
+
+L’étage ajoute un salon de **54 m²** et un escalier de **18 m²**, pour atteindre
+**246 m²**. Rejoignez l’escalier au fond des annexes et montez à pied pour servir
+les tables 9 à 12. La boîte de nuit ajoute **48 m²** au rez-de-chaussée, au-delà
+de l’escalier, pour un total de **294 m²**. Elle comprend une piste de danse,
+une cabine DJ et les emplacements des tables 13 à 16.
+
+**Service** distingue les tables du rez-de-chaussée, de l’étage et du club.
+La prise de commande, le service et le paiement demandent d’être au même niveau
+que le client. Toutes les préparations restent derrière le comptoir principal.
+
+Les nouvelles licences s’achètent dans **Tablette > Licences** :
+
+| Licence | Déblocage | Prix | Boissons |
+| --- | --- | --- | --- |
+| Cocktails classiques | 45 clients, premier salon, licences cocktails et spiritueux | 260 € | Daiquiri, whisky highball |
+| Vodka et jus | 80 clients, deuxième salon et licence spiritueux | 380 € | Vodka tonic, vodka cranberry |
+| Cocktails de nuit | 190 clients, club et licence vodka et jus | 600 € | Vodka energy, Nuit Pourpre, commandées uniquement dans le club |
+
+La vodka, le jus de cranberry et la boisson énergisante sont à commander et
+à transférer depuis la réserve. Leur déblocage ne fournit aucun stock gratuit.
+
+**Tablette > Équipe** propose aussi des recrutements liés à la surface aménagée :
+
+| Poste | Conditions | Recrutement / salaire par soir | Effet |
+| --- | --- | --- | --- |
+| Responsable de salle | 85 clients, 174 m², deuxième salon et serveur | 650 € / 30 € | Serveur 25 % plus rapide ; patience consommée 20 % moins vite |
+| Second préparateur | 120 clients, 246 m², étage et premier préparateur | 700 € / 26 € | Une deuxième préparation automatique simultanée, stocks et plateau partagés |
+| DJ résident | 200 clients, 294 m², club et licence cocktails de nuit | 850 € / 35 € | 1 € de pourboire supplémentaire par boisson du club ; délai entre les arrivées de clients réduit de 15 % |
+| Agent d’accueil | 210 clients, 294 m² et club | 550 € / 24 € | Patience consommée 15 % moins vite, en complément du responsable de salle |
+
+Les prérequis, salaires et effets restent visibles avant l’achat. La masse
+salariale totale apparaît en haut de la rubrique Équipe.
+Le DJ diffuse une ambiance rythmique instrumentale produite dans le jeu,
+plus discrète hors du club. Le réglage **Ambiance** en contrôle le volume.
+La pause, le mode muet et la perte de focus interrompent la musique.
 
 Les clients s’installent aux tables achetées ou au comptoir, dont les six places
 sont utilisées progressivement. Approchez une table et appuyez sur **E** pour
